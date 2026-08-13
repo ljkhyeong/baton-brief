@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF Event Flows"
+  short_description: "Evolve BRIEF event ingestion safely"
+  default_prompt: "Use $baton-brief-event-flows to define or implement reliable BATON event ingestion for BRIEF."

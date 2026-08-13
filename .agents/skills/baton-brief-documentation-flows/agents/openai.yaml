@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF Documentation"
+  short_description: "Keep BRIEF documentation accurate"
+  default_prompt: "Use $baton-brief-documentation-flows to update BATON BRIEF documentation honestly."

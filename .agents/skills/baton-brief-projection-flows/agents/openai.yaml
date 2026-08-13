@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF Projection Flows"
+  short_description: "Build deterministic attention projections"
+  default_prompt: "Use $baton-brief-projection-flows to change BRIEF attention-item projection and rebuild behavior."

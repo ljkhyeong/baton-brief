@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF Edition Flows"
+  short_description: "Generate immutable BRIEF editions"
+  default_prompt: "Use $baton-brief-edition-flows to implement deterministic immutable brief generation."
