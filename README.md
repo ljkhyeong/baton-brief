@@ -1,89 +1,140 @@
 # BATON BRIEF
 
 BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한 관심 항목으로 투영하고,
-일정 시점의 불변 운영 브리프를 만드는 독립 read-model 서비스다.
+일정 시점의 불변 운영 브리프를 만드는 독립 읽기 모델 서비스다.
 
-> 현재 상태: 저장소와 제품 경계만 만든 초기 스캐폴드다. 런타임, API, 메시지 계약과 기술
-> 스택은 아직 채택하지 않았다.
+> 현재 상태: Kotlin/JDK 21과 PostgreSQL 18.4 기반의 내부 HTTP 이벤트 수신,
+> 투영/재구축과 불변 주간 에디션 로컬 MVP를 구현했다. PostgreSQL 통합 테스트 4개,
+> 전체 테스트·실행 JAR 생성과 Java 21/PostgreSQL 18.4 실행 점검이 통과했다. 운영 배포
+> 구성은 없다.
 
 ## 왜 BRIEF인가
 
 BATON, WATCH, RELAY와 GO는 각각 조직 운영 원본, 자료 상태 점검, 전달, 링크 생명주기를
 소유한다. BRIEF는 그 책임을 복제하지 않고, 여러 시점의 사실을 사용자가 읽고 행동할 수
-있는 하나의 운영 snapshot으로 고정한다.
+있는 하나의 운영 스냅샷으로 고정한다.
 
 ```text
-BATON domain events ──> BRIEF inbox ──> AttentionItem projection
+BATON 도메인 이벤트 ──> BRIEF 수신함 ──> AttentionItem 투영
                                              │
-                                             └─> immutable BriefEdition
+                                             └─> 불변 BriefEdition
                                                         │
                                                         ├─> BATON UI
-                                                        └─> BRIEF_READY -> RELAY (later)
+                                                        └─> BRIEF_READY -> RELAY (향후)
 ```
 
-WATCH의 health 사실은 WATCH 데이터베이스에서 직접 읽지 않는다. BATON이 수신하고
+WATCH의 상태 사실은 WATCH 데이터베이스에서 직접 읽지 않는다. BATON이 수신하고
 정규화한 권위 있는 도메인 이벤트를 통해서만 BRIEF로 전달한다.
 
 ## 서비스 경계
 
 BRIEF가 소유한다.
 
-- source event inbox와 멱등 처리 결과
-- workspace/season별 `AttentionItem` read model
-- 선정 규칙 버전, 이유 코드, 심각도와 원본 reference
-- generation cursor, source watermark와 rebuild 상태
-- 생성 시점의 항목을 고정한 immutable `BriefEdition`
-- edition 생성 성공·실패와 재생 가능한 운영 증거
+- 원본 이벤트 수신함과 멱등 처리 결과
+- 작업공간/시즌별 `AttentionItem` 읽기 모델
+- 선정 규칙 버전, 이유 코드, 심각도와 원본 참조
+- 작업공간/시즌의 `generation`, 로컬 수신 기록 `sourceCursor`와 재구축 상태
+- 생성 시점의 항목을 고정한 불변 `BriefEdition`
+- 에디션 생성 성공·실패와 재생 가능한 운영 증거
 
 BRIEF가 소유하지 않는다.
 
 - 팀, 시즌, 역할, 루틴, 결정, 인수인계와 최종 권한: BATON
-- URL 점검 일정, 시도, 결과와 현재 health: BATON WATCH
-- 구독, 채널, provider binding, 전송 retry와 결과: BATON RELAY
-- 공개 코드, 만료, 폐기와 redirect: BATON GO
+- URL 점검 일정, 시도, 결과와 현재 상태: BATON WATCH
+- 구독, 채널, 제공자 연결, 전송 재시도와 결과: BATON RELAY
+- 공개 코드, 만료, 폐기와 리디렉션: BATON GO
 - 운영 사실의 최종 판정이나 원본 감사 사건
 
 ## 첫 MVP
 
-1. BATON이 after-commit으로 발행한 소수의 versioned event만 수신한다.
+1. BATON이 커밋 후 발행한 소수의 버전이 있는 이벤트만 수신한다.
 2. `reasonCode`, `severity`, `sourceReference`, `observedAt`을 가진 설명 가능한
    `AttentionItem`을 만든다.
-3. workspace/season 단위의 주간 `BriefEdition`을 결정적으로 생성한다.
-4. 최신 edition과 특정 edition을 조회한다.
-5. 정확한 event replay를 멱등 처리하고 projection 전체 rebuild를 지원한다.
-6. 첫 소비자는 BATON UI로 제한한다. AI 요약과 외부 provider 전달은 포함하지 않는다.
+3. 작업공간/시즌 단위의 주간 `BriefEdition`을 결정적으로 생성한다.
+4. 최신 에디션과 특정 에디션을 조회한다.
+5. 동일 이벤트 재생을 멱등 처리하고 투영 전체 재구축을 지원한다.
+6. 첫 소비자는 BATON UI로 제한한다. AI 요약과 외부 제공자 전달은 포함하지 않는다.
 
 ## 설계 원칙
 
-- 서비스별 데이터베이스를 유지하고 다른 서비스의 테이블이나 entity를 공유하지 않는다.
-- 외부 I/O는 source transaction 안에서 수행하지 않는다.
-- at-least-once 수신, 중복, 지연 도착과 재생을 정상 흐름으로 다룬다.
-- 시간 의존 규칙에는 주입 가능한 `Clock`과 명시적인 timezone을 사용한다.
-- edition은 생성 후 수정하지 않는다. 정정은 새 edition 또는 명시적인 supersession으로
+- 서비스별 데이터베이스를 유지하고 다른 서비스의 테이블이나 엔티티를 공유하지 않는다.
+- 외부 I/O는 원본 트랜잭션 안에서 수행하지 않는다.
+- 최소 한 번 수신, 중복, 지연 도착과 재생을 정상 흐름으로 다룬다.
+- 시간 의존 규칙에는 주입 가능한 `Clock`과 명시적인 시간대를 사용한다.
+- 에디션은 생성 후 수정하지 않는다. 정정은 새 에디션 또는 명시적인 대체 관계로
   표현한다.
-- 사람에게 보이는 문장만 저장하지 않고 안정적인 이유 코드와 source reference를 함께
+- 사람에게 보이는 문장만 저장하지 않고 안정적인 이유 코드와 원본 참조를 함께
   보존한다.
-- PII, credential, provider address와 원문 secret을 event, 로그, metric label에 넣지 않는다.
+- 개인 식별 정보(PII), 자격 증명, 제공자 주소와 원문 비밀 값을 이벤트, 로그, 메트릭
+  레이블에 넣지 않는다.
 
-## 착수 전에 채택할 계약
+## 채택한 로컬 MVP 계약
 
-- BATON domain-event envelope, event version과 transactional outbox
-- source ordering이 아니라 aggregate revision을 사용하는 projection 규칙
-- replay, retention, rebuild와 poison-event 처리
-- BATON membership 기반 조회 권한
-- 향후 `BRIEF_READY`를 RELAY에 전달하는 작은 reference-only 계약
-- 향후 GO deep link가 필요할 때의 허용 locator 계약
+- 인증 없는 내부 HTTP로 이벤트 v1을 수신한다.
+- `HANDOFF_BLOCKED`, `ROUTINE_MISSED`, `DECISION_FOLLOW_UP_OVERDUE`를 규칙 v1로
+  결정적으로 투영한다.
+- 이벤트 지문과 집계 리비전으로 `DUPLICATE`, `CONFLICT`, `STALE`과 리비전 공백을 구분한다.
+- IANA 시간대의 월요일 시작 주간 구간과 수신 기록 `sourceCursor`로 불변 에디션을
+  생성한다.
+- 투영 재구축, 최신 에디션과 특정 에디션 조회를 제공한다.
+- 이벤트와 생성 시각은 PostgreSQL `TIMESTAMPTZ` 의미와 맞게 마이크로초로 정규화하고,
+  HTTP 시간·날짜·시간대 입력은 엄격한 문자열 형식으로 검증한다.
+
+정확한 경로, 필드, 결과와 비목표는
+[MVP 계약](docs/PRD/0002_mvp-contract/spec.md)을 따른다. 인증·인가, 브로커, 스케줄러,
+생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 문서
 
 - [제품 기준](docs/PRD/0001_product-baseline/spec.md)
+- [MVP 이벤트·투영·에디션 계약](docs/PRD/0002_mvp-contract/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
-- [다음 작업](HANDOFF.md)
+- [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
+- [인수인계](HANDOFF.md)
 
 ## 기술 스택
 
-아직 결정하지 않았다. 첫 입력 이벤트 계약과 projection 불변식을 정한 뒤, BATON
-생태계의 운영 비용과 독립 배포 필요성을 기준으로 선택한다.
+ADR-0002에서 다음 기준을 채택했다.
+
+- Kotlin/JVM 2.3.21, Java 21 도구 체인·JVM 21 바이트코드 대상·JDK 21 실행 환경
+- Spring Boot/BOM 4.1.0, Gradle wrapper 9.2.1과 Kotlin DSL
+- PostgreSQL 18.4
+- Spring JDBC `JdbcClient`와 Flyway 마이그레이션, JPA 미사용
+- Spring Boot BOM으로 버전을 관리하는 JUnit Jupiter, AssertJ와 PostgreSQL Testcontainers
+- `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap`의 다섯
+  Gradle 모듈
+
+의존은 `bootstrap`과 어댑터에서 `application`, 다시 `domain` 쪽으로만 향한다. 두
+어댑터는 서로 의존하지 않고 안쪽 모듈은 바깥쪽 모듈을 참조하지 않는다.
+
+Java 25 호환 빌드와 기동은 검토 과정에서 확인했지만 MVP에 필요한 기능상 이점이나
+고정된 CI/실행 이미지 기준이 없어 Java 21을 채택했다. 특정 JDK 공급자, 실행
+컨테이너 이미지와 운영 배포 방식은 아직 채택하지 않았다. 현재 구현·검증 상태는
+`HANDOFF.md`에 기록한다.
+
+## 로컬 데이터베이스
+
+로컬 PostgreSQL 18.4는 저장소의 `compose.yml`로 준비한다.
+
+```shell
+docker compose up -d --wait postgres
+./gradlew :bootstrap:bootRun
+```
+
+기본 연결은 `jdbc:postgresql://localhost:5432/baton_brief`, 사용자와 비밀번호는 각각
+`brief`이며 Flyway는 기본 활성화된다. 다른 환경에서는 Spring Boot 표준 환경변수
+`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`와
+`SPRING_FLYWAY_ENABLED`로 덮어쓴다. `BRIEF_DB_PORT`는 Compose가 호스트에 공개할 PostgreSQL
+포트만 바꾸며, 바꾼 경우 데이터 원본 URL도 같은 포트로 지정해야 한다.
+
+PostgreSQL 18 공식 이미지의 데이터 디렉터리에 맞춰 이름 있는 볼륨은
+`/var/lib/postgresql`에 마운트한다.
+
+이 구성은 로컬 개발용이며 운영 배포 구성을 뜻하지 않는다.
+
+현재 검증은 MockMvc 기반 HTTP 통합 테스트와 비웹 실행 JAR 기동이다. 실제 네트워크를 통한
+BATON 생산자 연동이나 운영 배포를 검증한 것은 아니다. 상세한 실행 증거와 남은
+범위는 `HANDOFF.md`에 기록한다.
 
 ## 라이선스
 
