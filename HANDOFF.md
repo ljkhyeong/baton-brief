@@ -1,6 +1,7 @@
 # 인수인계
 
-내부 HTTP 이벤트 수신, 투영/재구축과 불변 주간 에디션 로컬 MVP 구현을 완료했다.
+내부 HTTP 이벤트 수신, 투영/재구축, 불변 주간 에디션과 에디션 이력 조회 로컬 MVP 구현을
+완료했다.
 PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행 점검까지 통과했다.
 
 ## 채택한 기반
@@ -17,6 +18,8 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
   다섯 개이며 의존은 어댑터에서 `application`, 다시 `domain` 쪽으로만 향한다.
 - PRD-0002에서 인증 없는 내부 HTTP API, 이벤트 v1 봉투와 결과, 규칙 v1 투영,
   리비전 공백/오래된 리비전 처리, 재구축과 불변 주간 에디션 계약을 채택했다.
+- PRD-0003에서 작업공간·시즌별 에디션 요약을 `generation` 배타 키셋으로 조회하는 내부
+  HTTP 계약을 채택했다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -32,7 +35,8 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
    작업공간/시즌 `generation`으로 불변 에디션을 생성한다. 같은 요청 범위의 직전 상태는
    멱등하게 재사용하고, `A → B → A`처럼 상태가 되돌아오면 과거 에디션을 재사용하지 않고
    새 세대를 만든다.
-5. 최신 에디션과 단건 에디션 조회는 저장한 고정 스냅샷을 반환한다.
+5. 최신·단건 에디션 조회는 저장한 고정 스냅샷을 반환하고, 에디션 이력은
+   `generation` 내림차순 요약과 배타적 다음 커서를 반환한다.
 6. 이벤트·생성 시각을 PostgreSQL `TIMESTAMPTZ` 의미와 맞게 마이크로초로 정규화하고,
    `occurredAt`, `weekStart`, `zoneId`의 HTTP 표현을 엄격하게 검증한다.
 
@@ -41,11 +45,11 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
 
 ## 현재 검증
 
-- `./gradlew --no-daemon :bootstrap:test --tests com.personal.baton.brief.BriefMvpIntegrationTest --rerun-tasks`:
+- `./gradlew --no-daemon :bootstrap:test --tests com.personal.baton.brief.BriefMvpIntegrationTest`:
   성공, PostgreSQL 18.4 Testcontainers에서 Flyway V1·V2를 적용하고 통합 시나리오 4개 통과
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백과 이벤트별 충돌 증거 상한
-  - 에디션 멱등성·불변성·`generation`/최신 조회, `A → B → A` 상태 회귀, 재구축 재현성과
-    마이크로초 구간 경계
+  - 에디션 멱등성·불변성·`generation`/최신 조회, `A → B → A` 상태 회귀, 이력 키셋
+    페이지·범위 격리·항목 수, 재구축 재현성과 마이크로초 구간 경계
   - 엄격한 HTTP 표현 검증과 없는 에디션의 `404`
   - 동시 중복 수신과 동시 에디션 생성
 - `docker compose config`: 성공. `postgres:18.4-alpine`, 상태 확인과 이름 있는 볼륨의

@@ -4,7 +4,7 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 일정 시점의 불변 운영 브리프를 만드는 독립 읽기 모델 서비스다.
 
 > 현재 상태: Kotlin/JDK 21과 PostgreSQL 18.4 기반의 내부 HTTP 이벤트 수신,
-> 투영/재구축과 불변 주간 에디션 로컬 MVP를 구현했다. PostgreSQL 통합 테스트 4개,
+> 투영/재구축, 불변 주간 에디션과 에디션 이력 조회 로컬 MVP를 구현했다. PostgreSQL 통합 테스트 4개,
 > 전체 테스트·실행 JAR 생성과 Java 21/PostgreSQL 18.4 실행 점검이 통과했다. 운영 배포
 > 구성은 없다.
 
@@ -51,7 +51,7 @@ BRIEF가 소유하지 않는다.
 2. `reasonCode`, `severity`, `sourceReference`, `observedAt`을 가진 설명 가능한
    `AttentionItem`을 만든다.
 3. 작업공간/시즌 단위의 주간 `BriefEdition`을 결정적으로 생성한다.
-4. 최신 에디션과 특정 에디션을 조회한다.
+4. 최신·특정 에디션과 작업공간·시즌별 에디션 이력을 조회한다.
 5. 동일 이벤트 재생을 멱등 처리하고 투영 전체 재구축을 지원한다.
 6. 첫 소비자는 BATON UI로 제한한다. AI 요약과 외부 제공자 전달은 포함하지 않는다.
 
@@ -77,18 +77,19 @@ BRIEF가 소유하지 않는다.
 - IANA 시간대의 월요일 시작 주간 구간과 수신 기록 `sourceCursor`로 불변 에디션을
   생성한다. 같은 요청 범위의 직전 상태는 멱등하게 재사용하고, 상태가 바뀌었다가 과거
   상태로 돌아오면 새 `generation`으로 기록한다.
-- 투영 재구축, 최신 에디션과 특정 에디션 조회를 제공한다.
+- 투영 재구축, 최신·특정 에디션 조회와 `generation` 기반 에디션 이력 페이지를 제공한다.
 - 이벤트와 생성 시각은 PostgreSQL `TIMESTAMPTZ` 의미와 맞게 마이크로초로 정규화하고,
   HTTP 시간·날짜·시간대 입력은 엄격한 문자열 형식으로 검증한다.
 
-정확한 경로, 필드, 결과와 비목표는
-[MVP 계약](docs/PRD/0002_mvp-contract/spec.md)을 따른다. 인증·인가, 브로커, 스케줄러,
-생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
+정확한 경로, 필드, 결과와 비목표는 [MVP 계약](docs/PRD/0002_mvp-contract/spec.md)과
+[에디션 이력 조회 계약](docs/PRD/0003_edition-history/spec.md)을 따른다. 인증·인가, 브로커,
+스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 문서
 
 - [제품 기준](docs/PRD/0001_product-baseline/spec.md)
 - [MVP 이벤트·투영·에디션 계약](docs/PRD/0002_mvp-contract/spec.md)
+- [불변 에디션 이력 조회 계약](docs/PRD/0003_edition-history/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)
