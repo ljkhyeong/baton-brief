@@ -4,9 +4,9 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 일정 시점의 불변 운영 브리프를 만드는 독립 읽기 모델 서비스다.
 
 > 현재 상태: Kotlin/JDK 21과 PostgreSQL 18.4 기반의 내부 HTTP 이벤트 수신,
-> 투영/재구축, 불변 주간 에디션과 에디션 이력 조회 로컬 MVP를 구현했다. PostgreSQL 통합 테스트 4개,
-> 전체 테스트·실행 JAR 생성과 Java 21/PostgreSQL 18.4 실행 점검이 통과했다. 운영 배포
-> 구성은 없다.
+> 투영/재구축, 불변 주간 에디션, 에디션 이력 조회와 표준 요청 오류 응답 로컬 MVP를
+> 구현했다. PostgreSQL 통합 테스트 4개, 전체 테스트·실행 JAR 생성과 Java 21/PostgreSQL
+> 18.4 실행 점검이 통과했다. 운영 배포 구성은 없다.
 
 ## 왜 BRIEF인가
 
@@ -78,11 +78,13 @@ BRIEF가 소유하지 않는다.
   생성한다. 같은 요청 범위의 직전 상태는 멱등하게 재사용하고, 상태가 바뀌었다가 과거
   상태로 돌아오면 새 `generation`으로 기록한다.
 - 투영 재구축, 최신·특정 에디션 조회와 `generation` 기반 에디션 이력 페이지를 제공한다.
+- 요청 검증 실패와 명시적 미존재 응답은 RFC 9457 `ProblemDetail` 형식으로 제공한다.
 - 이벤트와 생성 시각은 PostgreSQL `TIMESTAMPTZ` 의미와 맞게 마이크로초로 정규화하고,
   HTTP 시간·날짜·시간대 입력은 엄격한 문자열 형식으로 검증한다.
 
-정확한 경로, 필드, 결과와 비목표는 [MVP 계약](docs/PRD/0002_mvp-contract/spec.md)과
-[에디션 이력 조회 계약](docs/PRD/0003_edition-history/spec.md)을 따른다. 인증·인가, 브로커,
+정확한 경로, 필드, 결과와 비목표는 [MVP 계약](docs/PRD/0002_mvp-contract/spec.md),
+[에디션 이력 조회 계약](docs/PRD/0003_edition-history/spec.md)과
+[표준 요청 오류 계약](docs/PRD/0004_problem-detail/spec.md)을 따른다. 인증·인가, 브로커,
 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 문서
@@ -90,6 +92,7 @@ BRIEF가 소유하지 않는다.
 - [제품 기준](docs/PRD/0001_product-baseline/spec.md)
 - [MVP 이벤트·투영·에디션 계약](docs/PRD/0002_mvp-contract/spec.md)
 - [불변 에디션 이력 조회 계약](docs/PRD/0003_edition-history/spec.md)
+- [표준 요청 오류 응답 계약](docs/PRD/0004_problem-detail/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)
