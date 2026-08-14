@@ -6,6 +6,7 @@ import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.ProjectionDecision
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.WeeklyWindow
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -42,6 +43,22 @@ data class EditionResult(
     val created: Boolean,
 )
 
+data class EditionSummary(
+    val editionId: UUID,
+    val generation: Long,
+    val weekStart: LocalDate,
+    val zoneId: ZoneId,
+    val generatedAt: Instant,
+    val sourceCursor: Long,
+    val ruleVersion: Int,
+    val itemCount: Int,
+)
+
+data class EditionHistoryResult(
+    val editions: List<EditionSummary>,
+    val nextBeforeGeneration: Long?,
+)
+
 data class EditionContent(
     val items: List<BriefEditionItem>,
     val stateFingerprint: String,
@@ -60,6 +77,13 @@ interface BriefUseCases {
         workspaceId: UUID,
         seasonId: UUID,
     ): BriefEdition?
+
+    fun findEditionHistory(
+        workspaceId: UUID,
+        seasonId: UUID,
+        beforeGeneration: Long?,
+        limit: Int,
+    ): EditionHistoryResult
 }
 
 interface BriefPersistencePort {
@@ -91,4 +115,11 @@ interface BriefPersistencePort {
         workspaceId: UUID,
         seasonId: UUID,
     ): BriefEdition?
+
+    fun findEditionHistory(
+        workspaceId: UUID,
+        seasonId: UUID,
+        beforeGeneration: Long?,
+        limit: Int,
+    ): EditionHistoryResult
 }

@@ -1,5 +1,7 @@
 package com.personal.baton.brief.web
 
+import com.personal.baton.brief.application.EditionHistoryResult
+import com.personal.baton.brief.application.EditionSummary
 import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
@@ -166,6 +168,42 @@ data class BriefEditionResponse(
             generatedAt = edition.generatedAt,
             ruleVersion = edition.ruleVersion,
             items = edition.items.map(EditionItemResponse::from),
+        )
+    }
+}
+
+data class EditionSummaryResponse(
+    val editionId: UUID,
+    val generation: Long,
+    val weekStart: LocalDate,
+    val zoneId: String,
+    val generatedAt: Instant,
+    val sourceCursor: Long,
+    val ruleVersion: Int,
+    val itemCount: Int,
+) {
+    companion object {
+        fun from(summary: EditionSummary): EditionSummaryResponse = EditionSummaryResponse(
+            editionId = summary.editionId,
+            generation = summary.generation,
+            weekStart = summary.weekStart,
+            zoneId = summary.zoneId.id,
+            generatedAt = summary.generatedAt,
+            sourceCursor = summary.sourceCursor,
+            ruleVersion = summary.ruleVersion,
+            itemCount = summary.itemCount,
+        )
+    }
+}
+
+data class EditionHistoryResponse(
+    val editions: List<EditionSummaryResponse>,
+    val nextBeforeGeneration: Long?,
+) {
+    companion object {
+        fun from(result: EditionHistoryResult): EditionHistoryResponse = EditionHistoryResponse(
+            editions = result.editions.map(EditionSummaryResponse::from),
+            nextBeforeGeneration = result.nextBeforeGeneration,
         )
     }
 }

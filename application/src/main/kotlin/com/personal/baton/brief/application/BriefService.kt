@@ -55,6 +55,18 @@ class BriefService(
         seasonId: UUID,
     ): BriefEdition? = persistence.findLatestEdition(workspaceId, seasonId)
 
+    override fun findEditionHistory(
+        workspaceId: UUID,
+        seasonId: UUID,
+        beforeGeneration: Long?,
+        limit: Int,
+    ): EditionHistoryResult = persistence.findEditionHistory(
+        workspaceId,
+        seasonId,
+        beforeGeneration,
+        limit,
+    )
+
     private fun selectEditionContent(items: List<AttentionItem>): EditionContent {
         val selected = items
             .asSequence()

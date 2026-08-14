@@ -4,6 +4,9 @@ import com.personal.baton.brief.application.BriefUseCases
 import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.Positive
 import java.net.URI
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -13,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 
@@ -65,6 +69,16 @@ class BriefController(
     ): BriefEditionResponse = brief.findLatestEdition(workspaceId, seasonId)
         ?.let(BriefEditionResponse::from)
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
+
+    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions")
+    fun findEditionHistory(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @RequestParam("beforeGeneration", required = false) @Positive beforeGeneration: Long?,
+        @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
+    ): EditionHistoryResponse = EditionHistoryResponse.from(
+        brief.findEditionHistory(workspaceId, seasonId, beforeGeneration, limit),
+    )
 
     @GetMapping("/editions/{editionId}")
     fun findEdition(

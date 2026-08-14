@@ -2,7 +2,9 @@ package com.personal.baton.brief.persistence
 
 import com.personal.baton.brief.application.BriefPersistencePort
 import com.personal.baton.brief.application.EditionContent
+import com.personal.baton.brief.application.EditionHistoryResult
 import com.personal.baton.brief.application.EditionResult
+import com.personal.baton.brief.application.EditionSummary
 import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
@@ -165,6 +167,63 @@ class JdbcBriefPersistenceAdapter(
         "WHERE workspace_id = :workspaceId AND season_id = :seasonId ORDER BY generation DESC LIMIT 1",
         mapOf("workspaceId" to workspaceId, "seasonId" to seasonId),
     )
+
+    override fun findEditionHistory(
+        workspaceId: UUID,
+        seasonId: UUID,
+        beforeGeneration: Long?,
+        limit: Int,
+    ): EditionHistoryResult {
+        val beforeClause = if (beforeGeneration == null) {
+            ""
+        } else {
+            "AND edition.generation < :beforeGeneration"
+        }
+        val parameters = mutableMapOf<String, Any>(
+            "workspaceId" to workspaceId,
+            "seasonId" to seasonId,
+            "fetchLimit" to limit + 1,
+        )
+        if (beforeGeneration != null) {
+            parameters["beforeGeneration"] = beforeGeneration
+        }
+
+        val summaries = jdbc.sql(
+            """
+            SELECT edition.edition_id, edition.generation, edition.week_start, edition.zone_id,
+                   edition.generated_at, edition.source_cursor, edition.rule_version,
+                   (
+                       SELECT COUNT(*)
+                         FROM brief_edition_item item
+                        WHERE item.edition_id = edition.edition_id
+                   ) AS item_count
+              FROM brief_edition edition
+             WHERE edition.workspace_id = :workspaceId
+               AND edition.season_id = :seasonId
+               $beforeClause
+             ORDER BY edition.generation DESC
+             LIMIT :fetchLimit
+            """.trimIndent(),
+        ).params(parameters)
+            .query { result, _ ->
+                EditionSummary(
+                    editionId = result.getObject("edition_id", UUID::class.java),
+                    generation = result.getLong("generation"),
+                    weekStart = result.getObject("week_start", LocalDate::class.java),
+                    zoneId = ZoneId.of(result.getString("zone_id")),
+                    generatedAt = result.instant("generated_at"),
+                    sourceCursor = result.getLong("source_cursor"),
+                    ruleVersion = result.getInt("rule_version"),
+                    itemCount = result.getInt("item_count"),
+                )
+            }.list()
+        val hasNextPage = summaries.size > limit
+        val editions = if (hasNextPage) summaries.take(limit) else summaries
+        return EditionHistoryResult(
+            editions = editions,
+            nextBeforeGeneration = if (hasNextPage) editions.last().generation else null,
+        )
+    }
 
     private fun findReceiptFingerprint(eventId: UUID): String? = jdbc.sql(
         "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
