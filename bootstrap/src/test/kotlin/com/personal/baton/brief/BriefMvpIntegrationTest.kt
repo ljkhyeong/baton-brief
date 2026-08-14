@@ -187,18 +187,45 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items.length()").value(1))
             .andExpect(jsonPath("$.items[0].reasonCode").value("ROUTINE_MISSED"))
 
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000005",
+                workspaceId,
+                seasonId,
+                blockedReference,
+                3,
+                occurredAt = "2026-08-09T15:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+
+        val recurringStateResult = postEdition(generationPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(3))
+            .andExpect(jsonPath("$.sourceCursor").value(5))
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andReturn()
+        val recurringStateEditionId = JsonPath.read<String>(
+            recurringStateResult.response.contentAsString,
+            "$.editionId",
+        )
+        assertThat(recurringStateEditionId).isNotEqualTo(firstEditionId)
+
+        postEdition(generationPath, editionRequest)
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editionId").value(recurringStateEditionId))
+
         mockMvc.perform(get("$generationPath/latest"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.generation").value(2))
+            .andExpect(jsonPath("$.generation").value(3))
 
         mockMvc.perform(post("/api/v1/projections/rebuild"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.receiptCount").value(4))
+            .andExpect(jsonPath("$.receiptCount").value(5))
             .andExpect(jsonPath("$.itemCount").value(3))
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.generation").value(2))
+            .andExpect(jsonPath("$.editionId").value(recurringStateEditionId))
 
         val rebuiltSnapshot = mockMvc.perform(get("/api/v1/editions/$firstEditionId"))
             .andExpect(status().isOk)
