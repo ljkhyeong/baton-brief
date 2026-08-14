@@ -5,6 +5,7 @@ import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -210,6 +211,34 @@ class BriefMvpIntegrationTest(
         )
         assertThat(recurringStateEditionId).isNotEqualTo(firstEditionId)
 
+        mockMvc.perform(get(generationPath).param("limit", "2"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions.length()").value(2))
+            .andExpect(jsonPath("$.editions[0].editionId").value(recurringStateEditionId))
+            .andExpect(jsonPath("$.editions[0].generation").value(3))
+            .andExpect(jsonPath("$.editions[0].itemCount").value(2))
+            .andExpect(jsonPath("$.editions[1].generation").value(2))
+            .andExpect(jsonPath("$.editions[1].itemCount").value(1))
+            .andExpect(jsonPath("$.nextBeforeGeneration").value(2))
+
+        mockMvc.perform(
+            get(generationPath)
+                .param("beforeGeneration", "2")
+                .param("limit", "2"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions.length()").value(1))
+            .andExpect(jsonPath("$.editions[0].editionId").value(firstEditionId))
+            .andExpect(jsonPath("$.editions[0].generation").value(1))
+            .andExpect(jsonPath("$.editions[0].itemCount").value(2))
+            .andExpect(jsonPath("$.nextBeforeGeneration").value(nullValue()))
+
+        val emptyScopePath =
+            "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/editions"
+        mockMvc.perform(get(emptyScopePath))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions").isEmpty)
+            .andExpect(jsonPath("$.nextBeforeGeneration").value(nullValue()))
+
         postEdition(generationPath, editionRequest)
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.editionId").value(recurringStateEditionId))
@@ -254,6 +283,13 @@ class BriefMvpIntegrationTest(
         postEdition(path, """{"weekStart":"2026-08-11","zoneId":"Asia/Seoul"}""")
             .andExpect(status().isBadRequest)
         postEdition(path, """{"weekStart":"2026-08-10","zoneId":"+09:00"}""")
+            .andExpect(status().isBadRequest)
+
+        mockMvc.perform(get(path).param("beforeGeneration", "0"))
+            .andExpect(status().isBadRequest)
+        mockMvc.perform(get(path).param("limit", "0"))
+            .andExpect(status().isBadRequest)
+        mockMvc.perform(get(path).param("limit", "101"))
             .andExpect(status().isBadRequest)
 
         mockMvc.perform(get("$path/latest")).andExpect(status().isNotFound)
