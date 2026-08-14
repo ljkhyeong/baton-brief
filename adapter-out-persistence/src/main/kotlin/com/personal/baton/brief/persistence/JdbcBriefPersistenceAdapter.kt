@@ -130,7 +130,7 @@ class JdbcBriefPersistenceAdapter(
 
         val candidates = findAttentionForWindow(command, window)
         val content = selectContent(candidates)
-        findEditionByState(command, content.stateFingerprint)?.let { existing ->
+        findLatestEditionByState(command, content.stateFingerprint)?.let { existing ->
             return EditionResult(existing, created = false)
         }
 
@@ -331,7 +331,7 @@ class JdbcBriefPersistenceAdapter(
         .query(Long::class.java)
         .single()
 
-    private fun findEditionByState(
+    private fun findLatestEditionByState(
         command: GenerateEditionCommand,
         stateFingerprint: String,
     ): BriefEdition? = findEditionRow(
@@ -342,6 +342,15 @@ class JdbcBriefPersistenceAdapter(
           AND zone_id = :zoneId
           AND rule_version = :ruleVersion
           AND state_fingerprint = :stateFingerprint
+          AND generation = (
+              SELECT MAX(latest.generation)
+                FROM brief_edition latest
+               WHERE latest.workspace_id = :workspaceId
+                 AND latest.season_id = :seasonId
+                 AND latest.week_start = :weekStart
+                 AND latest.zone_id = :zoneId
+                 AND latest.rule_version = :ruleVersion
+          )
         """.trimIndent(),
         mapOf(
             "workspaceId" to command.workspaceId,
