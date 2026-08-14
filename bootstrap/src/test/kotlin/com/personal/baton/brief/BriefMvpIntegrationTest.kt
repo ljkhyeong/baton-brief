@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.junit.jupiter.Container
@@ -272,6 +273,11 @@ class BriefMvpIntegrationTest(
 
         postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1, eventVersion = 0))
             .andExpect(status().isBadRequest)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.title").value("Bad Request"))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.detail").isNotEmpty)
+            .andExpect(jsonPath("$.instance").value("/api/v1/events"))
 
         val numericInstant = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
             .replace("\"occurredAt\": \"2026-08-12T09:00:00Z\"", "\"occurredAt\": 1786525200")
@@ -295,6 +301,13 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(get("$path/latest")).andExpect(status().isNotFound)
         mockMvc.perform(get("/api/v1/editions/50000000-0000-0000-0000-000000000001"))
             .andExpect(status().isNotFound)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.detail").isNotEmpty)
+            .andExpect(
+                jsonPath("$.instance")
+                    .value("/api/v1/editions/50000000-0000-0000-0000-000000000001"),
+            )
     }
 
     @Test
