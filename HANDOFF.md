@@ -29,7 +29,9 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
 3. 재구축이 수락된 수신 기록으로 현재 투영만 원자적으로 재생성하고 기존 에디션을
    보존한다.
 4. 월요일 시작 IANA 시간대 구간, 로컬 수신 기록 `sourceCursor`, 상태 지문과
-   작업공간/시즌 `generation`으로 불변 에디션을 생성한다.
+   작업공간/시즌 `generation`으로 불변 에디션을 생성한다. 같은 요청 범위의 직전 상태는
+   멱등하게 재사용하고, `A → B → A`처럼 상태가 되돌아오면 과거 에디션을 재사용하지 않고
+   새 세대를 만든다.
 5. 최신 에디션과 단건 에디션 조회는 저장한 고정 스냅샷을 반환한다.
 6. 이벤트·생성 시각을 PostgreSQL `TIMESTAMPTZ` 의미와 맞게 마이크로초로 정규화하고,
    `occurredAt`, `weekStart`, `zoneId`의 HTTP 표현을 엄격하게 검증한다.
@@ -40,9 +42,10 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
 ## 현재 검증
 
 - `./gradlew --no-daemon :bootstrap:test --tests com.personal.baton.brief.BriefMvpIntegrationTest --rerun-tasks`:
-  성공, PostgreSQL 18.4 Testcontainers 기반 통합 시나리오 4개 통과
+  성공, PostgreSQL 18.4 Testcontainers에서 Flyway V1·V2를 적용하고 통합 시나리오 4개 통과
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백과 이벤트별 충돌 증거 상한
-  - 에디션 멱등성·불변성·`generation`/최신 조회, 재구축 재현성과 마이크로초 구간 경계
+  - 에디션 멱등성·불변성·`generation`/최신 조회, `A → B → A` 상태 회귀, 재구축 재현성과
+    마이크로초 구간 경계
   - 엄격한 HTTP 표현 검증과 없는 에디션의 `404`
   - 동시 중복 수신과 동시 에디션 생성
 - `docker compose config`: 성공. `postgres:18.4-alpine`, 상태 확인과 이름 있는 볼륨의
@@ -52,6 +55,10 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
 - `java -jar bootstrap/build/libs/bootstrap-0.1.0-SNAPSHOT.jar --spring.main.web-application-type=none`:
   Java 21.0.10에서 Compose PostgreSQL 18.4에 연결해 성공. Flyway가 V1 마이그레이션을
   검증·적용했고 Spring 컨텍스트가 시작됨
+
+위 비웹 실행 JAR 점검은 V2 추가 전 V1 기준이다. V2는 PostgreSQL 18.4 통합 테스트에서
+실제 적용했고 현재 실행 JAR 생성까지 확인했으며, 같은 실행 환경 기동은 중복 수행하지
+않았다.
 
 실행 점검은 비웹 모드이므로 실제 수신 포트를 통한 HTTP 네트워크 동작은 입증하지 않는다.
 HTTP 경로와 영속성 동작은 위 PostgreSQL Testcontainers·MockMvc 통합 시나리오가 입증한다.
