@@ -55,8 +55,13 @@
 - 의존은 `bootstrap`/어댑터 -> `application` -> `domain`으로만 향하게 한다. 두 어댑터가
   서로 의존하거나 안쪽 모듈이 어댑터/`bootstrap`을 참조하게 하지 않는다.
 - PRD-0002의 이벤트·투영·에디션 경로, PRD-0003의 에디션 이력 경로, PRD-0004의 표준
-  요청 오류 표현과 PRD-0005의 에디션 비교 경로, 인증 없는 로컬 MVP 경계를 따른다. 이를
-  운영 인증·인가가 결정되거나 외부 공개가 허용된 것으로 확대 해석하지 않는다.
+  요청 오류 표현, PRD-0005의 에디션 비교 경로와 PRD-0006의 최소 상태 확인 경계,
+  인증 없는 로컬 MVP 경계를 따른다. 이를 운영 인증·인가가 결정되거나 외부 공개가
+  허용된 것으로 확대 해석하지 않는다.
+- 최소 상태 확인은 Spring Boot Actuator의 표준 aggregate health와 자동 구성된 DB
+  contributor를 사용한다. 커스텀 controller, DTO, `HealthIndicator`와 확인 SQL을 만들지
+  않는다. Spring Boot 4.1의 health probes 기본값은 `true`이므로 배포 계약을 채택하기
+  전에는 표준 속성으로 비활성 상태를 유지한다.
 - 브로커, 스케줄러, 원본 생산자 변경, 외부 시스템 연동 어댑터와 운영 배포는
   아직 결정된 것으로 가정하지 않는다.
 - 로컬 PostgreSQL은 `compose.yml`을 사용한다. 애플리케이션 설정에는 Spring Boot 표준

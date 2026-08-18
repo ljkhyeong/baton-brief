@@ -18,6 +18,8 @@ description: BATON BRIEF 문서화 작업 절차. 제품 코드를 주로 변경
   경계를 기록한다.
 - PRD-0005에는 두 불변 에디션의 비교 키, 추가·제거·변경 의미, 기준·대상별 순서와
   읽기 전용 범위를 기록한다.
+- PRD-0006에는 Spring Boot 표준 aggregate health의 로컬 노출 경계, 상세 비노출,
+  배포 probe 제외와 운영 비목표를 기록한다.
 - ADR에는 채택한 장기 아키텍처, 기술, 전송, 저장, 보안 또는 운영 결정과
   그 장단점만 기록한다.
 - ADR-0002를 채택한 Kotlin/JVM, Java 도구 체인, 바이트코드 대상, 실행 환경, Spring Boot/BOM,
@@ -43,6 +45,12 @@ description: BATON BRIEF 문서화 작업 절차. 제품 코드를 주로 변경
   PostgreSQL 통합 테스트, Compose 설정, 전체 빌드·테스트, 실행 JAR와 Java 21 비웹 실행
   환경/Flyway 근거가 있다. 이 근거를 실제 네트워크, 생산자 연동 또는 운영 배포 주장으로
   확대하지 않는다. 정확한 경계는 `HANDOFF.md`를 사용한다.
+- PRD-0006 최소 상태 확인은 대상 PostgreSQL 통합 테스트, 전체 테스트와 실행 JAR 생성이
+  성공했다. 이 근거를 실제 네트워크 실행이나 운영 상태 확인 주장으로 확대하지 않는다.
+- 최소 상태 확인에는 Spring Boot Actuator의 표준 aggregate health와 자동 구성된 DB
+  contributor만 사용한다. 커스텀 controller, DTO, `HealthIndicator`와 확인 SQL이 있는
+  것처럼 기록하지 않는다. Spring Boot 4.1의 health probes 기본값은 `true`이므로 배포
+  계약 전에는 표준 속성으로 비활성 상태를 유지한다.
 - BATON, WATCH, RELAY, GO와 BRIEF의 소유권 경계를 보존한다.
 - 이벤트 종류, 경로, 인증, 브로커, 스키마, 재시도, 제공자, 배포 또는 검증 결과를 만들어내지
   않는다.
