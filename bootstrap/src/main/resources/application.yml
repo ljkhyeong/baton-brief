@@ -11,3 +11,12 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+management:
+  endpoints:
+    web:
+      discovery:
+        enabled: false
+  endpoint:
+    health:
+      probes:
+        enabled: false

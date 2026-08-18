@@ -9,7 +9,7 @@ dependencies {
     implementation(project(":application"))
     implementation(project(":adapter-in-web"))
     implementation(project(":adapter-out-persistence"))
-    implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
