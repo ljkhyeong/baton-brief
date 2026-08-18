@@ -47,6 +47,20 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `health exposes aggregate status without deployment probes`() {
+        mockMvc.perform(get("/actuator/health"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("UP"))
+            .andExpect(jsonPath("$.components").doesNotExist())
+            .andExpect(jsonPath("$.details").doesNotExist())
+
+        mockMvc.perform(get("/actuator"))
+            .andExpect(status().isNotFound)
+        mockMvc.perform(get("/actuator/health/liveness"))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
     fun `ingestion distinguishes duplicate conflict unsupported stale and gap`() {
         val workspaceId = "10000000-0000-0000-0000-000000000001"
         val seasonId = "20000000-0000-0000-0000-000000000001"
