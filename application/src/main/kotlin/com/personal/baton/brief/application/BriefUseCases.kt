@@ -52,12 +52,48 @@ data class EditionSummary(
     val sourceCursor: Long,
     val ruleVersion: Int,
     val itemCount: Int,
-)
+) {
+    companion object {
+        fun from(edition: BriefEdition): EditionSummary = EditionSummary(
+            editionId = edition.editionId,
+            generation = edition.generation,
+            weekStart = edition.window.weekStart,
+            zoneId = edition.window.zoneId,
+            generatedAt = edition.generatedAt,
+            sourceCursor = edition.sourceCursor,
+            ruleVersion = edition.ruleVersion,
+            itemCount = edition.items.size,
+        )
+    }
+}
 
 data class EditionHistoryResult(
     val editions: List<EditionSummary>,
     val nextBeforeGeneration: Long?,
 )
+
+data class EditionItemChange(
+    val before: BriefEditionItem,
+    val after: BriefEditionItem,
+)
+
+data class EditionComparison(
+    val from: EditionSummary,
+    val to: EditionSummary,
+    val added: List<BriefEditionItem>,
+    val removed: List<BriefEditionItem>,
+    val changed: List<EditionItemChange>,
+)
+
+sealed interface EditionComparisonResult {
+    data class Found(
+        val comparison: EditionComparison,
+    ) : EditionComparisonResult
+
+    data object NotFound : EditionComparisonResult
+
+    data object ScopeMismatch : EditionComparisonResult
+}
 
 data class EditionContent(
     val items: List<BriefEditionItem>,
@@ -84,6 +120,11 @@ interface BriefUseCases {
         beforeGeneration: Long?,
         limit: Int,
     ): EditionHistoryResult
+
+    fun compareEditions(
+        baseEditionId: UUID,
+        targetEditionId: UUID,
+    ): EditionComparisonResult
 }
 
 interface BriefPersistencePort {

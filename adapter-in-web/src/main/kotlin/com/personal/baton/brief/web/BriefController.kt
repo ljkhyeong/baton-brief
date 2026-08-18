@@ -1,6 +1,7 @@
 package com.personal.baton.brief.web
 
 import com.personal.baton.brief.application.BriefUseCases
+import com.personal.baton.brief.application.EditionComparisonResult
 import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
 import jakarta.validation.Valid
@@ -86,4 +87,17 @@ class BriefController(
     ): BriefEditionResponse = brief.findEdition(editionId)
         ?.let(BriefEditionResponse::from)
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
+
+    @GetMapping("/editions/{targetEditionId}/changes")
+    fun compareEditions(
+        @PathVariable("targetEditionId") targetEditionId: UUID,
+        @RequestParam("fromEditionId") fromEditionId: UUID,
+    ): EditionComparisonResponse = when (val result = brief.compareEditions(fromEditionId, targetEditionId)) {
+        is EditionComparisonResult.Found -> EditionComparisonResponse.from(result.comparison)
+        EditionComparisonResult.NotFound -> throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
+        EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "editions must belong to the same workspace and season",
+        )
+    }
 }

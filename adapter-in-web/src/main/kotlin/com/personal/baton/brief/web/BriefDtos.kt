@@ -1,6 +1,8 @@
 package com.personal.baton.brief.web
 
 import com.personal.baton.brief.application.EditionHistoryResult
+import com.personal.baton.brief.application.EditionComparison
+import com.personal.baton.brief.application.EditionItemChange
 import com.personal.baton.brief.application.EditionSummary
 import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
@@ -204,6 +206,36 @@ data class EditionHistoryResponse(
         fun from(result: EditionHistoryResult): EditionHistoryResponse = EditionHistoryResponse(
             editions = result.editions.map(EditionSummaryResponse::from),
             nextBeforeGeneration = result.nextBeforeGeneration,
+        )
+    }
+}
+
+data class EditionItemChangeResponse(
+    val before: EditionItemResponse,
+    val after: EditionItemResponse,
+) {
+    companion object {
+        fun from(change: EditionItemChange): EditionItemChangeResponse = EditionItemChangeResponse(
+            before = EditionItemResponse.from(change.before),
+            after = EditionItemResponse.from(change.after),
+        )
+    }
+}
+
+data class EditionComparisonResponse(
+    val from: EditionSummaryResponse,
+    val to: EditionSummaryResponse,
+    val added: List<EditionItemResponse>,
+    val removed: List<EditionItemResponse>,
+    val changed: List<EditionItemChangeResponse>,
+) {
+    companion object {
+        fun from(comparison: EditionComparison): EditionComparisonResponse = EditionComparisonResponse(
+            from = EditionSummaryResponse.from(comparison.from),
+            to = EditionSummaryResponse.from(comparison.to),
+            added = comparison.added.map(EditionItemResponse::from),
+            removed = comparison.removed.map(EditionItemResponse::from),
+            changed = comparison.changed.map(EditionItemChangeResponse::from),
         )
     }
 }

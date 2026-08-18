@@ -67,6 +67,39 @@ class BriefService(
         limit,
     )
 
+    override fun compareEditions(
+        baseEditionId: UUID,
+        targetEditionId: UUID,
+    ): EditionComparisonResult {
+        val base = persistence.findEdition(baseEditionId)
+        val target = persistence.findEdition(targetEditionId)
+        if (base == null || target == null) {
+            return EditionComparisonResult.NotFound
+        }
+        if (base.workspaceId != target.workspaceId || base.seasonId != target.seasonId) {
+            return EditionComparisonResult.ScopeMismatch
+        }
+
+        val baseItemsByKey = base.items.associateBy { it.reasonCode to it.sourceReference }
+        val targetItemsByKey = target.items.associateBy { it.reasonCode to it.sourceReference }
+        val added = target.items.filter { (it.reasonCode to it.sourceReference) !in baseItemsByKey }
+        val removed = base.items.filter { (it.reasonCode to it.sourceReference) !in targetItemsByKey }
+        val changed = target.items.mapNotNull { after ->
+            val before = baseItemsByKey[after.reasonCode to after.sourceReference] ?: return@mapNotNull null
+            if (before == after) null else EditionItemChange(before, after)
+        }
+
+        return EditionComparisonResult.Found(
+            EditionComparison(
+                from = EditionSummary.from(base),
+                to = EditionSummary.from(target),
+                added = added,
+                removed = removed,
+                changed = changed,
+            ),
+        )
+    }
+
     private fun selectEditionContent(items: List<AttentionItem>): EditionContent {
         val selected = items
             .asSequence()
