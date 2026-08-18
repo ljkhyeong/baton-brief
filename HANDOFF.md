@@ -1,7 +1,7 @@
 # 인수인계
 
 내부 HTTP 이벤트 수신, 투영/재구축, 불변 주간 에디션, 에디션 이력 조회와 표준 요청 오류
-응답 로컬 MVP 구현을 완료했다.
+응답 로컬 MVP에 이어 두 불변 에디션의 읽기 전용 비교 API 구현을 완료했다.
 PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행 점검까지 통과했다.
 
 ## 채택한 기반
@@ -22,6 +22,8 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
   HTTP 계약을 채택했다.
 - PRD-0004에서 요청 검증 실패와 명시적 `404`를 RFC 9457 `ProblemDetail`로 반환하는
   계약을 채택했다.
+- PRD-0005에서 같은 작업공간·시즌의 두 불변 에디션을 안정적인 항목 키로 비교하는
+  내부 HTTP 계약을 채택했다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -47,19 +49,30 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
 동시 중복 수신은 수신 기록 하나와 `202/200`, 동시 동일 상태 에디션 생성은 에디션 하나와
 `201/200`으로 직렬화한다.
 
+## 구현한 후속 비교 조회
+
+- `GET /api/v1/editions/{targetEditionId}/changes?fromEditionId={baseEditionId}`가 저장된 두
+  불변 스냅샷의 `added`, `removed`, `changed.before`·`changed.after`를 반환한다.
+- 비교 키는 `(reasonCode, sourceReference)`이며 `added`·`changed`는 대상 순서,
+  `removed`는 기준 순서를 유지한다.
+- 비교는 저장된 스냅샷만 읽으므로 이후 투영 변경이나 재구축에도 기존 비교 결과가
+  달라지지 않는다.
+
 ## 현재 검증
 
-- `./gradlew --no-daemon :bootstrap:test --tests com.personal.baton.brief.BriefMvpIntegrationTest`:
-  성공, PostgreSQL 18.4 Testcontainers에서 Flyway V1·V2를 적용하고 통합 시나리오 4개 통과
+- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition changes compare immutable snapshots and reject invalid scopes'`:
+  성공, PostgreSQL 18.4 Testcontainers에서 Flyway V1·V2를 적용하고 비교 분류·순서·역방향,
+  재구축 뒤 불변성, 범위 불일치 `400`과 미존재 `404`를 확인
+- `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 다섯 모듈의 전체 테스트,
+  PostgreSQL 통합 시나리오 5개와 `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백과 이벤트별 충돌 증거 상한
   - 에디션 멱등성·불변성·`generation`/최신 조회, `A → B → A` 상태 회귀, 이력 키셋
     페이지·범위 격리·항목 수, 재구축 재현성과 마이크로초 구간 경계
   - 엄격한 HTTP 표현 검증과 대표 `400`·`404`의 표준 `ProblemDetail`
   - 동시 중복 수신과 동시 에디션 생성
+  - 불변 에디션의 추가·제거·변경, 기준·대상 순서, 역방향 비교와 재구축 뒤 동일 결과
 - `docker compose config`: 성공. `postgres:18.4-alpine`, 상태 확인과 이름 있는 볼륨의
   `/var/lib/postgresql` 마운트 구문 확인
-- `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 다섯 모듈의 전체 테스트와
-  `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
 - `java -jar bootstrap/build/libs/bootstrap-0.1.0-SNAPSHOT.jar --spring.main.web-application-type=none`:
   Java 21.0.10에서 Compose PostgreSQL 18.4에 연결해 성공. Flyway가 V1 마이그레이션을
   검증·적용했고 Spring 컨텍스트가 시작됨
