@@ -9,7 +9,7 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 
 - `AGENTS.md`, `HANDOFF.md`, `README.md`, 영향받는 PRD와 관련 ADR을 읽는다.
 - 파일, 코드, 테스트와 설정에서 실행 가능한 기준을 확인한다. 현재 기준은 구현하고
-  로컬에서 검증한 ADR-0002 다섯 모듈 MVP와 PRD-0002·PRD-0003·PRD-0004 계약이다. 대상 PostgreSQL 통합,
+  로컬에서 검증한 ADR-0002 다섯 모듈과 PRD-0002·PRD-0003·PRD-0004·PRD-0005 계약이다. 대상 PostgreSQL 통합,
   Compose 설정, 전체 빌드·테스트, 실행 JAR 생성과 Java 21 비웹 실행 환경/Flyway 점검이
   통과했다. 근거의 경계는 `HANDOFF.md`에서 확인한다. 외부 연동, 실제 네트워크 실행과
   운영 배포는 범위 밖으로 유지한다.
@@ -38,9 +38,10 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 3. `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap` 다섯
    모듈을 유지한다. 의존은 `bootstrap`/어댑터에서 `application`, 다시 `domain`으로
    향하게 한다. 어댑터끼리 의존하지 않고 내부 모듈은 외부 모듈에 의존하지 않는다.
-4. PRD-0002·PRD-0003·PRD-0004에서 채택한 인증 없는 내부 로컬 MVP HTTP 계약만 구현한다. 후속 결정이 채택하기
-   전에 JDK 공급자, 실행 컨테이너 이미지, 브로커, 스케줄러, 생산자 변경, 외부 시스템
-   어댑터, 운영 배포 또는 운영 인증·인가 계약을 가정하지 않는다.
+4. PRD-0002·PRD-0003·PRD-0004·PRD-0005에서 채택한 인증 없는 내부 로컬 MVP HTTP 계약만
+   구현한다. 후속 결정이 채택하기 전에 JDK 공급자, 실행 컨테이너 이미지, 브로커,
+   스케줄러, 생산자 변경, 외부 시스템 어댑터, 운영 배포 또는 운영 인증·인가 계약을
+   가정하지 않는다.
 5. 로컬 PostgreSQL 18.4 의존 서비스에는 `compose.yml`을 사용한다. Spring Boot의 표준
    데이터 원본 및 Flyway 속성/환경변수를 우선하고 프레임워크 설정에 프로젝트 전용 별칭을
    추가하지 않는다.
