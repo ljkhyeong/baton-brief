@@ -266,6 +266,179 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `edition changes compare immutable snapshots and reject invalid scopes`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000005"
+        val seasonId = "20000000-0000-0000-0000-000000000005"
+        val removedReference = "handoff:removed"
+        val changedReference = "routine:changed"
+
+        postEvent(
+            eventJson(
+                "60000000-0000-0000-0000-000000000001",
+                workspaceId,
+                seasonId,
+                removedReference,
+                1,
+                occurredAt = "2026-08-11T01:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(
+            eventJson(
+                "60000000-0000-0000-0000-000000000002",
+                workspaceId,
+                seasonId,
+                changedReference,
+                1,
+                type = "ROUTINE_MISSED",
+                occurredAt = "2026-08-11T02:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+
+        val generationPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        val baseEdition = postEdition(generationPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(1))
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andReturn()
+        val baseEditionId = JsonPath.read<String>(baseEdition.response.contentAsString, "$.editionId")
+
+        postEvent(
+            eventJson(
+                "60000000-0000-0000-0000-000000000003",
+                workspaceId,
+                seasonId,
+                removedReference,
+                2,
+                state = "RESOLVED",
+                occurredAt = "2026-08-12T01:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(
+            eventJson(
+                "60000000-0000-0000-0000-000000000004",
+                workspaceId,
+                seasonId,
+                changedReference,
+                2,
+                type = "ROUTINE_MISSED",
+                occurredAt = "2026-08-13T02:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(
+            eventJson(
+                "60000000-0000-0000-0000-000000000005",
+                workspaceId,
+                seasonId,
+                "decision:added",
+                1,
+                type = "DECISION_FOLLOW_UP_OVERDUE",
+                occurredAt = "2026-08-14T03:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(
+            eventJson(
+                "60000000-0000-0000-0000-000000000006",
+                workspaceId,
+                seasonId,
+                "handoff:added",
+                1,
+                occurredAt = "2026-08-15T03:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+
+        val targetEdition = postEdition(generationPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(2))
+            .andExpect(jsonPath("$.items.length()").value(3))
+            .andReturn()
+        val targetEditionId = JsonPath.read<String>(
+            targetEdition.response.contentAsString,
+            "$.editionId",
+        )
+        val changesPath = "/api/v1/editions/$targetEditionId/changes"
+        val changes = mockMvc.perform(get(changesPath).param("fromEditionId", baseEditionId))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.from.editionId").value(baseEditionId))
+            .andExpect(jsonPath("$.from.generation").value(1))
+            .andExpect(jsonPath("$.from.itemCount").value(2))
+            .andExpect(jsonPath("$.to.editionId").value(targetEditionId))
+            .andExpect(jsonPath("$.to.generation").value(2))
+            .andExpect(jsonPath("$.to.itemCount").value(3))
+            .andExpect(jsonPath("$.added.length()").value(2))
+            .andExpect(jsonPath("$.added[0].sourceReference").value("handoff:added"))
+            .andExpect(jsonPath("$.added[0].severity").value("HIGH"))
+            .andExpect(jsonPath("$.added[1].sourceReference").value("decision:added"))
+            .andExpect(jsonPath("$.added[1].severity").value("MEDIUM"))
+            .andExpect(jsonPath("$.removed.length()").value(1))
+            .andExpect(jsonPath("$.removed[0].sourceReference").value(removedReference))
+            .andExpect(jsonPath("$.removed[0].reasonCode").value("HANDOFF_BLOCKED"))
+            .andExpect(jsonPath("$.changed.length()").value(1))
+            .andExpect(jsonPath("$.changed[0].before.sourceReference").value(changedReference))
+            .andExpect(jsonPath("$.changed[0].before.observedAt").value("2026-08-11T02:00:00Z"))
+            .andExpect(jsonPath("$.changed[0].after.sourceReference").value(changedReference))
+            .andExpect(jsonPath("$.changed[0].after.observedAt").value("2026-08-13T02:00:00Z"))
+            .andReturn()
+
+        mockMvc.perform(
+            get("/api/v1/editions/$baseEditionId/changes")
+                .param("fromEditionId", targetEditionId),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.from.editionId").value(targetEditionId))
+            .andExpect(jsonPath("$.to.editionId").value(baseEditionId))
+            .andExpect(jsonPath("$.added.length()").value(1))
+            .andExpect(jsonPath("$.added[0].sourceReference").value(removedReference))
+            .andExpect(jsonPath("$.removed.length()").value(2))
+            .andExpect(jsonPath("$.removed[0].sourceReference").value("handoff:added"))
+            .andExpect(jsonPath("$.removed[1].sourceReference").value("decision:added"))
+            .andExpect(jsonPath("$.changed.length()").value(1))
+            .andExpect(jsonPath("$.changed[0].before.observedAt").value("2026-08-13T02:00:00Z"))
+            .andExpect(jsonPath("$.changed[0].after.observedAt").value("2026-08-11T02:00:00Z"))
+
+        postEvent(
+            eventJson(
+                "60000000-0000-0000-0000-000000000007",
+                workspaceId,
+                seasonId,
+                "handoff:after-target",
+                1,
+                occurredAt = "2026-08-15T04:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+        mockMvc.perform(post("/api/v1/projections/rebuild"))
+            .andExpect(status().isOk)
+        val rebuiltChanges = mockMvc.perform(
+            get(changesPath).param("fromEditionId", baseEditionId),
+        ).andExpect(status().isOk)
+            .andReturn()
+        assertThat(rebuiltChanges.response.contentAsString)
+            .isEqualTo(changes.response.contentAsString)
+
+        val otherWorkspaceId = "10000000-0000-0000-0000-000000000099"
+        val otherGenerationPath =
+            "/api/v1/workspaces/$otherWorkspaceId/seasons/$seasonId/editions"
+        val otherEdition = postEdition(otherGenerationPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andReturn()
+        val otherEditionId = JsonPath.read<String>(
+            otherEdition.response.contentAsString,
+            "$.editionId",
+        )
+
+        mockMvc.perform(get(changesPath).param("fromEditionId", otherEditionId))
+            .andExpect(status().isBadRequest)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(400))
+
+        mockMvc.perform(
+            get(changesPath)
+                .param("fromEditionId", "50000000-0000-0000-0000-000000000099"),
+        ).andExpect(status().isNotFound)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(404))
+    }
+
+    @Test
     fun `rejects representations outside the HTTP contract and reports missing editions`() {
         val workspaceId = "10000000-0000-0000-0000-000000000003"
         val seasonId = "20000000-0000-0000-0000-000000000003"
