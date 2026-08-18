@@ -5,7 +5,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 
 > 현재 상태: Kotlin/JDK 21과 PostgreSQL 18.4 기반의 내부 HTTP 이벤트 수신,
 > 투영/재구축, 불변 주간 에디션, 에디션 이력 조회와 표준 요청 오류 응답 로컬 MVP에 이어
-> 두 불변 에디션의 읽기 전용 비교 API까지 구현했다. PostgreSQL 통합 테스트 5개,
+> 두 불변 에디션의 읽기 전용 비교 API와 Spring Boot Actuator 표준 aggregate health를
+> 사용하는 최소 상태 확인까지 구현했다. PostgreSQL 통합 테스트 6개,
 > 전체 테스트·실행 JAR 생성과 Java 21/PostgreSQL 18.4 실행 점검이 통과했다. 운영 배포
 > 구성은 없다.
 
@@ -82,14 +83,17 @@ BRIEF가 소유하지 않는다.
 - 저장된 같은 작업공간·시즌의 두 불변 에디션을 안정적인 항목 키와 스냅샷 순서로
   비교하는 읽기 전용 API를 제공한다.
 - 요청 검증 실패와 명시적 미존재 응답은 RFC 9457 `ProblemDetail` 형식으로 제공한다.
+- `/actuator/health`는 프로세스와 필수 데이터베이스의 Spring Boot 표준 aggregate 상태만
+  노출하고 상세와 배포 probe는 노출하지 않는다.
 - 이벤트와 생성 시각은 PostgreSQL `TIMESTAMPTZ` 의미와 맞게 마이크로초로 정규화하고,
   HTTP 시간·날짜·시간대 입력은 엄격한 문자열 형식으로 검증한다.
 
 정확한 경로, 필드, 결과와 비목표는 [MVP 계약](docs/PRD/0002_mvp-contract/spec.md),
 [에디션 이력 조회 계약](docs/PRD/0003_edition-history/spec.md)과
 [표준 요청 오류 계약](docs/PRD/0004_problem-detail/spec.md),
-[불변 에디션 비교 계약](docs/PRD/0005_edition-comparison/spec.md)을 따른다. 인증·인가,
-브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
+[불변 에디션 비교 계약](docs/PRD/0005_edition-comparison/spec.md),
+[최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md)을 따른다. 인증·인가, 브로커,
+스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 문서
 
@@ -98,6 +102,7 @@ BRIEF가 소유하지 않는다.
 - [불변 에디션 이력 조회 계약](docs/PRD/0003_edition-history/spec.md)
 - [표준 요청 오류 응답 계약](docs/PRD/0004_problem-detail/spec.md)
 - [불변 에디션 비교 계약](docs/PRD/0005_edition-comparison/spec.md)
+- [최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)
@@ -110,6 +115,7 @@ ADR-0002에서 다음 기준을 채택했다.
 - Spring Boot/BOM 4.1.0, Gradle wrapper 9.2.1과 Kotlin DSL
 - PostgreSQL 18.4
 - Spring JDBC `JdbcClient`와 Flyway 마이그레이션, JPA 미사용
+- Spring Boot Actuator 표준 aggregate health와 자동 구성된 DB contributor
 - Spring Boot BOM으로 버전을 관리하는 JUnit Jupiter, AssertJ와 PostgreSQL Testcontainers
 - `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap`의 다섯
   Gradle 모듈

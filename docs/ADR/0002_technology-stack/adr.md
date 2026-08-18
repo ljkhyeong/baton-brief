@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-11
-- 수정일: 2026-08-13
+- 수정일: 2026-08-18
 
 ## 맥락
 
@@ -40,6 +40,10 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   Flyway를 기본 활성화한다.
 - 테스트는 필요한 모듈에만 두고 BOM이 관리하는 JUnit Jupiter, AssertJ와 PostgreSQL
   Testcontainers를 사용한다. 개별 라이브러리 버전은 별도로 고정하지 않는다.
+- 실행 상태 확인에는 `spring-boot-starter-actuator`의 표준 aggregate health와 `DataSource`
+  기반 DB health contributor 자동 구성을 사용한다. 제품 API와 분리된
+  `/actuator/health`에서 aggregate 상태만 노출하며 별도 controller, DTO,
+  `HealthIndicator`와 DB 확인 SQL을 만들지 않는다.
 
 CAL의 미병합 MVP 작업에서 진행 중인 Kotlin/JVM과 Spring Boot 4.1.0 기준은 참고하되 JDK
 25나 Gradle 9.6.1까지 복제하지 않는다. Kotlin 2.3.21이 공식적으로 지원하는 Gradle 범위는
@@ -72,6 +76,10 @@ bootstrap ─┬─> adapter-in-web ──────────> application 
 현재 브로커나 외부 시스템 연동 어댑터를 채택하지 않는다. 운영 배포 방식도
 결정하지 않는다. 로컬 MVP의 내부 HTTP 엔드포인트와 인증 없는 경계는 PRD-0002에서
 채택하며, 운영 인증·인가 계약은 별도 결정 전까지 만들지 않는다.
+
+상세 health 정보, 탐색 페이지, 배포 probe, 별도 관리 포트와 커스텀 상태 코드는 채택하지
+않는다. liveness·readiness와 외부 의존성 포함 정책은 컨테이너 또는 오케스트레이터 배포
+계약을 정할 때 별도로 결정한다.
 
 ### 검증 기준
 

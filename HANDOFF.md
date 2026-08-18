@@ -3,6 +3,8 @@
 내부 HTTP 이벤트 수신, 투영/재구축, 불변 주간 에디션, 에디션 이력 조회와 표준 요청 오류
 응답 로컬 MVP에 이어 두 불변 에디션의 읽기 전용 비교 API 구현을 완료했다.
 PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행 점검까지 통과했다.
+Spring Boot Actuator 표준 aggregate health를 사용하는 최소 상태 확인도 구현했고,
+대상 PostgreSQL 통합 테스트와 전체 테스트·실행 JAR 생성이 성공했다.
 
 ## 채택한 기반
 
@@ -24,6 +26,8 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
   계약을 채택했다.
 - PRD-0005에서 같은 작업공간·시즌의 두 불변 에디션을 안정적인 항목 키로 비교하는
   내부 HTTP 계약을 채택했다.
+- PRD-0006에서 프로세스와 필수 데이터베이스의 Spring Boot 표준 aggregate 상태만
+  `/actuator/health`로 노출하는 로컬 관리 계약을 채택했다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -58,19 +62,33 @@ PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행
 - 비교는 저장된 스냅샷만 읽으므로 이후 투영 변경이나 재구축에도 기존 비교 결과가
   달라지지 않는다.
 
+## 구현한 최소 상태 확인
+
+- `bootstrap`의 기본 starter를 `spring-boot-starter-actuator`로 교체해 중복 의존성 없이
+  `GET /actuator/health`를 제공한다.
+- Spring Boot가 `DataSource`를 감지해 자동 구성하는 DB health contributor를 사용하며,
+  정상 응답에는 aggregate `status`만 노출한다.
+- Actuator 탐색 페이지와 health probes는 표준 속성으로 비활성화했다. 커스텀 controller,
+  DTO, `HealthIndicator`, 상태 매퍼와 DB 확인 SQL은 추가하지 않았다.
+- 대상 PostgreSQL 통합 테스트와 전체 `clean test`, `bootJar` 생성이 성공했다.
+
 ## 현재 검증
 
-- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition changes compare immutable snapshots and reject invalid scopes'`:
-  성공, PostgreSQL 18.4 Testcontainers에서 Flyway V1·V2를 적용하고 비교 분류·순서·역방향,
-  재구축 뒤 불변성, 범위 불일치 `400`과 미존재 `404`를 확인
+- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.health exposes aggregate status without deployment probes'`:
+  성공, PostgreSQL 18.4 Testcontainers에서 `/actuator/health`의 `200`·`UP`, 상세 비노출,
+  탐색 페이지와 대표 probe 경로의 `404`를 확인
 - `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 다섯 모듈의 전체 테스트,
-  PostgreSQL 통합 시나리오 5개와 `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
+  PostgreSQL 통합 시나리오 6개와 `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
+  - 최소 aggregate health의 `UP`·상세 비노출과 탐색 페이지·대표 probe 경로 미노출
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백과 이벤트별 충돌 증거 상한
   - 에디션 멱등성·불변성·`generation`/최신 조회, `A → B → A` 상태 회귀, 이력 키셋
     페이지·범위 격리·항목 수, 재구축 재현성과 마이크로초 구간 경계
   - 엄격한 HTTP 표현 검증과 대표 `400`·`404`의 표준 `ProblemDetail`
   - 동시 중복 수신과 동시 에디션 생성
   - 불변 에디션의 추가·제거·변경, 기준·대상 순서, 역방향 비교와 재구축 뒤 동일 결과
+- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition changes compare immutable snapshots and reject invalid scopes'`:
+  성공, PostgreSQL 18.4 Testcontainers에서 Flyway V1·V2를 적용하고 비교 분류·순서·역방향,
+  재구축 뒤 불변성, 범위 불일치 `400`과 미존재 `404`를 확인
 - `docker compose config`: 성공. `postgres:18.4-alpine`, 상태 확인과 이름 있는 볼륨의
   `/var/lib/postgresql` 마운트 구문 확인
 - `java -jar bootstrap/build/libs/bootstrap-0.1.0-SNAPSHOT.jar --spring.main.web-application-type=none`:
