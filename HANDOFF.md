@@ -5,6 +5,8 @@
 PostgreSQL 통합 테스트, 저장소 전체 빌드와 Java 21 패키지 실행 점검까지 통과했다.
 Spring Boot Actuator 표준 aggregate health를 사용하는 최소 상태 확인도 구현했고,
 대상 PostgreSQL 통합 테스트와 전체 테스트·실행 JAR 생성이 성공했다.
+최초 이벤트 수신 증거의 읽기 전용 단건 조회도 구현했고, 대상 PostgreSQL 통합 테스트와
+전체 테스트·실행 JAR 생성이 성공했다.
 
 ## 채택한 기반
 
@@ -28,6 +30,8 @@ Spring Boot Actuator 표준 aggregate health를 사용하는 최소 상태 확�
   내부 HTTP 계약을 채택했다.
 - PRD-0006에서 프로세스와 필수 데이터베이스의 Spring Boot 표준 aggregate 상태만
   `/actuator/health`로 노출하는 로컬 관리 계약을 채택했다.
+- PRD-0007에서 이벤트 식별자별 최초 수신 메타데이터와 제한된 충돌 탐지 시각을
+  조회하는 인증 없는 내부 로컬 계약을 채택했다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -72,15 +76,32 @@ Spring Boot Actuator 표준 aggregate health를 사용하는 최소 상태 확�
   DTO, `HealthIndicator`, 상태 매퍼와 DB 확인 SQL은 추가하지 않았다.
 - 대상 PostgreSQL 통합 테스트와 전체 `clean test`, `bootJar` 생성이 성공했다.
 
+## 구현한 이벤트 수신 증거 조회
+
+- `GET /api/v1/events/{eventId}/receipt`가 최초 수신 메타데이터,
+  `ingestionSequence`, 저장된 `processingOutcome`, `receivedAt`과 선택적인
+  `conflictDetectedAt`을 반환한다.
+- `DUPLICATE`와 `CONFLICT`는 최초 `processingOutcome`을 덮어쓰지 않는다. 충돌은 최초
+  탐지 시각만 별도 증거로 드러낸다.
+- fingerprint, 원문 payload, SQL과 예외 상세는 응답에 포함하지 않는다.
+- 기존 기본 키 기반 읽기만 추가하며 새 스키마, 보존 기간, 삭제와 격리 해제 정책은
+  포함하지 않는다.
+- 대상 PostgreSQL 통합 테스트와 전체 `clean test`, `bootJar` 생성이 성공했다.
+
 ## 현재 검증
 
+- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.ingestion distinguishes duplicate conflict unsupported stale and gap'`:
+  성공, PostgreSQL 18.4 Testcontainers에서 최초 수신 결과, 동일 재전달과 충돌 뒤 불변성,
+  fingerprint 비노출, 재구축 뒤 동일 응답, `UNSUPPORTED`와 미존재 `404 ProblemDetail`을
+  확인
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.health exposes aggregate status without deployment probes'`:
   성공, PostgreSQL 18.4 Testcontainers에서 `/actuator/health`의 `200`·`UP`, 상세 비노출,
   탐색 페이지와 대표 probe 경로의 `404`를 확인
 - `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 다섯 모듈의 전체 테스트,
   PostgreSQL 통합 시나리오 6개와 `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
   - 최소 aggregate health의 `UP`·상세 비노출과 탐색 페이지·대표 probe 경로 미노출
-  - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백과 이벤트별 충돌 증거 상한
+  - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백, 이벤트별 충돌 증거 상한과
+    최초 수신 증거의 읽기 전용 조회·재구축 뒤 불변성·fingerprint 비노출
   - 에디션 멱등성·불변성·`generation`/최신 조회, `A → B → A` 상태 회귀, 이력 키셋
     페이지·범위 격리·항목 수, 재구축 재현성과 마이크로초 구간 경계
   - 엄격한 HTTP 표현 검증과 대표 `400`·`404`의 표준 `ProblemDetail`

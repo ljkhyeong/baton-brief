@@ -6,7 +6,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 현재 상태: Kotlin/JDK 21과 PostgreSQL 18.4 기반의 내부 HTTP 이벤트 수신,
 > 투영/재구축, 불변 주간 에디션, 에디션 이력 조회와 표준 요청 오류 응답 로컬 MVP에 이어
 > 두 불변 에디션의 읽기 전용 비교 API와 Spring Boot Actuator 표준 aggregate health를
-> 사용하는 최소 상태 확인까지 구현했다. PostgreSQL 통합 테스트 6개,
+> 사용하는 최소 상태 확인, 최초 이벤트 수신 증거의 읽기 전용 단건 조회까지 구현했다.
+> PostgreSQL 통합 테스트 6개,
 > 전체 테스트·실행 JAR 생성과 Java 21/PostgreSQL 18.4 실행 점검이 통과했다. 운영 배포
 > 구성은 없다.
 
@@ -76,6 +77,8 @@ BRIEF가 소유하지 않는다.
 - `HANDOFF_BLOCKED`, `ROUTINE_MISSED`, `DECISION_FOLLOW_UP_OVERDUE`를 규칙 v1로
   결정적으로 투영한다.
 - 이벤트 지문과 집계 리비전으로 `DUPLICATE`, `CONFLICT`, `STALE`과 리비전 공백을 구분한다.
+- 이벤트 식별자로 최초 수신 결과와 제한된 충돌 탐지 시각을 조회한다. fingerprint와
+  원문 payload는 조회 응답에 노출하지 않는다.
 - IANA 시간대의 월요일 시작 주간 구간과 수신 기록 `sourceCursor`로 불변 에디션을
   생성한다. 같은 요청 범위의 직전 상태는 멱등하게 재사용하고, 상태가 바뀌었다가 과거
   상태로 돌아오면 새 `generation`으로 기록한다.
@@ -92,8 +95,9 @@ BRIEF가 소유하지 않는다.
 [에디션 이력 조회 계약](docs/PRD/0003_edition-history/spec.md)과
 [표준 요청 오류 계약](docs/PRD/0004_problem-detail/spec.md),
 [불변 에디션 비교 계약](docs/PRD/0005_edition-comparison/spec.md),
-[최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md)을 따른다. 인증·인가, 브로커,
-스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
+[최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md),
+[이벤트 수신 증거 조회 계약](docs/PRD/0007_event-receipt-query/spec.md)을 따른다. 인증·인가,
+브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 문서
 
@@ -103,6 +107,7 @@ BRIEF가 소유하지 않는다.
 - [표준 요청 오류 응답 계약](docs/PRD/0004_problem-detail/spec.md)
 - [불변 에디션 비교 계약](docs/PRD/0005_edition-comparison/spec.md)
 - [최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md)
+- [이벤트 수신 증거 조회 계약](docs/PRD/0007_event-receipt-query/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)
