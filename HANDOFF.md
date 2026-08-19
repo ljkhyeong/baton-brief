@@ -8,6 +8,11 @@ Spring Boot Actuator 표준 aggregate health를 사용하는 최소 상태 확�
 최초 이벤트 수신 증거의 읽기 전용 단건 조회도 구현했고, 대상 PostgreSQL 통합 테스트와
 전체 테스트·실행 JAR 생성이 성공했다.
 
+PRD-0008에서 모든 수신 기록과 이벤트별 최초 충돌 한 건을 보존하는 `retain-all`, 불변
+에디션 `sourceCursor` 근거와 동기 전역 원자적 투영 재구축 경계를 채택하고 구현했다.
+강제 실패 롤백과 재구축·지원 이벤트 수신 잠금 동시성 대상 테스트, 변경 뒤 전체
+테스트와 실행 JAR 생성이 성공했다.
+
 ## 채택한 기반
 
 - ADR-0001에서 BRIEF의 독립 읽기 모델 서비스 경계를 채택했다.
@@ -32,6 +37,9 @@ Spring Boot Actuator 표준 aggregate health를 사용하는 최소 상태 확�
   `/actuator/health`로 노출하는 로컬 관리 계약을 채택했다.
 - PRD-0007에서 이벤트 식별자별 최초 수신 메타데이터와 제한된 충돌 탐지 시각을
   조회하는 인증 없는 내부 로컬 계약을 채택했다.
+- PRD-0008에서 숫자 TTL이나 SLO를 만들지 않는 현재 `retain-all` 기준, 이벤트별 최초
+  충돌 한 건, 불변 에디션과 `sourceCursor` 근거, `UNSUPPORTED`를 제외한 동기 전역
+  원자적 투영 재구축 경계를 채택했다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -88,7 +96,29 @@ Spring Boot Actuator 표준 aggregate health를 사용하는 최소 상태 확�
   포함하지 않는다.
 - 대상 PostgreSQL 통합 테스트와 전체 `clean test`, `bootJar` 생성이 성공했다.
 
+## 구현한 보존·재구축 경계
+
+- 현재 스키마에는 수신 기록, 최초 충돌 증거와 불변 에디션을 삭제·압축하는 경로가 없고,
+  대체 계약 전까지 모든 저장 결과를 보존한다.
+- 재구축은 PostgreSQL 트랜잭션 advisory lock을 투영 전역에서 배타적으로 사용한다.
+  지원 이벤트 수신은 같은 잠금을 공유 모드로, 에디션 생성과 다른 재구축은 배타 모드로
+  사용해 직렬화한다.
+- `UNSUPPORTED` 수신 기록은 보존하지만 재생 입력에서는 제외한다. 나머지 기록을
+  `ingestion_sequence` 순서와 실시간 규칙으로 재생하고 현재 `attention_item`만 같은
+  트랜잭션에서 전체 교체한다.
+- 기존 통합 시나리오는 실시간·재구축 결과의 재현성과 재구축 뒤 수신 증거·에디션
+  불변성을 확인했다. 확장한 대상 시나리오는 재구축 도중 강제 예외의 원자적 롤백과
+  재구축·지원 이벤트 수신 사이의 잠금 직렬화를 직접 확인했다.
+- 에디션 생성과 다른 재구축도 구현에서 같은 전역 배타 잠금 경로를 사용하지만, 대상
+  테스트가 두 별도 동시 실행 시나리오까지 직접 증명한 것으로 확대하지 않는다.
+
 ## 현재 검증
+
+- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition is idempotent immutable generated and reproducible after rebuild' --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.serializes concurrent duplicate ingestion edition generation and rebuild'`:
+  성공. PostgreSQL 18.4 Testcontainers에서 재구축 중 데이터베이스 제약 위반 뒤
+  이전 관심 항목 수가 복원되고 기존 에디션이 재사용되는 원자적 롤백, 재구축의 전역
+  배타 잠금 동안 지원 이벤트 수신의 투영 단계가 대기하고 종료 뒤 두 작업이 순서대로
+  성공하는 동작을 확인
 
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.ingestion distinguishes duplicate conflict unsupported stale and gap'`:
   성공, PostgreSQL 18.4 Testcontainers에서 최초 수신 결과, 동일 재전달과 충돌 뒤 불변성,
@@ -98,7 +128,7 @@ Spring Boot Actuator 표준 aggregate health를 사용하는 최소 상태 확�
   성공, PostgreSQL 18.4 Testcontainers에서 `/actuator/health`의 `200`·`UP`, 상세 비노출,
   탐색 페이지와 대표 probe 경로의 `404`를 확인
 - `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 다섯 모듈의 전체 테스트,
-  PostgreSQL 통합 시나리오 6개와 `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
+  PostgreSQL 통합 시나리오와 `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
   - 최소 aggregate health의 `UP`·상세 비노출과 탐색 페이지·대표 probe 경로 미노출
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백, 이벤트별 충돌 증거 상한과
     최초 수신 증거의 읽기 전용 조회·재구축 뒤 불변성·fingerprint 비노출
@@ -106,6 +136,7 @@ Spring Boot Actuator 표준 aggregate health를 사용하는 최소 상태 확�
     페이지·범위 격리·항목 수, 재구축 재현성과 마이크로초 구간 경계
   - 엄격한 HTTP 표현 검증과 대표 `400`·`404`의 표준 `ProblemDetail`
   - 동시 중복 수신과 동시 에디션 생성
+  - 재구축 강제 실패의 원자적 롤백과 재구축·지원 이벤트 수신 잠금 직렬화
   - 불변 에디션의 추가·제거·변경, 기준·대상 순서, 역방향 비교와 재구축 뒤 동일 결과
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition changes compare immutable snapshots and reject invalid scopes'`:
   성공, PostgreSQL 18.4 Testcontainers에서 Flyway V1·V2를 적용하고 비교 분류·순서·역방향,
@@ -133,5 +164,7 @@ BATON 생산자와의 외부 종단 간 연동, 인증·인가, 운영 배포는
 - 로컬 MVP만 구현했다. 운영 준비와 배포 검증은 완료하지 않았다.
 - BATON, WATCH, RELAY, GO 생산자와의 종단 간 연동은 없다.
 - 브로커, 스케줄러, 외부 시스템 연동 어댑터와 운영 인증·인가 계약은 없다.
+- 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관은 구현하지 않았다. 숫자 보존 기간,
+  용량 상한, 재구축 SLO·잠금 제한 시간, 체크포인트와 운영 복구 목표도 미결정이다.
 - 특정 JDK 공급자, 실행 컨테이너 이미지와 운영 배포 구성은 없다.
 - GitHub Actions와 릴리스 정책은 아직 없다.

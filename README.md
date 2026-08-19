@@ -7,9 +7,11 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 투영/재구축, 불변 주간 에디션, 에디션 이력 조회와 표준 요청 오류 응답 로컬 MVP에 이어
 > 두 불변 에디션의 읽기 전용 비교 API와 Spring Boot Actuator 표준 aggregate health를
 > 사용하는 최소 상태 확인, 최초 이벤트 수신 증거의 읽기 전용 단건 조회까지 구현했다.
-> PostgreSQL 통합 테스트 6개,
-> 전체 테스트·실행 JAR 생성과 Java 21/PostgreSQL 18.4 실행 점검이 통과했다. 운영 배포
-> 구성은 없다.
+> PostgreSQL 통합 테스트와 전체 테스트·실행 JAR 생성, Java 21/PostgreSQL 18.4 실행
+> 점검이 통과했다. 운영 배포
+> 구성은 없다. PRD-0008의 수신 증거 `retain-all`과 동기 전역 원자적 재구축 경계는
+> 강제 실패 롤백과 재구축·지원 이벤트 수신 잠금 동시성 대상 테스트, 변경 뒤 전체
+> 테스트·실행 JAR 생성으로 검증했다.
 
 ## 왜 BRIEF인가
 
@@ -70,6 +72,9 @@ BRIEF가 소유하지 않는다.
   보존한다.
 - 개인 식별 정보(PII), 자격 증명, 제공자 주소와 원문 비밀 값을 이벤트, 로그, 메트릭
   레이블에 넣지 않는다.
+- 명시적인 대체 계약 전에는 멱등 판정, 최초 수신 증거 조회, 재구축과 에디션
+  `sourceCursor`의 근거인 모든 수신 기록 및 이벤트별 최초 충돌 한 건을 삭제·압축하지
+  않는다.
 
 ## 채택한 로컬 계약
 
@@ -83,6 +88,9 @@ BRIEF가 소유하지 않는다.
   생성한다. 같은 요청 범위의 직전 상태는 멱등하게 재사용하고, 상태가 바뀌었다가 과거
   상태로 돌아오면 새 `generation`으로 기록한다.
 - 투영 재구축, 최신·특정 에디션 조회와 `generation` 기반 에디션 이력 페이지를 제공한다.
+- 재구축은 `UNSUPPORTED`를 제외한 보존 수신 기록을 순서대로 재생하는 동기 전역 명령이다.
+  현재 투영만 전역 잠금과 하나의 트랜잭션으로 교체하며 수신 증거와 불변 에디션은
+  바꾸지 않는다. 숫자 TTL과 재구축 SLO는 아직 정하지 않았다.
 - 저장된 같은 작업공간·시즌의 두 불변 에디션을 안정적인 항목 키와 스냅샷 순서로
   비교하는 읽기 전용 API를 제공한다.
 - 요청 검증 실패와 명시적 미존재 응답은 RFC 9457 `ProblemDetail` 형식으로 제공한다.
@@ -96,8 +104,9 @@ BRIEF가 소유하지 않는다.
 [표준 요청 오류 계약](docs/PRD/0004_problem-detail/spec.md),
 [불변 에디션 비교 계약](docs/PRD/0005_edition-comparison/spec.md),
 [최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md),
-[이벤트 수신 증거 조회 계약](docs/PRD/0007_event-receipt-query/spec.md)을 따른다. 인증·인가,
-브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
+[이벤트 수신 증거 조회 계약](docs/PRD/0007_event-receipt-query/spec.md)과
+[수신 증거 보존·재구축 운영 경계](docs/PRD/0008_retention-rebuild-boundary/spec.md)를 따른다.
+인증·인가, 브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 문서
 
@@ -108,6 +117,7 @@ BRIEF가 소유하지 않는다.
 - [불변 에디션 비교 계약](docs/PRD/0005_edition-comparison/spec.md)
 - [최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md)
 - [이벤트 수신 증거 조회 계약](docs/PRD/0007_event-receipt-query/spec.md)
+- [수신 증거 보존·재구축 운영 경계](docs/PRD/0008_retention-rebuild-boundary/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)
