@@ -87,6 +87,44 @@ class BriefMvpIntegrationTest(
                 .single(),
         ).isEqualTo(1)
 
+        val receiptPath = "/api/v1/events/$eventId/receipt"
+        val canonicalReceipt = mockMvc.perform(get(receiptPath))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.eventId").value(eventId))
+            .andExpect(jsonPath("$.eventType").value("HANDOFF_BLOCKED"))
+            .andExpect(jsonPath("$.aggregateRevision").value(1))
+            .andExpect(jsonPath("$.state").value("ACTIVE"))
+            .andExpect(jsonPath("$.processingOutcome").value("APPLIED"))
+            .andExpect(jsonPath("$.conflictDetectedAt").isNotEmpty)
+            .andReturn()
+            .response
+            .contentAsString
+        assertThat(JsonPath.read<Map<String, Any?>>(canonicalReceipt, "$").keys)
+            .containsExactlyInAnyOrder(
+                "eventId",
+                "ingestionSequence",
+                "eventType",
+                "eventVersion",
+                "workspaceId",
+                "seasonId",
+                "sourceReference",
+                "aggregateRevision",
+                "occurredAt",
+                "state",
+                "processingOutcome",
+                "receivedAt",
+                "conflictDetectedAt",
+            )
+
+        mockMvc.perform(post("/api/v1/projections/rebuild"))
+            .andExpect(status().isOk)
+        val rebuiltReceipt = mockMvc.perform(get(receiptPath))
+            .andExpect(status().isOk)
+            .andReturn()
+            .response
+            .contentAsString
+        assertThat(rebuiltReceipt).isEqualTo(canonicalReceipt)
+
         postEvent(
             eventJson(
                 "30000000-0000-0000-0000-000000000002",
@@ -125,6 +163,18 @@ class BriefMvpIntegrationTest(
         postEvent(unsupported)
             .andExpect(status().isUnprocessableContent)
             .andExpect(jsonPath("$.status").value("UNSUPPORTED"))
+        mockMvc.perform(get("/api/v1/events/30000000-0000-0000-0000-000000000004/receipt"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.eventVersion").value(2))
+            .andExpect(jsonPath("$.processingOutcome").value("UNSUPPORTED"))
+            .andExpect(jsonPath("$.conflictDetectedAt").value(nullValue()))
+
+        val missingReceiptPath = "/api/v1/events/30000000-0000-0000-0000-000000000099/receipt"
+        mockMvc.perform(get(missingReceiptPath))
+            .andExpect(status().isNotFound)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.instance").value(missingReceiptPath))
     }
 
     @Test
