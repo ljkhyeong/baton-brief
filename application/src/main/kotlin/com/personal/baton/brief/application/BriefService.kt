@@ -36,6 +36,8 @@ class BriefService(
         }
     }
 
+    override fun findEventReceipt(eventId: UUID): SourceEventReceipt? = persistence.findEventReceipt(eventId)
+
     override fun rebuild(): RebuildResult = persistence.rebuild(projector::project)
 
     override fun generateEdition(command: GenerateEditionCommand): EditionResult {

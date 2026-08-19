@@ -9,6 +9,7 @@ import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
+import com.personal.baton.brief.application.SourceEventReceipt
 import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.AttentionProjector
 import com.personal.baton.brief.domain.AttentionStatus
@@ -92,6 +93,39 @@ class JdbcBriefPersistenceAdapter(
             }
         }
     }
+
+    override fun findEventReceipt(eventId: UUID): SourceEventReceipt? = jdbc.sql(
+        """
+        SELECT receipt.event_id, receipt.ingestion_sequence, receipt.event_type,
+               receipt.event_version, receipt.workspace_id, receipt.season_id,
+               receipt.source_reference, receipt.aggregate_revision, receipt.occurred_at,
+               receipt.event_state, receipt.processing_outcome, receipt.received_at,
+               conflict.detected_at AS conflict_detected_at
+          FROM source_event_receipt receipt
+          LEFT JOIN source_event_conflict conflict ON conflict.event_id = receipt.event_id
+         WHERE receipt.event_id = :eventId
+        """.trimIndent(),
+    ).param("eventId", eventId)
+        .query { result, _ ->
+            SourceEventReceipt(
+                eventId = result.getObject("event_id", UUID::class.java),
+                ingestionSequence = result.getLong("ingestion_sequence"),
+                eventType = SourceEventType.valueOf(result.getString("event_type")),
+                eventVersion = result.getInt("event_version"),
+                workspaceId = result.getObject("workspace_id", UUID::class.java),
+                seasonId = result.getObject("season_id", UUID::class.java),
+                sourceReference = result.getString("source_reference"),
+                aggregateRevision = result.getLong("aggregate_revision"),
+                occurredAt = result.instant("occurred_at"),
+                state = SourceEventState.valueOf(result.getString("event_state")),
+                processingOutcome = IngestStatus.valueOf(result.getString("processing_outcome")),
+                receivedAt = result.instant("received_at"),
+                conflictDetectedAt = result
+                    .getObject("conflict_detected_at", OffsetDateTime::class.java)
+                    ?.toInstant(),
+            )
+        }.optional()
+        .orElse(null)
 
     @Transactional
     override fun rebuild(

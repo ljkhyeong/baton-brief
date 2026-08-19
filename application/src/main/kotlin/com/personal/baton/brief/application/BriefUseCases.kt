@@ -5,6 +5,8 @@ import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.ProjectionDecision
 import com.personal.baton.brief.domain.SourceEvent
+import com.personal.baton.brief.domain.SourceEventState
+import com.personal.baton.brief.domain.SourceEventType
 import com.personal.baton.brief.domain.WeeklyWindow
 import java.time.Instant
 import java.time.LocalDate
@@ -24,6 +26,22 @@ data class IngestResult(
     val eventId: UUID,
     val status: IngestStatus,
     val item: AttentionItem? = null,
+)
+
+data class SourceEventReceipt(
+    val eventId: UUID,
+    val ingestionSequence: Long,
+    val eventType: SourceEventType,
+    val eventVersion: Int,
+    val workspaceId: UUID,
+    val seasonId: UUID,
+    val sourceReference: String,
+    val aggregateRevision: Long,
+    val occurredAt: Instant,
+    val state: SourceEventState,
+    val processingOutcome: IngestStatus,
+    val receivedAt: Instant,
+    val conflictDetectedAt: Instant?,
 )
 
 data class RebuildResult(
@@ -103,6 +121,8 @@ data class EditionContent(
 interface BriefUseCases {
     fun ingest(event: SourceEvent): IngestResult
 
+    fun findEventReceipt(eventId: UUID): SourceEventReceipt?
+
     fun rebuild(): RebuildResult
 
     fun generateEdition(command: GenerateEditionCommand): EditionResult
@@ -140,6 +160,8 @@ interface BriefPersistencePort {
         receivedAt: java.time.Instant,
         project: (AttentionItem?) -> ProjectionDecision,
     ): IngestResult
+
+    fun findEventReceipt(eventId: UUID): SourceEventReceipt?
 
     fun rebuild(project: (SourceEvent, AttentionItem?, java.time.Instant) -> ProjectionDecision): RebuildResult
 

@@ -4,6 +4,7 @@ import com.personal.baton.brief.application.BriefUseCases
 import com.personal.baton.brief.application.EditionComparisonResult
 import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
+import com.personal.baton.brief.application.SourceEventReceipt
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
@@ -43,6 +44,12 @@ class BriefController(
         }
         return ResponseEntity.status(status).body(IngestResponse.from(result))
     }
+
+    @GetMapping("/events/{eventId}/receipt")
+    fun findEventReceipt(
+        @PathVariable("eventId") eventId: UUID,
+    ): SourceEventReceipt = brief.findEventReceipt(eventId)
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "event receipt not found")
 
     @PostMapping("/projections/rebuild")
     fun rebuild(): RebuildResult = brief.rebuild()
