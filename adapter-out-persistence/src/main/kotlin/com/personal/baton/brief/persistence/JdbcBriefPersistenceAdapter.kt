@@ -132,7 +132,9 @@ class JdbcBriefPersistenceAdapter(
         project: (SourceEvent, AttentionItem?, Instant) -> ProjectionDecision,
     ): RebuildResult {
         lockExclusive(PROJECTION_LOCK)
-        val receipts = jdbc.sql(
+        val current = linkedMapOf<EventIdentity, AttentionItem>()
+        var receiptCount = 0
+        jdbc.sql(
             """
             SELECT event_id, event_type, event_version, workspace_id, season_id,
                    source_reference, aggregate_revision, occurred_at, event_state, received_at
@@ -140,19 +142,23 @@ class JdbcBriefPersistenceAdapter(
              WHERE processing_outcome <> 'UNSUPPORTED'
              ORDER BY ingestion_sequence
             """.trimIndent(),
-        ).query(::mapReceiptEvent).list()
+        ).withFetchSize(500)
+            .query(::mapReceiptEvent)
+            .stream()
+            .use { receipts ->
+                receipts.forEachOrdered { receipt ->
+                    receiptCount += 1
+                    val identity = receipt.event.identity()
+                    when (val decision = project(receipt.event, current[identity], receipt.receivedAt)) {
+                        is ProjectionDecision.Applied -> current[identity] = decision.item
+                        ProjectionDecision.Stale -> Unit
+                    }
+                }
+            }
 
         jdbc.sql("DELETE FROM attention_item").update()
-        val current = linkedMapOf<EventIdentity, AttentionItem>()
-        receipts.forEach { receipt ->
-            val identity = receipt.event.identity()
-            when (val decision = project(receipt.event, current[identity], receipt.receivedAt)) {
-                is ProjectionDecision.Applied -> current[identity] = decision.item
-                ProjectionDecision.Stale -> Unit
-            }
-        }
         current.values.forEach(::upsertAttention)
-        return RebuildResult(receipts.size, current.size)
+        return RebuildResult(receiptCount, current.size)
     }
 
     @Transactional
