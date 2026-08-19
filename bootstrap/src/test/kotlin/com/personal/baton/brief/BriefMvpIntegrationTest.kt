@@ -1,10 +1,23 @@
 package com.personal.baton.brief
 
 import com.jayway.jsonpath.JsonPath
+import com.personal.baton.brief.application.BriefPersistencePort
+import com.personal.baton.brief.application.IngestResult
+import com.personal.baton.brief.application.IngestStatus
+import com.personal.baton.brief.application.RebuildResult
+import com.personal.baton.brief.domain.AttentionProjector
+import com.personal.baton.brief.domain.ProjectionDecision
+import com.personal.baton.brief.domain.SourceEvent
+import com.personal.baton.brief.domain.SourceEventState
+import com.personal.baton.brief.domain.SourceEventType
+import java.time.Instant
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -12,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.test.web.servlet.MockMvc
@@ -30,6 +44,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 class BriefMvpIntegrationTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbc: JdbcClient,
+    @param:Autowired private val persistence: BriefPersistencePort,
 ) {
     @BeforeEach
     fun clearDatabase() {
@@ -116,15 +131,6 @@ class BriefMvpIntegrationTest(
                 "conflictDetectedAt",
             )
 
-        mockMvc.perform(post("/api/v1/projections/rebuild"))
-            .andExpect(status().isOk)
-        val rebuiltReceipt = mockMvc.perform(get(receiptPath))
-            .andExpect(status().isOk)
-            .andReturn()
-            .response
-            .contentAsString
-        assertThat(rebuiltReceipt).isEqualTo(canonicalReceipt)
-
         postEvent(
             eventJson(
                 "30000000-0000-0000-0000-000000000002",
@@ -168,6 +174,17 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.eventVersion").value(2))
             .andExpect(jsonPath("$.processingOutcome").value("UNSUPPORTED"))
             .andExpect(jsonPath("$.conflictDetectedAt").value(nullValue()))
+
+        mockMvc.perform(post("/api/v1/projections/rebuild"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.receiptCount").value(3))
+            .andExpect(jsonPath("$.itemCount").value(1))
+        val rebuiltReceipt = mockMvc.perform(get(receiptPath))
+            .andExpect(status().isOk)
+            .andReturn()
+            .response
+            .contentAsString
+        assertThat(rebuiltReceipt).isEqualTo(canonicalReceipt)
 
         val missingReceiptPath = "/api/v1/events/30000000-0000-0000-0000-000000000099/receipt"
         mockMvc.perform(get(missingReceiptPath))
@@ -303,6 +320,27 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.editions").isEmpty)
             .andExpect(jsonPath("$.nextBeforeGeneration").value(nullValue()))
+
+        val attentionCountBeforeFailedRebuild = jdbc.sql("SELECT COUNT(*) FROM attention_item")
+            .query(Long::class.java)
+            .single()
+        val projector = AttentionProjector()
+        assertThatThrownBy {
+            persistence.rebuild { event, current, projectedAt ->
+                when (val decision = projector.project(event, current, projectedAt)) {
+                    is ProjectionDecision.Applied -> if (event.sourceReference == "routine:weekly") {
+                        decision.copy(item = decision.item.copy(ruleVersion = 0))
+                    } else {
+                        decision
+                    }
+
+                    ProjectionDecision.Stale -> decision
+                }
+            }
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertThat(
+            jdbc.sql("SELECT COUNT(*) FROM attention_item").query(Long::class.java).single(),
+        ).isEqualTo(attentionCountBeforeFailedRebuild)
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isOk)
@@ -548,7 +586,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `serializes concurrent duplicate ingestion and edition generation`() {
+    fun `serializes concurrent duplicate ingestion edition generation and rebuild`() {
         val workspaceId = "10000000-0000-0000-0000-000000000004"
         val seasonId = "20000000-0000-0000-0000-000000000004"
         val event = eventJson(
@@ -570,6 +608,82 @@ class BriefMvpIntegrationTest(
             .containsExactly(200, 201)
         assertThat(jdbc.sql("SELECT COUNT(*) FROM brief_edition").query(Long::class.java).single())
             .isEqualTo(1)
+
+        val projector = AttentionProjector()
+        val rebuildStarted = CountDownLatch(1)
+        val releaseRebuild = CountDownLatch(1)
+        val receivedAt = Instant.parse("2026-08-12T09:00:01Z")
+        val supportedEvent = SourceEvent(
+            eventId = UUID.fromString("30000000-0000-0000-0000-000000000021"),
+            eventType = SourceEventType.HANDOFF_BLOCKED,
+            eventVersion = 1,
+            workspaceId = UUID.fromString(workspaceId),
+            seasonId = UUID.fromString(seasonId),
+            sourceReference = "handoff:during-rebuild",
+            aggregateRevision = 1,
+            occurredAt = receivedAt,
+            state = SourceEventState.ACTIVE,
+        )
+
+        Executors.newFixedThreadPool(2).use { executor ->
+            val rebuild = executor.submit<RebuildResult> {
+                persistence.rebuild { receivedEvent, current, projectedAt ->
+                    rebuildStarted.countDown()
+                    check(releaseRebuild.await(10, TimeUnit.SECONDS))
+                    projector.project(receivedEvent, current, projectedAt)
+                }
+            }
+            try {
+                assertThat(rebuildStarted.await(10, TimeUnit.SECONDS)).isTrue()
+                val ingest = executor.submit<IngestResult> {
+                    persistence.processEvent(
+                        event = supportedEvent,
+                        fingerprint = "a".repeat(64),
+                        receivedAt = receivedAt,
+                    ) { current ->
+                        projector.project(supportedEvent, current, receivedAt)
+                    }
+                }
+
+                val waitDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+                var sharedLockWaitObserved: Boolean
+                do {
+                    sharedLockWaitObserved = jdbc.sql(
+                        """
+                        SELECT EXISTS (
+                            SELECT 1
+                              FROM pg_locks
+                             WHERE database = (
+                                       SELECT oid
+                                         FROM pg_database
+                                        WHERE datname = current_database()
+                                   )
+                               AND locktype = 'advisory'
+                               AND mode = 'ShareLock'
+                               AND NOT granted
+                        )
+                        """.trimIndent(),
+                    ).query(Boolean::class.java).single()
+                    if (!sharedLockWaitObserved) {
+                        TimeUnit.MILLISECONDS.sleep(10)
+                    }
+                } while (!sharedLockWaitObserved && System.nanoTime() < waitDeadline)
+                assertThat(sharedLockWaitObserved).isTrue()
+                releaseRebuild.countDown()
+
+                assertThat(rebuild.get(10, TimeUnit.SECONDS).receiptCount).isEqualTo(1)
+                assertThat(ingest.get(10, TimeUnit.SECONDS).status).isEqualTo(IngestStatus.APPLIED)
+            } finally {
+                releaseRebuild.countDown()
+            }
+        }
+        assertThat(
+            jdbc.sql(
+                "SELECT COUNT(*) FROM attention_item WHERE source_reference = :sourceReference",
+            ).param("sourceReference", supportedEvent.sourceReference)
+                .query(Long::class.java)
+                .single(),
+        ).isEqualTo(1)
     }
 
     private fun postEvent(json: String) = mockMvc.perform(
