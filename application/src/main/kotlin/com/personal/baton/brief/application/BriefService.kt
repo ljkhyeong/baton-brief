@@ -121,6 +121,8 @@ class BriefService(
                     status = it.status,
                     observedAt = it.observedAt,
                     ruleVersion = it.ruleVersion,
+                    aggregateRevision = it.lastRevision,
+                    revisionGap = it.revisionGap,
                 )
             }.toList()
         return EditionContent(
@@ -134,6 +136,8 @@ class BriefService(
                         item.status.name,
                         item.observedAt,
                         item.ruleVersion,
+                        item.aggregateRevision,
+                        item.revisionGap,
                     )
                 },
             ),
@@ -154,7 +158,7 @@ class BriefService(
         ),
     )
 
-    private fun sha256(values: Sequence<Any>): String {
+    private fun sha256(values: Sequence<Any?>): String {
         val canonical = ByteArrayOutputStream().use { bytes ->
             DataOutputStream(bytes).use { output ->
                 values.forEach { value ->

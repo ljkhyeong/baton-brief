@@ -129,6 +129,8 @@ data class EditionItemResponse(
     val status: AttentionStatus,
     val observedAt: Instant,
     val ruleVersion: Int,
+    val aggregateRevision: Long?,
+    val revisionGap: Boolean?,
 ) {
     companion object {
         fun from(item: BriefEditionItem): EditionItemResponse = EditionItemResponse(
@@ -138,6 +140,8 @@ data class EditionItemResponse(
             status = item.status,
             observedAt = item.observedAt,
             ruleVersion = item.ruleVersion,
+            aggregateRevision = item.aggregateRevision,
+            revisionGap = item.revisionGap,
         )
     }
 }

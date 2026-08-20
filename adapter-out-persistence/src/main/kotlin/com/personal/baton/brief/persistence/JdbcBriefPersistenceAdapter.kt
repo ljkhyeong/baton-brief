@@ -518,10 +518,10 @@ class JdbcBriefPersistenceAdapter(
                 """
                 INSERT INTO brief_edition_item (
                     edition_id, position, source_reference, reason_code, severity,
-                    item_status, observed_at, rule_version
+                    item_status, observed_at, rule_version, aggregate_revision, revision_gap
                 ) VALUES (
                     :editionId, :position, :sourceReference, :reasonCode, :severity,
-                    :itemStatus, :observedAt, :ruleVersion
+                    :itemStatus, :observedAt, :ruleVersion, :aggregateRevision, :revisionGap
                 )
                 """.trimIndent(),
             ).params(
@@ -534,6 +534,8 @@ class JdbcBriefPersistenceAdapter(
                     "itemStatus" to item.status.name,
                     "observedAt" to item.observedAt.jdbcValue(),
                     "ruleVersion" to item.ruleVersion,
+                    "aggregateRevision" to item.aggregateRevision,
+                    "revisionGap" to item.revisionGap,
                 ),
             ).update()
         }
@@ -560,7 +562,8 @@ class JdbcBriefPersistenceAdapter(
 
     private fun findEditionItems(editionId: UUID): List<BriefEditionItem> = jdbc.sql(
         """
-        SELECT source_reference, reason_code, severity, item_status, observed_at, rule_version
+        SELECT source_reference, reason_code, severity, item_status, observed_at, rule_version,
+               aggregate_revision, revision_gap
           FROM brief_edition_item
          WHERE edition_id = :editionId
          ORDER BY position
@@ -574,6 +577,8 @@ class JdbcBriefPersistenceAdapter(
                 status = AttentionStatus.valueOf(result.getString("item_status")),
                 observedAt = result.instant("observed_at"),
                 ruleVersion = result.getInt("rule_version"),
+                aggregateRevision = result.getObject("aggregate_revision", Long::class.javaObjectType),
+                revisionGap = result.getObject("revision_gap", Boolean::class.javaObjectType),
             )
         }.list()
 

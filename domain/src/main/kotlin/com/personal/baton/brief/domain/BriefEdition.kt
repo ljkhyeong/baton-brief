@@ -35,6 +35,8 @@ data class BriefEditionItem(
     val status: AttentionStatus,
     val observedAt: Instant,
     val ruleVersion: Int,
+    val aggregateRevision: Long?,
+    val revisionGap: Boolean?,
 )
 
 data class BriefEdition(
