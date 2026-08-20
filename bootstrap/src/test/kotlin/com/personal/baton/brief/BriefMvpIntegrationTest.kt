@@ -365,6 +365,80 @@ class BriefMvpIntegrationTest(
             .andReturn()
         assertThat(rebuiltSnapshot.response.contentAsString)
             .isEqualTo(firstResult.response.contentAsString)
+
+        val nextWeekRequest = """{"weekStart":"2026-08-17","zoneId":"Asia/Seoul"}"""
+        postEdition(generationPath, nextWeekRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(4))
+            .andExpect(jsonPath("$.weekStart").value("2026-08-17"))
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].sourceReference").value("decision:next-week"))
+
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000006",
+                workspaceId,
+                seasonId,
+                "routine:weekly",
+                2,
+                type = "ROUTINE_MISSED",
+                state = "RESOLVED",
+                occurredAt = "2026-08-14T09:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+
+        postEdition(generationPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(5))
+            .andExpect(jsonPath("$.weekStart").value("2026-08-10"))
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].sourceReference").value(blockedReference))
+
+        mockMvc.perform(get("$generationPath/latest"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.generation").value(5))
+            .andExpect(jsonPath("$.weekStart").value("2026-08-10"))
+
+        val weeklyLatestPath = "$generationPath/weekly/latest"
+        mockMvc.perform(
+            get(weeklyLatestPath)
+                .param("weekStart", "2026-08-17")
+                .param("zoneId", "Asia/Seoul"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.generation").value(4))
+            .andExpect(jsonPath("$.weekStart").value("2026-08-17"))
+
+        mockMvc.perform(
+            get(weeklyLatestPath)
+                .param("weekStart", "2026-08-10")
+                .param("zoneId", "Asia/Seoul"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.generation").value(5))
+            .andExpect(jsonPath("$.weekStart").value("2026-08-10"))
+
+        mockMvc.perform(
+            get(
+                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId" +
+                    "/editions/weekly/latest",
+            ).param("weekStart", "2026-08-10")
+                .param("zoneId", "Asia/Seoul"),
+        ).andExpect(status().isNotFound)
+
+        mockMvc.perform(
+            get(
+                "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099" +
+                    "/editions/weekly/latest",
+            ).param("weekStart", "2026-08-10")
+                .param("zoneId", "Asia/Seoul"),
+        ).andExpect(status().isNotFound)
+
+        mockMvc.perform(
+            get(weeklyLatestPath)
+                .param("weekStart", "2026-08-17")
+                .param("zoneId", "UTC"),
+        ).andExpect(status().isNotFound)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(404))
     }
 
     @Test
@@ -561,10 +635,18 @@ class BriefMvpIntegrationTest(
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         postEdition(path, """{"weekStart":[2026,8,10],"zoneId":"Asia/Seoul"}""")
             .andExpect(status().isBadRequest)
-        postEdition(path, """{"weekStart":"2026-08-11","zoneId":"Asia/Seoul"}""")
-            .andExpect(status().isBadRequest)
-        postEdition(path, """{"weekStart":"2026-08-10","zoneId":"+09:00"}""")
-            .andExpect(status().isBadRequest)
+
+        val weeklyLatestPath = "$path/weekly/latest"
+        mockMvc.perform(
+            get(weeklyLatestPath)
+                .param("weekStart", "2026-08-11")
+                .param("zoneId", "Asia/Seoul"),
+        ).andExpect(status().isBadRequest)
+        mockMvc.perform(
+            get(weeklyLatestPath)
+                .param("weekStart", "2026-08-10")
+                .param("zoneId", "+09:00"),
+        ).andExpect(status().isBadRequest)
 
         mockMvc.perform(get(path).param("beforeGeneration", "0"))
             .andExpect(status().isBadRequest)
