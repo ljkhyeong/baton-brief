@@ -22,6 +22,10 @@ PRD-0010에서 새 에디션 항목에 `aggregateRevision`과 `revisionGap`을 �
 Testcontainers 빈 데이터베이스의 V1~V3 적용, 대상 통합 시나리오와 저장소 전체
 테스트·실행 JAR 생성이 성공했다.
 
+PRD-0011에서 작업공간·시즌별 과거 이상 수신 증거를 `ingestionSequence` 배타 키셋으로
+조회하는 계약을 채택하고 구현했다. 기존 PostgreSQL 수신 통합 시나리오와 저장소 전체
+테스트·실행 JAR 생성이 성공했다.
+
 ## 채택한 기반
 
 - ADR-0001에서 BRIEF의 독립 읽기 모델 서비스 경계를 채택했다.
@@ -56,6 +60,9 @@ Testcontainers 빈 데이터베이스의 V1~V3 적용, 대상 통합 시나리�
   `stateFingerprint`와 비교 `changed` 판정에 포함하는 계약을 채택했다. Flyway V3 이전
   항목은 정확한 근거가 없으므로 두 값을 `null`로 유지하고 `0`·`false`로 기존 데이터를
   채우지 않는다. 이 의미 추가로 투영·에디션 `ruleVersion`을 올리지 않는다.
+- PRD-0011에서 `APPLIED_WITH_GAP`, `STALE`, `UNSUPPORTED` 또는 최초 충돌이 있는 수신
+  기록을 작업공간·시즌 범위에서 탐색하는 읽기 전용 계약을 채택했다. 충돌이 있는
+  `APPLIED`도 포함하며, 페이지 커서는 스냅샷 토큰으로 해석하지 않는다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -141,6 +148,29 @@ Testcontainers 빈 데이터베이스의 V1~V3 적용, 대상 통합 시나리�
   포함하지 않는다.
 - 대상 PostgreSQL 통합 테스트와 전체 `clean test`, `bootJar` 생성이 성공했다.
 
+## 구현한 이상 수신 증거 이력 조회
+
+- `GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/event-receipts/anomalies`가
+  `APPLIED_WITH_GAP`, `STALE`, `UNSUPPORTED` 또는 최초 충돌이 있는 보존 수신 기록을
+  발견하게 하는 계약을 채택했다.
+- 충돌이 있는 `APPLIED`는 포함하고 충돌이 없는 `APPLIED`는 제외한다. 동일 재전달의
+  `DUPLICATE`는 최초 처리 결과나 별도 수신 기록으로 저장되지 않는다.
+- `beforeIngestionSequence` 배타 커서와 `limit`을 사용해 `ingestionSequence` 내림차순으로
+  반환한다. 최초 충돌은 나중에 추가될 수 있으므로 여러 페이지를 하나의 스냅샷으로
+  보장하지 않으며 최신 이상 증거는 첫 페이지부터 새로 조회한다.
+- PRD-0007의 안전한 수신 증거 필드만 반환하고 새 필터·전체 개수·스키마·인덱스·인증·
+  재처리 동작을 추가하지 않는다.
+- 기존 PostgreSQL 수신 시나리오를 새 테스트 메서드 없이 확장했다. 최초 `APPLIED`와
+  `DUPLICATE` 직후 빈 목록, 후속 충돌 뒤 `APPLIED` 포함, 수신 순서 `4`·`3`에서 배타
+  커서 `3`으로 이어지는 `2`·`1`, `UNSUPPORTED`·`APPLIED_WITH_GAP`·`STALE`·충돌이 있는
+  `APPLIED`, 다른 시즌·작업공간의 빈 범위를 확인했다.
+- 기존 수신 증거 항목 표현을 재사용했고 별도 수신 증거 항목 DTO, Flyway 마이그레이션과
+  인덱스를 추가하지 않았다.
+- `./gradlew --no-daemon clean test :bootstrap:bootJar`가 성공해 전체 테스트와 실행 JAR
+  생성을 확인했다.
+- 첫 페이지와 다음 페이지 요청 사이에 충돌이 추가되는 별도 중간 페이지 시나리오는 직접
+  실행하지 않았다. 요청 간 비스냅샷과 첫 페이지 새로고침은 계약의 명시적 한계다.
+
 ## 구현한 보존·재구축 경계
 
 - 현재 스키마에는 수신 기록, 최초 충돌 증거와 불변 에디션을 삭제·압축하는 경로가 없고,
@@ -178,6 +208,8 @@ Testcontainers 빈 데이터베이스의 V1~V3 적용, 대상 통합 시나리�
   - 최소 aggregate health의 `UP`·상세 비노출과 탐색 페이지·대표 probe 경로 미노출
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백, 이벤트별 충돌 증거 상한과
     최초 수신 증거의 읽기 전용 조회·재구축 뒤 불변성·fingerprint 비노출
+  - 작업공간·시즌별 이상 수신 증거의 선정, 충돌 뒤 `APPLIED` 포함, 수신 순서 내림차순
+    배타 페이지와 다른 시즌·작업공간의 빈 범위
   - 에디션 멱등성·불변성·`generation`/최신 조회, 실제 동일 전체 스냅샷
     `A → B → A`의 새 역사적 세대, 이력 키셋 페이지·범위 격리·항목 수, 재구축 재현성과
     마이크로초 구간 경계
