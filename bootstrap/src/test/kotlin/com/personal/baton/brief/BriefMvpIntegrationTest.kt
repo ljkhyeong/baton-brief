@@ -256,9 +256,9 @@ class BriefMvpIntegrationTest(
                 "40000000-0000-0000-0000-000000000004",
                 workspaceId,
                 seasonId,
-                blockedReference,
-                2,
-                state = "RESOLVED",
+                "decision:temporary",
+                1,
+                type = "DECISION_FOLLOW_UP_OVERDUE",
                 occurredAt = "2026-08-13T09:00:00Z",
             ),
         ).andExpect(status().isAccepted)
@@ -267,17 +267,18 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.generation").value(2))
             .andExpect(jsonPath("$.sourceCursor").value(4))
-            .andExpect(jsonPath("$.items.length()").value(1))
-            .andExpect(jsonPath("$.items[0].reasonCode").value("ROUTINE_MISSED"))
+            .andExpect(jsonPath("$.items.length()").value(3))
 
         postEvent(
             eventJson(
                 "40000000-0000-0000-0000-000000000005",
                 workspaceId,
                 seasonId,
-                blockedReference,
-                3,
-                occurredAt = "2026-08-09T15:00:00Z",
+                "decision:temporary",
+                2,
+                state = "RESOLVED",
+                type = "DECISION_FOLLOW_UP_OVERDUE",
+                occurredAt = "2026-08-13T09:00:00Z",
             ),
         ).andExpect(status().isAccepted)
 
@@ -300,7 +301,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.editions[0].generation").value(3))
             .andExpect(jsonPath("$.editions[0].itemCount").value(2))
             .andExpect(jsonPath("$.editions[1].generation").value(2))
-            .andExpect(jsonPath("$.editions[1].itemCount").value(1))
+            .andExpect(jsonPath("$.editions[1].itemCount").value(3))
             .andExpect(jsonPath("$.nextBeforeGeneration").value(2))
 
         mockMvc.perform(
@@ -353,7 +354,7 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(post("/api/v1/projections/rebuild"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.receiptCount").value(5))
-            .andExpect(jsonPath("$.itemCount").value(3))
+            .andExpect(jsonPath("$.itemCount").value(4))
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isOk)
@@ -481,6 +482,31 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
+                "60000000-0000-0000-0000-000000000004",
+                workspaceId,
+                seasonId,
+                changedReference,
+                3,
+                type = "ROUTINE_MISSED",
+                occurredAt = "2026-08-11T02:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+
+        val revisionEvidenceEdition = postEdition(generationPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(2))
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andReturn()
+        val revisionEvidenceEditionId = JsonPath.read<String>(
+            revisionEvidenceEdition.response.contentAsString,
+            "$.editionId",
+        )
+        postEdition(generationPath, editionRequest)
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editionId").value(revisionEvidenceEditionId))
+
+        postEvent(
+            eventJson(
                 "60000000-0000-0000-0000-000000000003",
                 workspaceId,
                 seasonId,
@@ -488,17 +514,6 @@ class BriefMvpIntegrationTest(
                 2,
                 state = "RESOLVED",
                 occurredAt = "2026-08-12T01:00:00Z",
-            ),
-        ).andExpect(status().isAccepted)
-        postEvent(
-            eventJson(
-                "60000000-0000-0000-0000-000000000004",
-                workspaceId,
-                seasonId,
-                changedReference,
-                2,
-                type = "ROUTINE_MISSED",
-                occurredAt = "2026-08-13T02:00:00Z",
             ),
         ).andExpect(status().isAccepted)
         postEvent(
@@ -525,7 +540,7 @@ class BriefMvpIntegrationTest(
 
         val targetEdition = postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.generation").value(2))
+            .andExpect(jsonPath("$.generation").value(3))
             .andExpect(jsonPath("$.items.length()").value(3))
             .andReturn()
         val targetEditionId = JsonPath.read<String>(
@@ -539,7 +554,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.from.generation").value(1))
             .andExpect(jsonPath("$.from.itemCount").value(2))
             .andExpect(jsonPath("$.to.editionId").value(targetEditionId))
-            .andExpect(jsonPath("$.to.generation").value(2))
+            .andExpect(jsonPath("$.to.generation").value(3))
             .andExpect(jsonPath("$.to.itemCount").value(3))
             .andExpect(jsonPath("$.added.length()").value(2))
             .andExpect(jsonPath("$.added[0].sourceReference").value("handoff:added"))
@@ -551,9 +566,11 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.removed[0].reasonCode").value("HANDOFF_BLOCKED"))
             .andExpect(jsonPath("$.changed.length()").value(1))
             .andExpect(jsonPath("$.changed[0].before.sourceReference").value(changedReference))
-            .andExpect(jsonPath("$.changed[0].before.observedAt").value("2026-08-11T02:00:00Z"))
+            .andExpect(jsonPath("$.changed[0].before.aggregateRevision").value(1))
+            .andExpect(jsonPath("$.changed[0].before.revisionGap").value(false))
             .andExpect(jsonPath("$.changed[0].after.sourceReference").value(changedReference))
-            .andExpect(jsonPath("$.changed[0].after.observedAt").value("2026-08-13T02:00:00Z"))
+            .andExpect(jsonPath("$.changed[0].after.aggregateRevision").value(3))
+            .andExpect(jsonPath("$.changed[0].after.revisionGap").value(true))
             .andReturn()
 
         mockMvc.perform(
@@ -568,8 +585,10 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.removed[0].sourceReference").value("handoff:added"))
             .andExpect(jsonPath("$.removed[1].sourceReference").value("decision:added"))
             .andExpect(jsonPath("$.changed.length()").value(1))
-            .andExpect(jsonPath("$.changed[0].before.observedAt").value("2026-08-13T02:00:00Z"))
-            .andExpect(jsonPath("$.changed[0].after.observedAt").value("2026-08-11T02:00:00Z"))
+            .andExpect(jsonPath("$.changed[0].before.aggregateRevision").value(3))
+            .andExpect(jsonPath("$.changed[0].before.revisionGap").value(true))
+            .andExpect(jsonPath("$.changed[0].after.aggregateRevision").value(1))
+            .andExpect(jsonPath("$.changed[0].after.revisionGap").value(false))
 
         postEvent(
             eventJson(
