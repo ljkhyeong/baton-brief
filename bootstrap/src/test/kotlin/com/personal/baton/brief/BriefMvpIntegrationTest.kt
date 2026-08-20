@@ -91,6 +91,13 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("DUPLICATE"))
 
+        val anomalyPath =
+            "/api/v1/workspaces/$workspaceId/seasons/$seasonId/event-receipts/anomalies"
+        mockMvc.perform(get(anomalyPath))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.receipts").isEmpty)
+            .andExpect(jsonPath("$.nextBeforeIngestionSequence").value(nullValue()))
+
         postEvent(eventJson(eventId, workspaceId, seasonId, "handoff:1", 1, state = "RESOLVED"))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.status").value("CONFLICT"))
@@ -174,6 +181,47 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.eventVersion").value(2))
             .andExpect(jsonPath("$.processingOutcome").value("UNSUPPORTED"))
             .andExpect(jsonPath("$.conflictDetectedAt").value(nullValue()))
+
+        mockMvc.perform(get(anomalyPath).param("limit", "2"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.receipts[0].ingestionSequence").value(4))
+            .andExpect(jsonPath("$.receipts[0].processingOutcome").value("UNSUPPORTED"))
+            .andExpect(jsonPath("$.receipts[1].ingestionSequence").value(3))
+            .andExpect(jsonPath("$.receipts[1].processingOutcome").value("APPLIED_WITH_GAP"))
+            .andExpect(jsonPath("$.nextBeforeIngestionSequence").value(3))
+
+        mockMvc.perform(
+            get(anomalyPath)
+                .param("beforeIngestionSequence", "3")
+                .param("limit", "2"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.receipts[0].ingestionSequence").value(2))
+            .andExpect(jsonPath("$.receipts[0].processingOutcome").value("STALE"))
+            .andExpect(jsonPath("$.receipts[1].ingestionSequence").value(1))
+            .andExpect(jsonPath("$.receipts[1].eventId").value(eventId))
+            .andExpect(jsonPath("$.receipts[1].processingOutcome").value("APPLIED"))
+            .andExpect(jsonPath("$.receipts[1].conflictDetectedAt").isNotEmpty)
+            .andExpect(jsonPath("$.nextBeforeIngestionSequence").value(nullValue()))
+
+        mockMvc.perform(
+            get(
+                "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/" +
+                    "event-receipts/anomalies",
+            ),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.receipts").isEmpty)
+            .andExpect(jsonPath("$.nextBeforeIngestionSequence").value(nullValue()))
+
+        mockMvc.perform(
+            get(
+                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/" +
+                    "event-receipts/anomalies",
+            ),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.receipts").isEmpty)
 
         mockMvc.perform(post("/api/v1/projections/rebuild"))
             .andExpect(status().isOk)
