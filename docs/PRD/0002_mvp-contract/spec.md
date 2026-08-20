@@ -15,7 +15,11 @@
 BATON 생산자 연동, 운영 인증·인가, 외부 종단 간 동작이나 배포가 완료되었다는
 뜻은 아니다.
 
-PostgreSQL 18.4 통합 시나리오 4개, 저장소 전체 정리 후 테스트와 실행 JAR 생성, Compose
+PRD-0009는 이 계약의 기존 작업공간·시즌 전역 최신 조회를 바꾸지 않고 정확한 주간·시간대
+범위의 최신 에디션을 조회하는 별도 경로를 추가한다. 해당 추가 경로의 로컬 MVP 구현과
+검증을 완료했다.
+
+PostgreSQL 18.4 통합 시나리오, 저장소 전체 정리 후 테스트와 실행 JAR 생성, Compose
 PostgreSQL에 대한 Java 21 비웹 실행 환경/Flyway 기동 점검으로 로컬 MVP를 검증했다. MockMvc 기반
 HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워크 종단 간 검증으로
 확대 해석하지 않는다.
@@ -38,7 +42,8 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 | `POST` | `/api/v1/events` | 이벤트 v1 수신과 멱등 투영 |
 | `POST` | `/api/v1/projections/rebuild` | 보존한 수신 기록으로 현재 투영 전체 재구축 |
 | `POST` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions` | 주간 에디션 생성 |
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest` | 해당 범위의 최신 완료 에디션 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest` | 작업공간·시즌 전역 최신 완료 에디션 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest` | PRD-0009의 정확한 주간 범위 최신 에디션 조회 |
 | `GET` | `/api/v1/editions/{id}` | 불변 에디션 단건 조회 |
 
 로컬 MVP의 엔드포인트는 인증 없는 내부 API다. 호출자가 전달한 작업공간·시즌에
@@ -199,11 +204,14 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
   작업공간·시즌에서 증가하는 새 세대를 만든다. 상태가 `A → B → A`로 되돌아와 과거와
   같은 지문이 다시 나타나더라도 직전 에디션과 다르므로 과거 `A` 에디션을 재사용하지
   않고 새 세대를 만든다.
-- 최신 에디션은 해당 작업공간·시즌에서 완료된 에디션 중 세대가 가장 큰
+- 전역 최신 에디션은 해당 작업공간·시즌에서 완료된 에디션 중 세대가 가장 큰
   에디션이다.
 
-`GET .../editions/latest`와 `GET /api/v1/editions/{id}`는 저장된 고정 스냅샷을 반환하며
-실시간 투영을 다시 조합하지 않는다.
+`GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest`와
+`GET /api/v1/editions/{id}`는 저장된 고정 스냅샷을 반환하며 실시간 투영을 다시 조합하지
+않는다. PRD-0009의 별도 주간 최신 조회는 작업공간·시즌·`weekStart`·`zoneId`가 모두 같은
+범위에서 가장 큰 `generation`을 선택한다. `ruleVersion`으로 필터링하지 않고 선택한 저장
+스냅샷의 값을 응답에 포함한다.
 
 새 에디션 생성 응답은 `201 Created`와 단건 조회 `Location`을, 같은 논리 상태의 반복
 요청은 기존 에디션과 `200 OK`를 반환한다. 에디션 본문은 최소한 `editionId`,
@@ -234,7 +242,10 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 - 같은 요청 범위의 직전 `stateFingerprint`와 동일한 반복 요청은 에디션을 중복 생성하지
   않고, 선택 상태가 달라지거나 `A → B → A`로 되돌아오면 세대가 증가한다.
 - 정렬 순서가 항상 재현되고, 생성 뒤 투영을 바꿔도 에디션 항목이 변하지 않는다.
-- 최신 조회가 최대 세대를 반환하고 단건 조회가 동일 고정 스냅샷을 반환한다.
+- 전역 최신 조회가 작업공간·시즌의 최대 세대를 반환하고 단건 조회가 동일 고정 스냅샷을
+  반환한다.
+- PRD-0009의 주간 최신 조회가 정확한 작업공간·시즌·주간·시간대 범위의 최대 세대를
+  반환하면서 전역 최신 의미를 바꾸지 않는다.
 
 ## 명시적 비목표
 

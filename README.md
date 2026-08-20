@@ -12,6 +12,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 구성은 없다. PRD-0008의 수신 증거 `retain-all`과 동기 전역 원자적 재구축 경계는
 > 강제 실패 롤백과 재구축·지원 이벤트 수신 잠금 동시성 대상 테스트, 변경 뒤 전체
 > 테스트·실행 JAR 생성으로 검증했다.
+> PRD-0009의 주간 범위 최신 불변 에디션 조회도 구현했고 PostgreSQL 통합 테스트와 전체
+> 테스트·실행 JAR 생성이 성공했다.
 
 ## 왜 BRIEF인가
 
@@ -56,7 +58,7 @@ BRIEF가 소유하지 않는다.
 2. `reasonCode`, `severity`, `sourceReference`, `observedAt`을 가진 설명 가능한
    `AttentionItem`을 만든다.
 3. 작업공간/시즌 단위의 주간 `BriefEdition`을 결정적으로 생성한다.
-4. 최신·특정 에디션과 작업공간·시즌별 에디션 이력을 조회한다.
+4. 전역 최신·주간 범위 최신·특정 에디션과 작업공간·시즌별 에디션 이력을 조회한다.
 5. 동일 이벤트 재생을 멱등 처리하고 투영 전체 재구축을 지원한다.
 6. 첫 소비자는 BATON UI로 제한한다. AI 요약과 외부 제공자 전달은 포함하지 않는다.
 
@@ -87,7 +89,10 @@ BRIEF가 소유하지 않는다.
 - IANA 시간대의 월요일 시작 주간 구간과 수신 기록 `sourceCursor`로 불변 에디션을
   생성한다. 같은 요청 범위의 직전 상태는 멱등하게 재사용하고, 상태가 바뀌었다가 과거
   상태로 돌아오면 새 `generation`으로 기록한다.
-- 투영 재구축, 최신·특정 에디션 조회와 `generation` 기반 에디션 이력 페이지를 제공한다.
+- 투영 재구축, 전역 최신·특정 에디션 조회와 `generation` 기반 에디션 이력 페이지를
+  제공한다.
+- 기존 전역 최신 조회와 별도로 정확한 작업공간·시즌·주간·시간대의 최대 `generation`
+  에디션을 저장된 불변 스냅샷으로 조회하는 PRD-0009 경로를 구현했다.
 - 재구축은 `UNSUPPORTED`를 제외한 보존 수신 기록을 순서대로 재생하는 동기 전역 명령이다.
   현재 투영만 전역 잠금과 하나의 트랜잭션으로 교체하며 수신 증거와 불변 에디션은
   바꾸지 않는다. 숫자 TTL과 재구축 SLO는 아직 정하지 않았다.
@@ -105,7 +110,8 @@ BRIEF가 소유하지 않는다.
 [불변 에디션 비교 계약](docs/PRD/0005_edition-comparison/spec.md),
 [최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md),
 [이벤트 수신 증거 조회 계약](docs/PRD/0007_event-receipt-query/spec.md)과
-[수신 증거 보존·재구축 운영 경계](docs/PRD/0008_retention-rebuild-boundary/spec.md)를 따른다.
+[수신 증거 보존·재구축 운영 경계](docs/PRD/0008_retention-rebuild-boundary/spec.md),
+[주간 범위 최신 불변 에디션 조회 계약](docs/PRD/0009_weekly-latest-edition/spec.md)을 따른다.
 인증·인가, 브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 문서
@@ -118,6 +124,7 @@ BRIEF가 소유하지 않는다.
 - [최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md)
 - [이벤트 수신 증거 조회 계약](docs/PRD/0007_event-receipt-query/spec.md)
 - [수신 증거 보존·재구축 운영 경계](docs/PRD/0008_retention-rebuild-boundary/spec.md)
+- [주간 범위 최신 불변 에디션 조회 계약](docs/PRD/0009_weekly-latest-edition/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)
