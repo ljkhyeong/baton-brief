@@ -14,7 +14,6 @@ enum class AttentionStatus {
 }
 
 data class AttentionItem(
-    val itemId: UUID,
     val workspaceId: UUID,
     val seasonId: UUID,
     val eventType: SourceEventType,
@@ -58,7 +57,6 @@ class AttentionProjector {
 
         return ProjectionDecision.Applied(
             item = AttentionItem(
-                itemId = current?.itemId ?: event.eventId,
                 workspaceId = event.workspaceId,
                 seasonId = event.seasonId,
                 eventType = event.eventType,

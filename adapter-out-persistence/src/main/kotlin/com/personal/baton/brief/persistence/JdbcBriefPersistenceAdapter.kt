@@ -75,7 +75,9 @@ class JdbcBriefPersistenceAdapter(
             }
         }
 
-        lockExclusive(event.identityLockKey())
+        lockExclusive(
+            "attention:${event.workspaceId}:${event.seasonId}:${event.eventType.name}:${event.sourceReference}",
+        )
         return when (val decision = project(findAttention(event))) {
             ProjectionDecision.Stale -> {
                 insertReceipt(event, fingerprint, IngestStatus.STALE, receivedAt)
@@ -154,7 +156,7 @@ class JdbcBriefPersistenceAdapter(
             .query(::mapSourceEventReceipt)
             .list()
         val hasNextPage = fetched.size > limit
-        val receipts = if (hasNextPage) fetched.take(limit) else fetched
+        val receipts = fetched.take(limit)
         return EventReceiptAnomalyResult(
             receipts = receipts,
             nextBeforeIngestionSequence = if (hasNextPage) receipts.last().ingestionSequence else null,
@@ -182,7 +184,12 @@ class JdbcBriefPersistenceAdapter(
             .use { receipts ->
                 receipts.forEachOrdered { receipt ->
                     receiptCount += 1
-                    val identity = receipt.event.identity()
+                    val identity = EventIdentity(
+                        receipt.event.workspaceId,
+                        receipt.event.seasonId,
+                        receipt.event.eventType,
+                        receipt.event.sourceReference,
+                    )
                     when (val decision = project(receipt.event, current[identity], receipt.receivedAt)) {
                         is ProjectionDecision.Applied -> current[identity] = decision.item
                         ProjectionDecision.Stale -> Unit
@@ -309,7 +316,7 @@ class JdbcBriefPersistenceAdapter(
                 )
             }.list()
         val hasNextPage = summaries.size > limit
-        val editions = if (hasNextPage) summaries.take(limit) else summaries
+        val editions = summaries.take(limit)
         return EditionHistoryResult(
             editions = editions,
             nextBeforeGeneration = if (hasNextPage) editions.last().generation else null,
@@ -419,13 +426,11 @@ class JdbcBriefPersistenceAdapter(
         jdbc.sql(
             """
             INSERT INTO attention_item (
-                item_id, workspace_id, season_id, event_type, source_reference, reason_code,
-                severity, item_status, observed_at, projected_at, rule_version, last_revision,
-                revision_gap
+                workspace_id, season_id, event_type, source_reference, reason_code, severity,
+                item_status, observed_at, projected_at, rule_version, last_revision, revision_gap
             ) VALUES (
-                :itemId, :workspaceId, :seasonId, :eventType, :sourceReference, :reasonCode,
-                :severity, :itemStatus, :observedAt, :projectedAt, :ruleVersion, :lastRevision,
-                :revisionGap
+                :workspaceId, :seasonId, :eventType, :sourceReference, :reasonCode, :severity,
+                :itemStatus, :observedAt, :projectedAt, :ruleVersion, :lastRevision, :revisionGap
             )
             ON CONFLICT (workspace_id, season_id, event_type, source_reference) DO UPDATE SET
                 reason_code = EXCLUDED.reason_code,
@@ -439,7 +444,6 @@ class JdbcBriefPersistenceAdapter(
             """.trimIndent(),
         ).params(
             mapOf(
-                "itemId" to item.itemId,
                 "workspaceId" to item.workspaceId,
                 "seasonId" to item.seasonId,
                 "eventType" to item.eventType.name,
@@ -634,7 +638,6 @@ class JdbcBriefPersistenceAdapter(
         result: ResultSet,
         @Suppress("UNUSED_PARAMETER") rowNumber: Int,
     ): AttentionItem = AttentionItem(
-        itemId = result.getObject("item_id", UUID::class.java),
         workspaceId = result.getObject("workspace_id", UUID::class.java),
         seasonId = result.getObject("season_id", UUID::class.java),
         eventType = SourceEventType.valueOf(result.getString("event_type")),
@@ -716,16 +719,6 @@ class JdbcBriefPersistenceAdapter(
         getObject(column, OffsetDateTime::class.java).toInstant()
 
     private fun Instant.jdbcValue(): OffsetDateTime = atOffset(ZoneOffset.UTC)
-
-    private fun SourceEvent.identity(): EventIdentity = EventIdentity(
-        workspaceId,
-        seasonId,
-        eventType,
-        sourceReference,
-    )
-
-    private fun SourceEvent.identityLockKey(): String =
-        "attention:$workspaceId:$seasonId:${eventType.name}:$sourceReference"
 
     private data class ReceiptEvent(
         val event: SourceEvent,
