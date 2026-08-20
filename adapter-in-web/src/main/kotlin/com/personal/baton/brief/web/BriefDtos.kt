@@ -59,7 +59,7 @@ data class SourceEventRequest(
     )
 }
 
-data class GenerateEditionRequest(
+data class EditionWeekRequest(
     val weekStart: String,
     val zoneId: ZoneId,
 ) {

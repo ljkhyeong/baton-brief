@@ -57,6 +57,9 @@ class BriefService(
         seasonId: UUID,
     ): BriefEdition? = persistence.findLatestEdition(workspaceId, seasonId)
 
+    override fun findLatestEditionForWeek(command: GenerateEditionCommand): BriefEdition? =
+        persistence.findLatestEditionForWeek(command)
+
     override fun findEditionHistory(
         workspaceId: UUID,
         seasonId: UUID,

@@ -14,6 +14,7 @@ import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -58,7 +59,7 @@ class BriefController(
     fun generateEdition(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
-        @Valid @RequestBody request: GenerateEditionRequest,
+        @Valid @RequestBody request: EditionWeekRequest,
     ): ResponseEntity<BriefEditionResponse> {
         val result = brief.generateEdition(request.toCommand(workspaceId, seasonId))
         val response = BriefEditionResponse.from(result.edition)
@@ -75,6 +76,15 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
     ): BriefEditionResponse = brief.findLatestEdition(workspaceId, seasonId)
+        ?.let(BriefEditionResponse::from)
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
+
+    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest")
+    fun findLatestEditionForWeek(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @Valid @ModelAttribute request: EditionWeekRequest,
+    ): BriefEditionResponse = brief.findLatestEditionForWeek(request.toCommand(workspaceId, seasonId))
         ?.let(BriefEditionResponse::from)
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
 

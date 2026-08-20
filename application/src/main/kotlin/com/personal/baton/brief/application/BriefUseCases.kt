@@ -134,6 +134,8 @@ interface BriefUseCases {
         seasonId: UUID,
     ): BriefEdition?
 
+    fun findLatestEditionForWeek(command: GenerateEditionCommand): BriefEdition?
+
     fun findEditionHistory(
         workspaceId: UUID,
         seasonId: UUID,
@@ -178,6 +180,8 @@ interface BriefPersistencePort {
         workspaceId: UUID,
         seasonId: UUID,
     ): BriefEdition?
+
+    fun findLatestEditionForWeek(command: GenerateEditionCommand): BriefEdition?
 
     fun findEditionHistory(
         workspaceId: UUID,

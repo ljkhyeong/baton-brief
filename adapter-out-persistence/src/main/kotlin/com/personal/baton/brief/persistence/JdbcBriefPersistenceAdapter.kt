@@ -208,6 +208,23 @@ class JdbcBriefPersistenceAdapter(
         mapOf("workspaceId" to workspaceId, "seasonId" to seasonId),
     )
 
+    override fun findLatestEditionForWeek(command: GenerateEditionCommand): BriefEdition? = findEditionRow(
+        """
+        WHERE workspace_id = :workspaceId
+          AND season_id = :seasonId
+          AND week_start = :weekStart
+          AND zone_id = :zoneId
+        ORDER BY generation DESC
+        LIMIT 1
+        """.trimIndent(),
+        mapOf(
+            "workspaceId" to command.workspaceId,
+            "seasonId" to command.seasonId,
+            "weekStart" to command.weekStart,
+            "zoneId" to command.zoneId.id,
+        ),
+    )
+
     override fun findEditionHistory(
         workspaceId: UUID,
         seasonId: UUID,
