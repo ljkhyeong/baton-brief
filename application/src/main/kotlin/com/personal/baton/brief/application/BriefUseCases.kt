@@ -44,6 +44,11 @@ data class SourceEventReceipt(
     val conflictDetectedAt: Instant?,
 )
 
+data class EventReceiptAnomalyResult(
+    val receipts: List<SourceEventReceipt>,
+    val nextBeforeIngestionSequence: Long?,
+)
+
 data class RebuildResult(
     val receiptCount: Int,
     val itemCount: Int,
@@ -123,6 +128,13 @@ interface BriefUseCases {
 
     fun findEventReceipt(eventId: UUID): SourceEventReceipt?
 
+    fun findEventReceiptAnomalies(
+        workspaceId: UUID,
+        seasonId: UUID,
+        beforeIngestionSequence: Long?,
+        limit: Int,
+    ): EventReceiptAnomalyResult
+
     fun rebuild(): RebuildResult
 
     fun generateEdition(command: GenerateEditionCommand): EditionResult
@@ -164,6 +176,13 @@ interface BriefPersistencePort {
     ): IngestResult
 
     fun findEventReceipt(eventId: UUID): SourceEventReceipt?
+
+    fun findEventReceiptAnomalies(
+        workspaceId: UUID,
+        seasonId: UUID,
+        beforeIngestionSequence: Long?,
+        limit: Int,
+    ): EventReceiptAnomalyResult
 
     fun rebuild(project: (SourceEvent, AttentionItem?, java.time.Instant) -> ProjectionDecision): RebuildResult
 

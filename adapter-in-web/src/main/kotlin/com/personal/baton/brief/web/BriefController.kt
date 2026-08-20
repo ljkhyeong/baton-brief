@@ -2,6 +2,7 @@ package com.personal.baton.brief.web
 
 import com.personal.baton.brief.application.BriefUseCases
 import com.personal.baton.brief.application.EditionComparisonResult
+import com.personal.baton.brief.application.EventReceiptAnomalyResult
 import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
@@ -51,6 +52,20 @@ class BriefController(
         @PathVariable("eventId") eventId: UUID,
     ): SourceEventReceipt = brief.findEventReceipt(eventId)
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "event receipt not found")
+
+    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/event-receipts/anomalies")
+    fun findEventReceiptAnomalies(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @RequestParam("beforeIngestionSequence", required = false)
+        @Positive beforeIngestionSequence: Long?,
+        @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
+    ): EventReceiptAnomalyResult = brief.findEventReceiptAnomalies(
+        workspaceId,
+        seasonId,
+        beforeIngestionSequence,
+        limit,
+    )
 
     @PostMapping("/projections/rebuild")
     fun rebuild(): RebuildResult = brief.rebuild()
