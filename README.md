@@ -14,6 +14,9 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 테스트·실행 JAR 생성으로 검증했다.
 > PRD-0009의 주간 범위 최신 불변 에디션 조회도 구현했고 PostgreSQL 통합 테스트와 전체
 > 테스트·실행 JAR 생성이 성공했다.
+> PRD-0010의 새 에디션 항목 리비전 근거 고정과 이전 항목 `null` 호환성도 구현했다.
+> PostgreSQL Testcontainers 빈 데이터베이스의 V1~V3 적용과 전체 테스트·실행 JAR 생성이
+> 성공했다.
 
 ## 왜 BRIEF인가
 
@@ -70,6 +73,8 @@ BRIEF가 소유하지 않는다.
 - 시간 의존 규칙에는 주입 가능한 `Clock`과 명시적인 시간대를 사용한다.
 - 에디션은 생성 후 수정하지 않는다. 정정은 새 에디션 또는 명시적인 대체 관계로
   표현한다.
+- 새 에디션 항목은 `aggregateRevision`과 `revisionGap`을 함께 고정한다. 이 값을 저장하지
+  않았던 이전 항목은 알 수 없는 근거를 `null`로 유지하며 추정해 채우지 않는다.
 - 사람에게 보이는 문장만 저장하지 않고 안정적인 이유 코드와 원본 참조를 함께
   보존한다.
 - 개인 식별 정보(PII), 자격 증명, 제공자 주소와 원문 비밀 값을 이벤트, 로그, 메트릭
@@ -93,6 +98,9 @@ BRIEF가 소유하지 않는다.
   제공한다.
 - 기존 전역 최신 조회와 별도로 정확한 작업공간·시즌·주간·시간대의 최대 `generation`
   에디션을 저장된 불변 스냅샷으로 조회하는 PRD-0009 경로를 구현했다.
+- PRD-0010은 새 에디션 항목의 집계 리비전·리비전 공백 근거를 응답과 상태 지문에
+  포함하고, 근거만 달라진 항목도 비교 `changed`로 분류하도록 확장한다. 투영·에디션
+  `ruleVersion`은 계속 `1`이며 로컬 구현과 검증을 완료했다.
 - 재구축은 `UNSUPPORTED`를 제외한 보존 수신 기록을 순서대로 재생하는 동기 전역 명령이다.
   현재 투영만 전역 잠금과 하나의 트랜잭션으로 교체하며 수신 증거와 불변 에디션은
   바꾸지 않는다. 숫자 TTL과 재구축 SLO는 아직 정하지 않았다.
@@ -111,7 +119,8 @@ BRIEF가 소유하지 않는다.
 [최소 상태 확인 계약](docs/PRD/0006_minimum-health/spec.md),
 [이벤트 수신 증거 조회 계약](docs/PRD/0007_event-receipt-query/spec.md)과
 [수신 증거 보존·재구축 운영 경계](docs/PRD/0008_retention-rebuild-boundary/spec.md),
-[주간 범위 최신 불변 에디션 조회 계약](docs/PRD/0009_weekly-latest-edition/spec.md)을 따른다.
+[주간 범위 최신 불변 에디션 조회 계약](docs/PRD/0009_weekly-latest-edition/spec.md)과
+[불변 에디션 리비전 근거 계약](docs/PRD/0010_edition-revision-evidence/spec.md)을 따른다.
 인증·인가, 브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 문서
@@ -125,6 +134,7 @@ BRIEF가 소유하지 않는다.
 - [이벤트 수신 증거 조회 계약](docs/PRD/0007_event-receipt-query/spec.md)
 - [수신 증거 보존·재구축 운영 경계](docs/PRD/0008_retention-rebuild-boundary/spec.md)
 - [주간 범위 최신 불변 에디션 조회 계약](docs/PRD/0009_weekly-latest-edition/spec.md)
+- [불변 에디션 리비전 근거 계약](docs/PRD/0010_edition-revision-evidence/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)

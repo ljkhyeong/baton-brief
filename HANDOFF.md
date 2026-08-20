@@ -17,6 +17,11 @@ PRD-0009에서 기존 작업공간·시즌 전역 `latest`를 유지하면서 �
 최신 불변 에디션을 조회하는 별도 경로를 채택하고 구현했다. PostgreSQL 통합 시나리오와
 저장소 전체 테스트·실행 JAR 생성이 성공했다.
 
+PRD-0010에서 새 에디션 항목에 `aggregateRevision`과 `revisionGap`을 함께 고정하고,
+이전 항목의 미기록 값은 `null`로 유지하는 계약을 채택하고 구현했다. PostgreSQL
+Testcontainers 빈 데이터베이스의 V1~V3 적용, 대상 통합 시나리오와 저장소 전체
+테스트·실행 JAR 생성이 성공했다.
+
 ## 채택한 기반
 
 - ADR-0001에서 BRIEF의 독립 읽기 모델 서비스 경계를 채택했다.
@@ -47,6 +52,10 @@ PRD-0009에서 기존 작업공간·시즌 전역 `latest`를 유지하면서 �
 - PRD-0009에서 작업공간·시즌·`weekStart`·`zoneId`가 정확히 같은 범위의 최대
   `generation` 에디션을 저장된 불변 스냅샷으로 반환하는 별도 조회 계약을 채택했다.
   `ruleVersion`은 조회 필터가 아니며 저장된 값을 응답에 포함한다.
+- PRD-0010에서 새 에디션 항목의 집계 리비전·리비전 공백 근거를 응답,
+  `stateFingerprint`와 비교 `changed` 판정에 포함하는 계약을 채택했다. Flyway V3 이전
+  항목은 정확한 근거가 없으므로 두 값을 `null`로 유지하고 `0`·`false`로 기존 데이터를
+  채우지 않는다. 이 의미 추가로 투영·에디션 `ruleVersion`을 올리지 않는다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -82,6 +91,24 @@ PRD-0009에서 기존 작업공간·시즌 전역 `latest`를 유지하면서 �
   Flyway 마이그레이션을 추가하지 않는다.
 - PostgreSQL 통합 시나리오에서 전역 최신과 주간 최신의 분리, 작업공간·시즌·주간·시간대
   정확 범위, 월요일·IANA 시간대 입력 오류와 미존재 범위 `404`를 확인했다.
+
+## 구현한 에디션 리비전 근거 고정
+
+- `brief_edition_item`에서 `null`을 허용하는 `aggregate_revision`·`revision_gap`은 V3 이전
+  행의 알 수 없는 근거를 보존하고, 신규 저장은 두 값을 함께 고정한다.
+- 두 열은 함께 `null`이거나 함께 값이 있어야 하며, 값이 있는 `aggregate_revision`은
+  양수여야 한다. 기존 행에는 값을 추정해 채우지 않는다.
+- 두 근거를 에디션 응답과 `stateFingerprint`에 포함하고, 근거만 달라진 같은 키의 항목도
+  비교 응답의 `changed.before`·`changed.after`에 포함한다.
+- 처음 리비전 근거를 포함한 생성은 이전 지문과 달라 새 `generation`을 만들고, 이후 같은
+  근거는 멱등하게 재사용한다. 기존 에디션은 수정하지 않는다.
+- 새 경로, 인증, 생산자·브로커 변경, 인덱스와 규칙 버전 변경은 포함하지 않는다.
+- PostgreSQL Testcontainers 빈 데이터베이스에 Flyway V1~V3를 적용한 대상 시나리오에서
+  신규 근거 고정, 근거만 다른 새 세대와 즉시 멱등 재사용, 정방향·역방향 비교의
+  `1`·`false` ↔ `3`·`true`, 재구축 뒤 비교 불변성과 실제 동일 전체 스냅샷
+  `A → B → A`의 새 역사적 세대를 확인했다.
+- 기존 데이터가 있는 V2 데이터베이스의 별도 업그레이드 하네스와 잘못된 값에 대한 CHECK
+  제약 거부 시나리오는 직접 실행하지 않았다.
 
 ## 구현한 후속 비교 조회
 
@@ -146,30 +173,32 @@ PRD-0009에서 기존 작업공간·시즌 전역 `latest`를 유지하면서 �
   성공, PostgreSQL 18.4 Testcontainers에서 `/actuator/health`의 `200`·`UP`, 상세 비노출,
   탐색 페이지와 대표 probe 경로의 `404`를 확인
 - `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 다섯 모듈의 전체 테스트,
-  PostgreSQL 통합 시나리오와 `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
+  PostgreSQL Testcontainers 빈 데이터베이스의 Flyway V1~V3 적용과
+  `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
   - 최소 aggregate health의 `UP`·상세 비노출과 탐색 페이지·대표 probe 경로 미노출
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백, 이벤트별 충돌 증거 상한과
     최초 수신 증거의 읽기 전용 조회·재구축 뒤 불변성·fingerprint 비노출
-  - 에디션 멱등성·불변성·`generation`/최신 조회, `A → B → A` 상태 회귀, 이력 키셋
-    페이지·범위 격리·항목 수, 재구축 재현성과 마이크로초 구간 경계
+  - 에디션 멱등성·불변성·`generation`/최신 조회, 실제 동일 전체 스냅샷
+    `A → B → A`의 새 역사적 세대, 이력 키셋 페이지·범위 격리·항목 수, 재구축 재현성과
+    마이크로초 구간 경계
+  - 신규 에디션의 집계 리비전·리비전 공백 근거 고정, 근거만 다른 새 세대와 즉시 멱등
+    재사용, 정방향·역방향 비교의 `1`·`false` ↔ `3`·`true`, 재구축 뒤 비교 불변성
   - 작업공간·시즌 전역 최신과 주간 범위 최신의 분리, 작업공간·시즌·주간·시간대 격리,
     월요일·IANA 시간대 입력 오류와 미존재 범위 `404`
   - 엄격한 HTTP 표현 검증과 대표 `400`·`404`의 표준 `ProblemDetail`
   - 동시 중복 수신과 동시 에디션 생성
   - 재구축 강제 실패의 원자적 롤백과 재구축·지원 이벤트 수신 잠금 직렬화
   - 불변 에디션의 추가·제거·변경, 기준·대상 순서, 역방향 비교와 재구축 뒤 동일 결과
-- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition changes compare immutable snapshots and reject invalid scopes'`:
-  성공, PostgreSQL 18.4 Testcontainers에서 Flyway V1·V2를 적용하고 비교 분류·순서·역방향,
-  재구축 뒤 불변성, 범위 불일치 `400`과 미존재 `404`를 확인
 - `docker compose config`: 성공. `postgres:18.4-alpine`, 상태 확인과 이름 있는 볼륨의
   `/var/lib/postgresql` 마운트 구문 확인
 - `java -jar bootstrap/build/libs/bootstrap-0.1.0-SNAPSHOT.jar --spring.main.web-application-type=none`:
   Java 21.0.10에서 Compose PostgreSQL 18.4에 연결해 성공. Flyway가 V1 마이그레이션을
   검증·적용했고 Spring 컨텍스트가 시작됨
 
-위 비웹 실행 JAR 점검은 V2 추가 전 V1 기준이다. V2는 PostgreSQL 18.4 통합 테스트에서
-실제 적용했고 현재 실행 JAR 생성까지 확인했으며, 같은 실행 환경 기동은 중복 수행하지
-않았다.
+위 비웹 실행 JAR 기동 점검은 V2 추가 전 V1 기준이다. 현재 V1~V3는 PostgreSQL 18.4
+Testcontainers 빈 데이터베이스에서 실제 적용했고 실행 JAR 생성까지 확인했으며, 같은
+Compose 실행 환경 기동은 중복 수행하지 않았다. 기존 데이터가 있는 V2 데이터베이스의
+V3 업그레이드와 잘못된 값에 대한 CHECK 제약 거부는 별도 시나리오로 직접 검증하지 않았다.
 
 실행 점검은 비웹 모드이므로 실제 수신 포트를 통한 HTTP 네트워크 동작은 입증하지 않는다.
 HTTP 경로와 영속성 동작은 위 PostgreSQL Testcontainers·MockMvc 통합 시나리오가 입증한다.
