@@ -74,6 +74,22 @@ class BriefService(
         limit,
     )
 
+    override fun findAttentionItemTransitions(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType,
+        sourceReference: String,
+        beforeAggregateRevision: Long?,
+        limit: Int,
+    ): AttentionItemTransitionHistory = persistence.findAttentionItemTransitions(
+        workspaceId,
+        seasonId,
+        eventType,
+        sourceReference,
+        beforeAggregateRevision,
+        limit,
+    )
+
     override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)
 
     override fun generateEdition(command: GenerateEditionCommand): EditionResult {

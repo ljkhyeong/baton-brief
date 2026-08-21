@@ -1,5 +1,6 @@
 package com.personal.baton.brief.web
 
+import com.personal.baton.brief.application.AttentionItemTransitionHistory
 import com.personal.baton.brief.application.BriefUseCases
 import com.personal.baton.brief.application.EditionComparison
 import com.personal.baton.brief.application.EditionComparisonResult
@@ -101,6 +102,24 @@ class BriefController(
             request.toCursor(),
             limit,
         ),
+    )
+
+    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions")
+    fun findAttentionItemTransitions(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @RequestParam("eventType") eventType: SourceEventType,
+        @RequestParam("sourceReference") @NotBlank @Size(max = 128) sourceReference: String,
+        @RequestParam("beforeAggregateRevision", required = false)
+        @Positive beforeAggregateRevision: Long?,
+        @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
+    ): AttentionItemTransitionHistory = brief.findAttentionItemTransitions(
+        workspaceId,
+        seasonId,
+        eventType,
+        sourceReference,
+        beforeAggregateRevision,
+        limit,
     )
 
     @PostMapping("/projections/rebuild")

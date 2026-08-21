@@ -59,6 +59,19 @@ data class CurrentAttentionItemPage(
     val nextCursor: AttentionItemCursor?,
 )
 
+data class AttentionItemTransition(
+    val eventId: UUID,
+    val aggregateRevision: Long,
+    val state: SourceEventState,
+    val observedAt: Instant,
+    val detectedRevisionGap: Boolean,
+)
+
+data class AttentionItemTransitionHistory(
+    val transitions: List<AttentionItemTransition>,
+    val nextBeforeAggregateRevision: Long?,
+)
+
 data class RebuildResult(
     val receiptCount: Int,
     val itemCount: Int,
@@ -160,6 +173,15 @@ interface BriefUseCases {
         limit: Int,
     ): CurrentAttentionItemPage
 
+    fun findAttentionItemTransitions(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType,
+        sourceReference: String,
+        beforeAggregateRevision: Long?,
+        limit: Int,
+    ): AttentionItemTransitionHistory
+
     fun rebuild(): RebuildResult
 
     fun generateEdition(command: GenerateEditionCommand): EditionResult
@@ -223,6 +245,15 @@ interface BriefPersistencePort {
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage
+
+    fun findAttentionItemTransitions(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType,
+        sourceReference: String,
+        beforeAggregateRevision: Long?,
+        limit: Int,
+    ): AttentionItemTransitionHistory
 
     fun rebuild(project: (SourceEvent, AttentionItem?) -> ProjectionDecision): RebuildResult
 

@@ -1,6 +1,8 @@
 package com.personal.baton.brief.persistence
 
 import com.personal.baton.brief.application.AttentionItemCursor
+import com.personal.baton.brief.application.AttentionItemTransition
+import com.personal.baton.brief.application.AttentionItemTransitionHistory
 import com.personal.baton.brief.application.BriefPersistencePort
 import com.personal.baton.brief.application.CurrentAttentionItemPage
 import com.personal.baton.brief.application.EditionContent
@@ -236,6 +238,66 @@ class JdbcBriefPersistenceAdapter(
             items = items,
             nextCursor = if (fetched.size > limit) {
                 items.last().let { AttentionItemCursor(it.eventType, it.sourceReference) }
+            } else {
+                null
+            },
+        )
+    }
+
+    override fun findAttentionItemTransitions(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType,
+        sourceReference: String,
+        beforeAggregateRevision: Long?,
+        limit: Int,
+    ): AttentionItemTransitionHistory {
+        val beforeClause = if (beforeAggregateRevision == null) {
+            ""
+        } else {
+            "AND aggregate_revision < :beforeAggregateRevision"
+        }
+        val parameters = mutableMapOf<String, Any>(
+            "workspaceId" to workspaceId,
+            "seasonId" to seasonId,
+            "eventType" to eventType.name,
+            "sourceReference" to sourceReference,
+            "fetchLimit" to limit + 1,
+        )
+        if (beforeAggregateRevision != null) {
+            parameters["beforeAggregateRevision"] = beforeAggregateRevision
+        }
+
+        val fetched = jdbc.sql(
+            """
+            SELECT event_id, aggregate_revision, event_state, occurred_at,
+                   processing_outcome = 'APPLIED_WITH_GAP' AS detected_revision_gap
+              FROM source_event_receipt
+             WHERE workspace_id = :workspaceId
+               AND season_id = :seasonId
+               AND event_type = :eventType
+               AND source_reference = :sourceReference
+               AND processing_outcome IN ('APPLIED', 'APPLIED_WITH_GAP')
+               $beforeClause
+             ORDER BY aggregate_revision DESC
+             LIMIT :fetchLimit
+            """.trimIndent(),
+        ).params(parameters)
+            .query { rs, _ ->
+                AttentionItemTransition(
+                    eventId = rs.getObject("event_id", UUID::class.java),
+                    aggregateRevision = rs.getLong("aggregate_revision"),
+                    state = SourceEventState.valueOf(rs.getString("event_state")),
+                    observedAt = rs.instant("occurred_at"),
+                    detectedRevisionGap = rs.getBoolean("detected_revision_gap"),
+                )
+            }
+            .list()
+        val transitions = fetched.take(limit)
+        return AttentionItemTransitionHistory(
+            transitions = transitions,
+            nextBeforeAggregateRevision = if (fetched.size > limit) {
+                transitions.last().aggregateRevision
             } else {
                 null
             },
