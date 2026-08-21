@@ -15,7 +15,7 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > PRD-0009의 주간 범위 최신 불변 에디션 조회도 구현했고 PostgreSQL 통합 테스트와 전체
 > 테스트·실행 JAR 생성이 성공했다.
 > PRD-0010의 새 에디션 항목 리비전 근거 고정과 이전 항목 `null` 호환성도 구현했다.
-> PostgreSQL Testcontainers 빈 데이터베이스의 V1~V5 적용과 전체 테스트·실행 JAR 생성이
+> PostgreSQL Testcontainers 빈 데이터베이스의 V1~V6 적용과 전체 테스트·실행 JAR 생성이
 > 성공했다.
 > PRD-0011의 작업공간·시즌별 이상 수신 증거 이력 조회도 구현했고, 기존 PostgreSQL
 > 수신 시나리오와 전체 테스트·실행 JAR 생성이 성공했다.
