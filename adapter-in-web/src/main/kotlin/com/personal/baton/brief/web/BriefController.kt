@@ -1,7 +1,9 @@
 package com.personal.baton.brief.web
 
 import com.personal.baton.brief.application.BriefUseCases
+import com.personal.baton.brief.application.EditionComparison
 import com.personal.baton.brief.application.EditionComparisonResult
+import com.personal.baton.brief.application.EditionHistoryResult
 import com.personal.baton.brief.application.EventReceiptAnomalyResult
 import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
@@ -109,9 +111,7 @@ class BriefController(
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("beforeGeneration", required = false) @Positive beforeGeneration: Long?,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
-    ): EditionHistoryResponse = EditionHistoryResponse.from(
-        brief.findEditionHistory(workspaceId, seasonId, beforeGeneration, limit),
-    )
+    ): EditionHistoryResult = brief.findEditionHistory(workspaceId, seasonId, beforeGeneration, limit)
 
     @GetMapping("/editions/{editionId}")
     fun findEdition(
@@ -124,8 +124,8 @@ class BriefController(
     fun compareEditions(
         @PathVariable("targetEditionId") targetEditionId: UUID,
         @RequestParam("fromEditionId") fromEditionId: UUID,
-    ): EditionComparisonResponse = when (val result = brief.compareEditions(fromEditionId, targetEditionId)) {
-        is EditionComparisonResult.Found -> EditionComparisonResponse.from(result.comparison)
+    ): EditionComparison = when (val result = brief.compareEditions(fromEditionId, targetEditionId)) {
+        is EditionComparisonResult.Found -> result.comparison
         EditionComparisonResult.NotFound -> throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
         EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(
             HttpStatus.BAD_REQUEST,

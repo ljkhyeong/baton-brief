@@ -283,6 +283,7 @@ class BriefMvpIntegrationTest(
         val firstResult = postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.generation").value(1))
+            .andExpect(jsonPath("$.zoneId").value("Asia/Seoul"))
             .andExpect(jsonPath("$.sourceCursor").value(3))
             .andExpect(jsonPath("$.items[0].severity").value("HIGH"))
             .andExpect(jsonPath("$.items[1].severity").value("MEDIUM"))

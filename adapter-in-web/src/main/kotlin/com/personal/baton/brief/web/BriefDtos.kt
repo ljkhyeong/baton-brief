@@ -1,9 +1,5 @@
 package com.personal.baton.brief.web
 
-import com.personal.baton.brief.application.EditionHistoryResult
-import com.personal.baton.brief.application.EditionComparison
-import com.personal.baton.brief.application.EditionItemChange
-import com.personal.baton.brief.application.EditionSummary
 import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
@@ -122,43 +118,19 @@ data class AttentionItemResponse(
     }
 }
 
-data class EditionItemResponse(
-    val reasonCode: SourceEventType,
-    val severity: Severity,
-    val sourceReference: String,
-    val status: AttentionStatus,
-    val observedAt: Instant,
-    val ruleVersion: Int,
-    val aggregateRevision: Long?,
-    val revisionGap: Boolean?,
-) {
-    companion object {
-        fun from(item: BriefEditionItem): EditionItemResponse = EditionItemResponse(
-            reasonCode = item.reasonCode,
-            severity = item.severity,
-            sourceReference = item.sourceReference,
-            status = item.status,
-            observedAt = item.observedAt,
-            ruleVersion = item.ruleVersion,
-            aggregateRevision = item.aggregateRevision,
-            revisionGap = item.revisionGap,
-        )
-    }
-}
-
 data class BriefEditionResponse(
     val editionId: UUID,
     val workspaceId: UUID,
     val seasonId: UUID,
     val generation: Long,
     val weekStart: LocalDate,
-    val zoneId: String,
+    val zoneId: ZoneId,
     val windowStart: Instant,
     val windowEnd: Instant,
     val sourceCursor: Long,
     val generatedAt: Instant,
     val ruleVersion: Int,
-    val items: List<EditionItemResponse>,
+    val items: List<BriefEditionItem>,
 ) {
     companion object {
         fun from(edition: BriefEdition): BriefEditionResponse = BriefEditionResponse(
@@ -167,79 +139,13 @@ data class BriefEditionResponse(
             seasonId = edition.seasonId,
             generation = edition.generation,
             weekStart = edition.window.weekStart,
-            zoneId = edition.window.zoneId.id,
+            zoneId = edition.window.zoneId,
             windowStart = edition.window.start,
             windowEnd = edition.window.end,
             sourceCursor = edition.sourceCursor,
             generatedAt = edition.generatedAt,
             ruleVersion = edition.ruleVersion,
-            items = edition.items.map(EditionItemResponse::from),
-        )
-    }
-}
-
-data class EditionSummaryResponse(
-    val editionId: UUID,
-    val generation: Long,
-    val weekStart: LocalDate,
-    val zoneId: String,
-    val generatedAt: Instant,
-    val sourceCursor: Long,
-    val ruleVersion: Int,
-    val itemCount: Int,
-) {
-    companion object {
-        fun from(summary: EditionSummary): EditionSummaryResponse = EditionSummaryResponse(
-            editionId = summary.editionId,
-            generation = summary.generation,
-            weekStart = summary.weekStart,
-            zoneId = summary.zoneId.id,
-            generatedAt = summary.generatedAt,
-            sourceCursor = summary.sourceCursor,
-            ruleVersion = summary.ruleVersion,
-            itemCount = summary.itemCount,
-        )
-    }
-}
-
-data class EditionHistoryResponse(
-    val editions: List<EditionSummaryResponse>,
-    val nextBeforeGeneration: Long?,
-) {
-    companion object {
-        fun from(result: EditionHistoryResult): EditionHistoryResponse = EditionHistoryResponse(
-            editions = result.editions.map(EditionSummaryResponse::from),
-            nextBeforeGeneration = result.nextBeforeGeneration,
-        )
-    }
-}
-
-data class EditionItemChangeResponse(
-    val before: EditionItemResponse,
-    val after: EditionItemResponse,
-) {
-    companion object {
-        fun from(change: EditionItemChange): EditionItemChangeResponse = EditionItemChangeResponse(
-            before = EditionItemResponse.from(change.before),
-            after = EditionItemResponse.from(change.after),
-        )
-    }
-}
-
-data class EditionComparisonResponse(
-    val from: EditionSummaryResponse,
-    val to: EditionSummaryResponse,
-    val added: List<EditionItemResponse>,
-    val removed: List<EditionItemResponse>,
-    val changed: List<EditionItemChangeResponse>,
-) {
-    companion object {
-        fun from(comparison: EditionComparison): EditionComparisonResponse = EditionComparisonResponse(
-            from = EditionSummaryResponse.from(comparison.from),
-            to = EditionSummaryResponse.from(comparison.to),
-            added = comparison.added.map(EditionItemResponse::from),
-            removed = comparison.removed.map(EditionItemResponse::from),
-            changed = comparison.changed.map(EditionItemChangeResponse::from),
+            items = edition.items,
         )
     }
 }
