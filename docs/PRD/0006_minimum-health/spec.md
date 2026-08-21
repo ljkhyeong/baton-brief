@@ -5,7 +5,8 @@
 - 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 로컬 실행 프로세스와 필수 데이터베이스의 표준 집계 상태 확인
 
-대상 PostgreSQL 통합 테스트와 저장소 전체 `clean test`, 실행 JAR 생성이 성공했다.
+대상 PostgreSQL 통합 테스트와 저장소 전체 `clean test`, 실행 JAR 생성에 더해 패키지
+JAR의 실제 로컬 HTTP 상태 확인이 성공했다.
 
 ## 목적
 
@@ -99,3 +100,7 @@ Kubernetes나 다른 배포 오케스트레이터를 채택할 때 liveness, rea
   대표 probe 경로의 미노출을 확인했다.
 - `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 다섯 모듈의 전체 테스트와
   실행 JAR 생성을 확인했다.
+- Java 21.0.10에서 격리된 Compose PostgreSQL 18.4와
+  `bootstrap-0.1.0-SNAPSHOT.jar`를 실제 웹 모드로 기동했다. Flyway V1~V6 적용 뒤
+  `GET http://127.0.0.1:18080/actuator/health`가 `200 OK`와 `{"status":"UP"}`만 반환함을
+  확인했고, 검증용 컨테이너·네트워크·볼륨을 제거했다.

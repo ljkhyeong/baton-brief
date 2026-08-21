@@ -322,22 +322,22 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   - 불변 에디션의 추가·제거·변경, 기준·대상 순서, 역방향 비교와 재구축 뒤 동일 결과
 - `docker compose config`: 성공. `postgres:18.4-alpine`, 상태 확인과 이름 있는 볼륨의
   `/var/lib/postgresql` 마운트 구문 확인
-- `java -jar bootstrap/build/libs/bootstrap-0.1.0-SNAPSHOT.jar --spring.main.web-application-type=none`:
-  Java 21.0.10에서 Compose PostgreSQL 18.4에 연결해 성공. Flyway가 V1 마이그레이션을
-  검증·적용했고 Spring 컨텍스트가 시작됨
+- `BRIEF_DB_PORT=55432 docker compose -p baton-brief-smoke -f compose.yml up -d --wait`:
+  격리된 PostgreSQL 18.4 컨테이너가 정상 상태로 기동됨
+- `SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:55432/baton_brief java -jar bootstrap/build/libs/bootstrap-0.1.0-SNAPSHOT.jar --server.port=18080`:
+  Java 21.0.10에서 실제 웹 모드로 기동. Tomcat 11.0.22가 18080 포트를 열고 Flyway가 빈
+  스키마에 V1~V6 여섯 마이그레이션을 적용해 v6에 도달함
+- `curl --fail-with-body --silent --show-error --include http://127.0.0.1:18080/actuator/health`:
+  `200 OK`, `Content-Type: application/vnd.spring-boot.actuator.v3+json`, 본문
+  `{"status":"UP"}` 확인
 
-위 비웹 실행 JAR 기동 점검은 V2 추가 전 V1 기준이다. 현재 V1~V6는 PostgreSQL 18.4
-Testcontainers 빈 데이터베이스에서 Flyway로 적용했고, 별도 스키마의 대표 V2 데이터에는
-V3~V6 실제 SQL을 순서대로 적용했다. 실행 JAR 생성까지 확인했으며 같은 Compose 실행 환경
-기동은 중복 수행하지 않았다.
+실제 로컬 소켓을 통한 패키지 JAR의 Tomcat·Flyway·DataSource·aggregate health 결합은
+확인했다. 제품 HTTP 계약과 영속성 동작은 위 PostgreSQL Testcontainers·MockMvc 통합
+시나리오가 담당하므로 같은 제품 시나리오를 네트워크로 반복하지 않았다. BATON 생산자와의
+외부 종단 간 연동, 인증·인가와 운영 배포는 검증 범위가 아니다.
 
-실행 점검은 비웹 모드이므로 실제 수신 포트를 통한 HTTP 네트워크 동작은 입증하지 않는다.
-HTTP 경로와 영속성 동작은 위 PostgreSQL Testcontainers·MockMvc 통합 시나리오가 입증한다.
-BATON 생산자와의 외부 종단 간 연동, 인증·인가, 운영 배포는
-검증 범위가 아니다.
-
-검증 뒤 Compose 테스트 컨테이너, 네트워크와 이름 있는 볼륨
-`baton-brief_brief-postgres-data`를 모두 제거했다.
+검증 뒤 `baton-brief-smoke` 애플리케이션 프로세스를 정상 종료하고, 이번 검증에서 만든
+Compose 컨테이너·네트워크·이름 있는 볼륨을 모두 제거했다.
 
 ## 현재 제한
 
