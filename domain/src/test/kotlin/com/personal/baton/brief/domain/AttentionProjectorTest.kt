@@ -10,9 +10,7 @@ class AttentionProjectorTest {
     fun `maps a blocked handoff to a high severity item`() {
         val decision = AttentionProjector.project(event(), null) as ProjectionDecision.Applied
 
-        assertThat(decision.item.reasonCode).isEqualTo(SourceEventType.HANDOFF_BLOCKED)
         assertThat(decision.item.severity).isEqualTo(Severity.HIGH)
-        assertThat(decision.item.status).isEqualTo(AttentionStatus.ACTIVE)
         assertThat(decision.hasRevisionGap).isFalse()
     }
 

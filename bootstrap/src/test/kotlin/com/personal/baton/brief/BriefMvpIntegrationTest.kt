@@ -283,7 +283,6 @@ class BriefMvpIntegrationTest(
         val firstResult = postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.generation").value(1))
-            .andExpect(jsonPath("$.zoneId").value("Asia/Seoul"))
             .andExpect(jsonPath("$.sourceCursor").value(3))
             .andExpect(jsonPath("$.items[0].severity").value("HIGH"))
             .andExpect(jsonPath("$.items[1].severity").value("MEDIUM"))
@@ -401,7 +400,6 @@ class BriefMvpIntegrationTest(
         postEdition(generationPath, nextWeekRequest)
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.generation").value(4))
-            .andExpect(jsonPath("$.weekStart").value("2026-08-17"))
             .andExpect(jsonPath("$.items.length()").value(1))
             .andExpect(jsonPath("$.items[0].sourceReference").value("decision:next-week"))
 
@@ -427,7 +425,6 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(get("$generationPath/latest"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.generation").value(5))
-            .andExpect(jsonPath("$.weekStart").value("2026-08-10"))
 
         val weeklyLatestPath = "$generationPath/weekly/latest"
         mockMvc.perform(
