@@ -46,6 +46,10 @@ PRD-0016에서 보존 수신 기록 중 실제 적용된 상태 전이 증거를
 키셋으로 조회하는 계약을 채택하고 구현했다. 대상 PostgreSQL 수신 통합 시나리오와
 저장소 전체 테스트·실행 JAR 생성이 성공했다.
 
+PRD-0017에서 현재 관심 항목 단건 응답에 규칙 버전과 마지막 적용 집계 리비전에 결합한
+`ETag`를 제공하고 Spring MVC의 표준 `If-None-Match` 조건부 조회를 채택하고 구현했다.
+대상 PostgreSQL 수신 통합 시나리오와 저장소 전체 테스트·실행 JAR 생성이 성공했다.
+
 관심 항목에서 실제 소비되지 않던 `item_id` 대리키는 Flyway V4에서 제거했다. 기존
 `(workspace_id, season_id, event_type, source_reference)` 정체성을 복합 기본 키로 사용하며,
 제품 API와 투영 의미는 바꾸지 않았다.
@@ -108,6 +112,9 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   `RESOLVED`를 선택할 수 있으며, 어느 쪽도 과거 상태 이력으로 해석하지 않는다.
 - PRD-0016에서 실제 적용된 `APPLIED`·`APPLIED_WITH_GAP` 상태 전이만 원본 집계 리비전
   내림차순 키셋으로 조회하는 계약을 채택했다. 현재 규칙의 과거 전체 투영 재계산은 아니다.
+- PRD-0017에서 현재 관심 항목 단건 응답의 규칙 버전·마지막 적용 집계 리비전에 결합한
+  불투명 `ETag`와 Spring MVC 표준 `If-None-Match` 조건부 조회를 채택했다. 목록 검증자와
+  캐시 TTL·저장소는 포함하지 않는다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -141,6 +148,9 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   `AttentionItemResponse`를 반환한다. 새 DTO, SQL 도우미, 스키마와 인덱스는 없다.
 - 현재 항목은 후속 지원 이벤트와 재구축 결과에 따라 바뀔 수 있다. 불변 에디션이나 과거
   투영 이력으로 해석하지 않는다.
+- 현재 응답은 `ruleVersion`과 마지막 적용 리비전에 결합한 `ETag`를 제공한다. 같은 현재
+  표현은 `304`, 더 큰 적용 리비전으로 바뀐 표현은 이전 검증자에 `200`과 새 `ETag`를
+  반환하며 직접 헤더 파서·본문 해시·캐시 저장소는 없다.
 
 ## 구현한 현재 관심 항목 상태별 키셋 조회
 
@@ -276,7 +286,8 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   성공. PostgreSQL 18.4 Testcontainers에서 수신 증거와 이상 증거 키셋, 재구축 뒤 현재
   단건의 리비전·공백 근거, 현재 `ACTIVE` 세 종류의 복합 키셋 페이지, 후속 `RESOLVED`
   갱신과 활성 목록 제외·해소 목록 포함, 적용 전이 `4 → 3 → 1`의 리비전 키셋·공백 탐지와
-  `STALE` 제외, 범위 격리와 대표 입력 오류를 확인
+  `STALE` 제외, 현재 단건의 동일 검증자 `304`와 후속 리비전 뒤 이전 검증자 `200`·새
+  `ETag`, 범위 격리와 대표 입력 오류를 확인
 
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition is idempotent immutable generated and reproducible after rebuild'`:
   성공. PostgreSQL 18.4 Testcontainers에서 재구축 뒤 불변 단건 에디션의 `304`, 전역
@@ -302,7 +313,8 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백, 이벤트별 충돌 증거 상한과
     최초 수신 증거의 읽기 전용 조회·재구축 뒤 불변성·fingerprint 비노출
   - 복합 정체성의 현재 관심 항목 단건 조회, 재구축 뒤 리비전·공백 근거와 후속
-    `RESOLVED` 갱신, 범위 격리와 입력 검증
+    `RESOLVED` 갱신, 동일 현재 표현의 `304`와 이전 검증자에 대한 새 `200` 응답, 범위
+    격리와 입력 검증
   - 현재 `ACTIVE` 항목의 복합 정체성 순서, 배타 키셋 다음 페이지, 다른 작업공간의 빈
     범위, 반쪽 커서 거부와 후속 `RESOLVED` 항목 제외
   - 작업공간·시즌별 이상 수신 증거의 선정, 충돌 뒤 `APPLIED` 포함, 수신 순서 내림차순
