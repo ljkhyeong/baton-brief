@@ -8,6 +8,7 @@ import com.personal.baton.brief.application.EventReceiptAnomalyResult
 import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
+import com.personal.baton.brief.domain.BriefEdition
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
@@ -79,21 +80,20 @@ class BriefController(
         @Valid @RequestBody request: EditionWeekRequest,
     ): ResponseEntity<BriefEditionResponse> {
         val result = brief.generateEdition(request.toCommand(workspaceId, seasonId))
-        val response = BriefEditionResponse.from(result.edition)
-        return if (result.created) {
+        val response = if (result.created) {
             ResponseEntity.created(URI.create("/api/v1/editions/${result.edition.editionId}"))
-                .body(response)
         } else {
-            ResponseEntity.ok(response)
+            ResponseEntity.ok()
         }
+        return result.edition.toResponse(response)
     }
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest")
     fun findLatestEdition(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
-    ): BriefEditionResponse = brief.findLatestEdition(workspaceId, seasonId)
-        ?.let(BriefEditionResponse::from)
+    ): ResponseEntity<BriefEditionResponse> = brief.findLatestEdition(workspaceId, seasonId)
+        ?.toResponse()
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest")
@@ -101,9 +101,10 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @Valid @ModelAttribute request: EditionWeekRequest,
-    ): BriefEditionResponse = brief.findLatestEditionForWeek(request.toCommand(workspaceId, seasonId))
-        ?.let(BriefEditionResponse::from)
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
+    ): ResponseEntity<BriefEditionResponse> =
+        brief.findLatestEditionForWeek(request.toCommand(workspaceId, seasonId))
+            ?.toResponse()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions")
     fun findEditionHistory(
@@ -116,8 +117,8 @@ class BriefController(
     @GetMapping("/editions/{editionId}")
     fun findEdition(
         @PathVariable("editionId") editionId: UUID,
-    ): BriefEditionResponse = brief.findEdition(editionId)
-        ?.let(BriefEditionResponse::from)
+    ): ResponseEntity<BriefEditionResponse> = brief.findEdition(editionId)
+        ?.toResponse()
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
 
     @GetMapping("/editions/{targetEditionId}/changes")
@@ -133,3 +134,9 @@ class BriefController(
         )
     }
 }
+
+private fun BriefEdition.toResponse(
+    builder: ResponseEntity.BodyBuilder = ResponseEntity.ok(),
+): ResponseEntity<BriefEditionResponse> = builder
+    .eTag("brief-edition-v1-$editionId")
+    .body(BriefEditionResponse.from(this))
