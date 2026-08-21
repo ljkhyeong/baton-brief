@@ -334,6 +334,46 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items[0].sourceReference").value("handoff:1"))
             .andExpect(jsonPath("$.items[0].status").value("RESOLVED"))
 
+        val transitionPath = "$attentionItemsPath/transitions"
+        mockMvc.perform(
+            get(transitionPath)
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "handoff:1")
+                .param("limit", "2"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.transitions.length()").value(2))
+            .andExpect(
+                jsonPath("$.transitions[0].eventId")
+                    .value("30000000-0000-0000-0000-000000000005"),
+            )
+            .andExpect(jsonPath("$.transitions[0].aggregateRevision").value(4))
+            .andExpect(jsonPath("$.transitions[0].state").value("RESOLVED"))
+            .andExpect(jsonPath("$.transitions[0].detectedRevisionGap").value(false))
+            .andExpect(jsonPath("$.transitions[1].aggregateRevision").value(3))
+            .andExpect(jsonPath("$.transitions[1].state").value("ACTIVE"))
+            .andExpect(jsonPath("$.transitions[1].detectedRevisionGap").value(true))
+            .andExpect(jsonPath("$.nextBeforeAggregateRevision").value(3))
+
+        mockMvc.perform(
+            get(transitionPath)
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "handoff:1")
+                .param("beforeAggregateRevision", "3")
+                .param("limit", "2"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.transitions.length()").value(1))
+            .andExpect(jsonPath("$.transitions[0].aggregateRevision").value(1))
+            .andExpect(jsonPath("$.nextBeforeAggregateRevision").value(nullValue()))
+
+        mockMvc.perform(
+            get(
+                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/" +
+                    "attention-items/transitions",
+            ).param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "handoff:1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.transitions").isEmpty)
+
         mockMvc.perform(
             get(
                 "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/" +
