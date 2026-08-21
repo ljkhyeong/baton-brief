@@ -234,6 +234,49 @@ class BriefMvpIntegrationTest(
             .contentAsString
         assertThat(rebuiltReceipt).isEqualTo(canonicalReceipt)
 
+        val currentAttentionPath =
+            "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
+        mockMvc.perform(
+            get(currentAttentionPath)
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "handoff:1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("ACTIVE"))
+            .andExpect(jsonPath("$.aggregateRevision").value(3))
+            .andExpect(jsonPath("$.revisionGap").value(true))
+
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000005",
+                workspaceId,
+                seasonId,
+                "handoff:1",
+                4,
+                state = "RESOLVED",
+            ),
+        ).andExpect(status().isAccepted)
+        mockMvc.perform(
+            get(currentAttentionPath)
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "handoff:1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("RESOLVED"))
+            .andExpect(jsonPath("$.aggregateRevision").value(4))
+
+        mockMvc.perform(
+            get(
+                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/" +
+                    "attention-items/current",
+            ).param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "handoff:1"),
+        ).andExpect(status().isNotFound)
+
+        mockMvc.perform(
+            get(currentAttentionPath)
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", " "),
+        ).andExpect(status().isBadRequest)
+
         val missingReceiptPath = "/api/v1/events/30000000-0000-0000-0000-000000000099/receipt"
         mockMvc.perform(get(missingReceiptPath))
             .andExpect(status().isNotFound)
