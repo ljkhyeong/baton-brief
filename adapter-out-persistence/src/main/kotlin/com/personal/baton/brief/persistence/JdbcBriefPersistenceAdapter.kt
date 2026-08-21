@@ -193,9 +193,10 @@ class JdbcBriefPersistenceAdapter(
         ),
     ).query(::mapAttention).optional().getOrNull()
 
-    override fun findActiveAttentionItems(
+    override fun findAttentionItems(
         workspaceId: UUID,
         seasonId: UUID,
+        status: SourceEventState,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage {
@@ -209,6 +210,7 @@ class JdbcBriefPersistenceAdapter(
         val parameters = mutableMapOf<String, Any>(
             "workspaceId" to workspaceId,
             "seasonId" to seasonId,
+            "status" to status.name,
             "fetchLimit" to limit + 1,
         )
         if (after != null) {
@@ -221,7 +223,7 @@ class JdbcBriefPersistenceAdapter(
             SELECT * FROM attention_item
              WHERE workspace_id = :workspaceId
                AND season_id = :seasonId
-               AND item_status = 'ACTIVE'
+               AND item_status = :status
                $afterClause
              ORDER BY event_type, source_reference
              LIMIT :fetchLimit

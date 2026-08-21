@@ -60,14 +60,16 @@ class BriefService(
         sourceReference,
     )
 
-    override fun findActiveAttentionItems(
+    override fun findAttentionItems(
         workspaceId: UUID,
         seasonId: UUID,
+        status: SourceEventState,
         after: AttentionItemCursor?,
         limit: Int,
-    ): CurrentAttentionItemPage = persistence.findActiveAttentionItems(
+    ): CurrentAttentionItemPage = persistence.findAttentionItems(
         workspaceId,
         seasonId,
+        status,
         after,
         limit,
     )

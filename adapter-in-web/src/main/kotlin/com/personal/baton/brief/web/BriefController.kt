@@ -88,15 +88,16 @@ class BriefController(
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "attention item not found")
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items")
-    fun findActiveAttentionItems(
+    fun findAttentionItems(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @Valid @ModelAttribute request: CurrentAttentionItemPageRequest,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
     ): CurrentAttentionItemPageResponse = CurrentAttentionItemPageResponse.from(
-        brief.findActiveAttentionItems(
+        brief.findAttentionItems(
             workspaceId,
             seasonId,
+            request.status,
             request.toCursor(),
             limit,
         ),

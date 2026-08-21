@@ -82,6 +82,7 @@ data class EditionWeekRequest(
 }
 
 data class CurrentAttentionItemPageRequest(
+    val status: SourceEventState = SourceEventState.ACTIVE,
     val afterEventType: SourceEventType? = null,
     @field:Size(max = 128)
     val afterSourceReference: String? = null,

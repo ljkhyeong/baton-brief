@@ -152,9 +152,10 @@ interface BriefUseCases {
         sourceReference: String,
     ): AttentionItem?
 
-    fun findActiveAttentionItems(
+    fun findAttentionItems(
         workspaceId: UUID,
         seasonId: UUID,
+        status: SourceEventState,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage
@@ -215,9 +216,10 @@ interface BriefPersistencePort {
         sourceReference: String,
     ): AttentionItem?
 
-    fun findActiveAttentionItems(
+    fun findAttentionItems(
         workspaceId: UUID,
         seasonId: UUID,
+        status: SourceEventState,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage
