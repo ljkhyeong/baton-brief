@@ -21,8 +21,6 @@ class BriefService(
     private val persistence: BriefPersistencePort,
     private val clock: Clock,
 ) : BriefUseCases {
-    private val projector = AttentionProjector()
-
     override fun ingest(event: SourceEvent): IngestResult {
         val normalizedEvent = event.copy(occurredAt = event.occurredAt.truncatedTo(ChronoUnit.MICROS))
         val receivedAt = clock.instant().truncatedTo(ChronoUnit.MICROS)
@@ -32,7 +30,7 @@ class BriefService(
         }
 
         return persistence.processEvent(normalizedEvent, fingerprint, receivedAt) { current ->
-            projector.project(normalizedEvent, current)
+            AttentionProjector.project(normalizedEvent, current)
         }
     }
 
@@ -50,7 +48,7 @@ class BriefService(
         limit,
     )
 
-    override fun rebuild(): RebuildResult = persistence.rebuild(projector::project)
+    override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)
 
     override fun generateEdition(command: GenerateEditionCommand): EditionResult {
         val window = WeeklyWindow.startingOn(command.weekStart, command.zoneId)

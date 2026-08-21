@@ -18,14 +18,16 @@ data class AttentionItem(
     val seasonId: UUID,
     val eventType: SourceEventType,
     val sourceReference: String,
-    val reasonCode: SourceEventType,
     val severity: Severity,
     val status: AttentionStatus,
     val observedAt: Instant,
     val ruleVersion: Int,
     val lastRevision: Long,
     val revisionGap: Boolean,
-)
+) {
+    val reasonCode: SourceEventType
+        get() = eventType
+}
 
 sealed interface ProjectionDecision {
     data class Applied(
@@ -36,7 +38,7 @@ sealed interface ProjectionDecision {
     data object Stale : ProjectionDecision
 }
 
-class AttentionProjector {
+object AttentionProjector {
     fun project(
         event: SourceEvent,
         current: AttentionItem?,
@@ -59,7 +61,6 @@ class AttentionProjector {
                 seasonId = event.seasonId,
                 eventType = event.eventType,
                 sourceReference = event.sourceReference,
-                reasonCode = event.eventType,
                 severity = severity,
                 status = when (event.state) {
                     SourceEventState.ACTIVE -> AttentionStatus.ACTIVE
@@ -74,7 +75,5 @@ class AttentionProjector {
         )
     }
 
-    companion object {
-        const val RULE_VERSION = 1
-    }
+    const val RULE_VERSION = 1
 }

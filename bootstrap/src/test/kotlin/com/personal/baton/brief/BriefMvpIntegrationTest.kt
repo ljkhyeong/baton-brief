@@ -361,10 +361,9 @@ class BriefMvpIntegrationTest(
         val attentionCountBeforeFailedRebuild = jdbc.sql("SELECT COUNT(*) FROM attention_item")
             .query(Long::class.java)
             .single()
-        val projector = AttentionProjector()
         assertThatThrownBy {
             persistence.rebuild { event, current ->
-                when (val decision = projector.project(event, current)) {
+                when (val decision = AttentionProjector.project(event, current)) {
                     is ProjectionDecision.Applied -> if (event.sourceReference == "routine:weekly") {
                         decision.copy(item = decision.item.copy(ruleVersion = 0))
                     } else {
@@ -723,7 +722,6 @@ class BriefMvpIntegrationTest(
         assertThat(jdbc.sql("SELECT COUNT(*) FROM brief_edition").query(Long::class.java).single())
             .isEqualTo(1)
 
-        val projector = AttentionProjector()
         val rebuildStarted = CountDownLatch(1)
         val releaseRebuild = CountDownLatch(1)
         val receivedAt = Instant.parse("2026-08-12T09:00:01Z")
@@ -744,7 +742,7 @@ class BriefMvpIntegrationTest(
                 persistence.rebuild { receivedEvent, current ->
                     rebuildStarted.countDown()
                     check(releaseRebuild.await(10, TimeUnit.SECONDS))
-                    projector.project(receivedEvent, current)
+                    AttentionProjector.project(receivedEvent, current)
                 }
             }
             try {
@@ -755,7 +753,7 @@ class BriefMvpIntegrationTest(
                         fingerprint = "a".repeat(64),
                         receivedAt = receivedAt,
                     ) { current ->
-                        projector.project(supportedEvent, current)
+                        AttentionProjector.project(supportedEvent, current)
                     }
                 }
 

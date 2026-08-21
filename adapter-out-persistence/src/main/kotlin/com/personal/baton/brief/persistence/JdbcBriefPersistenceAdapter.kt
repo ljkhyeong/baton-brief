@@ -426,14 +426,13 @@ class JdbcBriefPersistenceAdapter(
         jdbc.sql(
             """
             INSERT INTO attention_item (
-                workspace_id, season_id, event_type, source_reference, reason_code, severity,
+                workspace_id, season_id, event_type, source_reference, severity,
                 item_status, observed_at, rule_version, last_revision, revision_gap
             ) VALUES (
-                :workspaceId, :seasonId, :eventType, :sourceReference, :reasonCode, :severity,
+                :workspaceId, :seasonId, :eventType, :sourceReference, :severity,
                 :itemStatus, :observedAt, :ruleVersion, :lastRevision, :revisionGap
             )
             ON CONFLICT (workspace_id, season_id, event_type, source_reference) DO UPDATE SET
-                reason_code = EXCLUDED.reason_code,
                 severity = EXCLUDED.severity,
                 item_status = EXCLUDED.item_status,
                 observed_at = EXCLUDED.observed_at,
@@ -447,7 +446,6 @@ class JdbcBriefPersistenceAdapter(
                 "seasonId" to item.seasonId,
                 "eventType" to item.eventType.name,
                 "sourceReference" to item.sourceReference,
-                "reasonCode" to item.reasonCode.name,
                 "severity" to item.severity.name,
                 "itemStatus" to item.status.name,
                 "observedAt" to item.observedAt.jdbcValue(),
@@ -640,7 +638,6 @@ class JdbcBriefPersistenceAdapter(
         seasonId = result.getObject("season_id", UUID::class.java),
         eventType = SourceEventType.valueOf(result.getString("event_type")),
         sourceReference = result.getString("source_reference"),
-        reasonCode = SourceEventType.valueOf(result.getString("reason_code")),
         severity = Severity.valueOf(result.getString("severity")),
         status = AttentionStatus.valueOf(result.getString("item_status")),
         observedAt = result.instant("observed_at"),
