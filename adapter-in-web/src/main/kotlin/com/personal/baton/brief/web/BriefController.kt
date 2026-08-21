@@ -80,13 +80,17 @@ class BriefController(
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("eventType") eventType: SourceEventType,
         @RequestParam("sourceReference") @NotBlank @Size(max = 128) sourceReference: String,
-    ): AttentionItemResponse = brief.findAttentionItem(
-        workspaceId,
-        seasonId,
-        eventType,
-        sourceReference,
-    )?.let(AttentionItemResponse::from)
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "attention item not found")
+    ): ResponseEntity<AttentionItemResponse> {
+        val item = brief.findAttentionItem(
+            workspaceId,
+            seasonId,
+            eventType,
+            sourceReference,
+        ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "attention item not found")
+        return ResponseEntity.ok()
+            .eTag("brief-attention-item-v1-${item.ruleVersion}-${item.lastRevision}")
+            .body(AttentionItemResponse.from(item))
+    }
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items")
     fun findAttentionItems(
