@@ -18,6 +18,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.hamcrest.Matchers.contains
 import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -223,10 +224,31 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.receipts").isEmpty)
 
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000006",
+                workspaceId,
+                seasonId,
+                "decision:current",
+                1,
+                type = "DECISION_FOLLOW_UP_OVERDUE",
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000007",
+                workspaceId,
+                seasonId,
+                "routine:current",
+                1,
+                type = "ROUTINE_MISSED",
+            ),
+        ).andExpect(status().isAccepted)
+
         mockMvc.perform(post("/api/v1/projections/rebuild"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.receiptCount").value(3))
-            .andExpect(jsonPath("$.itemCount").value(1))
+            .andExpect(jsonPath("$.receiptCount").value(5))
+            .andExpect(jsonPath("$.itemCount").value(3))
         val rebuiltReceipt = mockMvc.perform(get(receiptPath))
             .andExpect(status().isOk)
             .andReturn()
@@ -245,6 +267,42 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.aggregateRevision").value(3))
             .andExpect(jsonPath("$.revisionGap").value(true))
 
+        val activeAttentionPath =
+            "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        mockMvc.perform(get(activeAttentionPath).param("limit", "2"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.items[0].reasonCode").value("DECISION_FOLLOW_UP_OVERDUE"))
+            .andExpect(jsonPath("$.items[0].sourceReference").value("decision:current"))
+            .andExpect(jsonPath("$.items[1].reasonCode").value("HANDOFF_BLOCKED"))
+            .andExpect(jsonPath("$.items[1].sourceReference").value("handoff:1"))
+            .andExpect(jsonPath("$.nextCursor.eventType").value("HANDOFF_BLOCKED"))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("handoff:1"))
+
+        mockMvc.perform(
+            get(activeAttentionPath)
+                .param("afterEventType", "HANDOFF_BLOCKED")
+                .param("afterSourceReference", "handoff:1")
+                .param("limit", "2"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].reasonCode").value("ROUTINE_MISSED"))
+            .andExpect(jsonPath("$.items[0].sourceReference").value("routine:current"))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+
+        mockMvc.perform(
+            get(
+                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/" +
+                    "attention-items",
+            ),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items").isEmpty)
+
+        mockMvc.perform(
+            get(activeAttentionPath)
+                .param("afterEventType", "HANDOFF_BLOCKED"),
+        ).andExpect(status().isBadRequest)
+
         postEvent(
             eventJson(
                 "30000000-0000-0000-0000-000000000005",
@@ -262,6 +320,13 @@ class BriefMvpIntegrationTest(
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("RESOLVED"))
             .andExpect(jsonPath("$.aggregateRevision").value(4))
+
+        mockMvc.perform(get(activeAttentionPath))
+            .andExpect(status().isOk)
+            .andExpect(
+                jsonPath("$.items[*].sourceReference")
+                    .value(contains("decision:current", "routine:current")),
+            )
 
         mockMvc.perform(
             get(
