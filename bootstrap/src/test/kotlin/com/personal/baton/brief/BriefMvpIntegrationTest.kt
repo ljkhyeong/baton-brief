@@ -16,6 +16,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import javax.sql.DataSource
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.hamcrest.Matchers.contains
@@ -25,10 +26,12 @@ import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.core.io.ClassPathResource
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator
 import org.springframework.test.context.TestConstructor
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -48,6 +51,7 @@ class BriefMvpIntegrationTest(
     private val mockMvc: MockMvc,
     private val jdbc: JdbcClient,
     private val persistence: BriefPersistencePort,
+    private val dataSource: DataSource,
 ) {
     @BeforeEach
     fun clearDatabase() {
@@ -76,6 +80,91 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isNotFound)
         mockMvc.perform(get("/actuator/health/liveness"))
             .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `migrations preserve representative V2 data through V6`() {
+        val schema = "brief_migration_upgrade"
+        jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
+        jdbc.sql("CREATE SCHEMA $schema").update()
+
+        try {
+            dataSource.connection.use { connection ->
+                connection.createStatement().use { it.execute("SET search_path TO $schema") }
+                try {
+                    ResourceDatabasePopulator(
+                        *listOf(
+                            "db/migration/V1__create_brief_mvp.sql",
+                            "db/migration/V2__allow_recurring_edition_state.sql",
+                            "fixtures/representative_v2_data.sql",
+                            "db/migration/V3__freeze_edition_revision_evidence.sql",
+                            "db/migration/V4__remove_attention_item_surrogate_key.sql",
+                            "db/migration/V5__remove_unused_projection_timestamp.sql",
+                            "db/migration/V6__derive_attention_reason_code.sql",
+                        ).map(::ClassPathResource).toTypedArray(),
+                    ).populate(connection)
+                } finally {
+                    connection.createStatement().use { it.execute("RESET search_path") }
+                }
+            }
+
+            assertThat(
+                jdbc.sql("SELECT COUNT(*) FROM $schema.attention_item")
+                    .query(Long::class.java)
+                    .single(),
+            ).isEqualTo(1)
+            assertThat(
+                jdbc.sql(
+                    """
+                    SELECT COUNT(*)
+                      FROM information_schema.columns
+                     WHERE table_schema = :schema
+                       AND table_name = 'attention_item'
+                       AND column_name IN ('item_id', 'projected_at', 'reason_code')
+                    """.trimIndent(),
+                ).param("schema", schema)
+                    .query(Long::class.java)
+                    .single(),
+            ).isZero()
+            assertThat(
+                jdbc.sql(
+                    """
+                    SELECT pg_get_constraintdef(oid)
+                      FROM pg_constraint
+                     WHERE conrelid = '$schema.attention_item'::regclass
+                       AND contype = 'p'
+                    """.trimIndent(),
+                ).query(String::class.java)
+                    .single(),
+            ).isEqualTo("PRIMARY KEY (workspace_id, season_id, event_type, source_reference)")
+            assertThat(
+                jdbc.sql(
+                    """
+                    SELECT COUNT(*)
+                      FROM $schema.brief_edition_item
+                     WHERE aggregate_revision IS NULL
+                       AND revision_gap IS NULL
+                    """.trimIndent(),
+                ).query(Long::class.java)
+                    .single(),
+            ).isEqualTo(1)
+            assertThatThrownBy {
+                jdbc.sql(
+                    "UPDATE $schema.brief_edition_item SET aggregate_revision = 1",
+                ).update()
+            }.isInstanceOf(DataIntegrityViolationException::class.java)
+            assertThatThrownBy {
+                jdbc.sql(
+                    """
+                    UPDATE $schema.brief_edition_item
+                       SET aggregate_revision = 0,
+                           revision_gap = FALSE
+                    """.trimIndent(),
+                ).update()
+            }.isInstanceOf(DataIntegrityViolationException::class.java)
+        } finally {
+            jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
+        }
     }
 
     @Test
