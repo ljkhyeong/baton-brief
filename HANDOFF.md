@@ -30,6 +30,10 @@ PRD-0012에서 생성·전역 최신·주간 최신·단건 에디션에 `ETag`�
 표준 `If-None-Match` 조건부 조회를 사용하는 계약을 채택하고 구현했다. 대상 PostgreSQL
 통합 시나리오와 저장소 전체 테스트·실행 JAR 생성이 성공했다.
 
+PRD-0013에서 기존 복합 정체성으로 현재 관심 항목 한 건을 조회하는 계약을 채택하고
+구현했다. 대상 PostgreSQL 수신 통합 시나리오와 저장소 전체 테스트·실행 JAR 생성이
+성공했다.
+
 관심 항목에서 실제 소비되지 않던 `item_id` 대리키는 Flyway V4에서 제거했다. 기존
 `(workspace_id, season_id, event_type, source_reference)` 정체성을 복합 기본 키로 사용하며,
 제품 API와 투영 의미는 바꾸지 않았다.
@@ -82,6 +86,9 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - PRD-0012에서 전체 불변 에디션 응답의 불투명 `ETag`와 적용 대상 `GET`의 표준
   `If-None-Match` 조건부 조회를 채택했다. 최신 조회의 검증자는 요청 시점에 선택된
   에디션을 나타내며 캐시 TTL과 외부 공개 정책은 포함하지 않는다.
+- PRD-0013에서 `(workspaceId, seasonId, eventType, sourceReference)`가 정확히 같은 현재
+  관심 항목 단건 조회를 채택했다. `ACTIVE`와 `RESOLVED`를 모두 반환하며 목록·검색·과거
+  상태 이력은 포함하지 않는다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -106,6 +113,15 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 
 동시 중복 수신은 수신 기록 하나와 `202/200`, 동시 동일 상태 에디션 생성은 에디션 하나와
 `201/200`으로 직렬화한다.
+
+## 구현한 현재 관심 항목 단건 조회
+
+- `GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current`에
+  `eventType`과 `sourceReference`를 전달해 현재 투영 한 건을 조회한다.
+- 이벤트 적용이 사용하던 복합 기본 키 조회를 포트로 승격해 재사용했고 기존
+  `AttentionItemResponse`를 반환한다. 새 DTO, SQL 도우미, 스키마와 인덱스는 없다.
+- 현재 항목은 후속 지원 이벤트와 재구축 결과에 따라 바뀔 수 있다. 불변 에디션이나 과거
+  투영 이력으로 해석하지 않는다.
 
 ## 구현한 주간 범위 최신 조회
 
@@ -217,6 +233,11 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 
 ## 현재 검증
 
+- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.ingestion distinguishes duplicate conflict unsupported stale and gap'`:
+  성공. PostgreSQL 18.4 Testcontainers에서 재구축 뒤 현재 `ACTIVE` 항목의 리비전 `3`과
+  공백 근거, 후속 리비전 `4`의 `RESOLVED` 갱신, 다른 작업공간 `404`와 빈 원본 참조
+  `400`을 확인
+
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition is idempotent immutable generated and reproducible after rebuild'`:
   성공. PostgreSQL 18.4 Testcontainers에서 재구축 뒤 불변 단건 에디션의 `304`, 전역
   최신 세대 변경 뒤 이전 검증자에 대한 `200`과 새 본문, 같은 주간 최신의 `304`를 확인
@@ -240,6 +261,8 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   - 최소 aggregate health의 `UP`·상세 비노출과 탐색 페이지·대표 probe 경로 미노출
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백, 이벤트별 충돌 증거 상한과
     최초 수신 증거의 읽기 전용 조회·재구축 뒤 불변성·fingerprint 비노출
+  - 복합 정체성의 현재 관심 항목 단건 조회, 재구축 뒤 리비전·공백 근거와 후속
+    `RESOLVED` 갱신, 범위 격리와 입력 검증
   - 작업공간·시즌별 이상 수신 증거의 선정, 충돌 뒤 `APPLIED` 포함, 수신 순서 내림차순
     배타 페이지와 다른 시즌·작업공간의 빈 범위
   - 에디션 멱등성·불변성·`generation`/최신 조회, 실제 동일 전체 스냅샷

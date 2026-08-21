@@ -1,0 +1,112 @@
+# PRD-0013: 현재 관심 항목 단건 조회
+
+- 상태: 채택됨
+- 결정일: 2026-08-21
+- 구현 상태: 로컬 구현 및 검증 완료
+- 범위: 작업공간·시즌·이벤트 종류·원본 참조로 식별하는 현재 투영 단건 조회
+
+## 목적
+
+BRIEF는 이벤트 수신 결과로 현재 `AttentionItem` 투영을 유지하지만, 기존 조회 API는 최초
+수신 증거나 생성 시점에 고정한 불변 에디션만 반환한다. 호출자가 특정 원본 참조의 현재
+투영 상태를 확인하려면 새 에디션을 만들거나 데이터베이스를 직접 읽어야 한다.
+
+이미 알고 있는 투영 정체성으로 현재 관심 항목 한 건을 조회하게 한다. 목록·검색·페이지
+계약을 추측하지 않고 기존 복합 기본 키와 응답 표현을 그대로 사용한다.
+
+## HTTP API
+
+다음 인증 없는 내부 로컬 MVP 경로를 추가한다.
+
+| 메서드 | 경로 | 의미 |
+|---|---|---|
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | 정확한 정체성의 현재 관심 항목 조회 |
+
+### 질의 매개변수
+
+| 이름 | 필수 | 형식과 제약 | 의미 |
+|---|---|---|---|
+| `eventType` | 예 | PRD-0002의 지원 이벤트 종류 | 투영 정체성의 이벤트 종류 |
+| `sourceReference` | 예 | 비어 있지 않은 문자열, 최대 128자 | 길이가 제한된 불투명 원본 참조 |
+
+경로의 `workspaceId`와 `seasonId`는 UUID다. 잘못된 UUID·열거형, 누락되거나 비어 있는
+`sourceReference`, 128자를 넘는 참조는 `400 Bad Request`와 PRD-0004의 표준
+`ProblemDetail`로 거부한다.
+
+## 현재 상태 의미
+
+조회 정체성은 `(workspaceId, seasonId, eventType, sourceReference)`다. 결과는 마지막으로
+적용된 원본 집계 리비전이 만든 현재 투영이며 `ACTIVE`와 `RESOLVED`를 모두 반환한다.
+
+- 더 큰 리비전의 `APPLIED` 또는 `APPLIED_WITH_GAP` 수신은 조회 결과를 갱신한다.
+- `STALE`, 같은 이벤트의 `DUPLICATE`, 다른 지문의 `CONFLICT`와 `UNSUPPORTED`는 현재
+  투영을 바꾸지 않는다.
+- 전체 재구축은 보존 수신 기록과 같은 규칙으로 현재 결과를 재현한다.
+- 현재 항목은 변경 가능하며 과거 상태 이력이나 생성 당시 스냅샷이 아니다. 과거 고정
+  내용은 불변 에디션을 조회한다.
+
+정확한 정체성에 현재 투영이 없으면 `404 Not Found`와 PRD-0004의 표준
+`ProblemDetail`을 반환한다. BRIEF는 작업공간이나 시즌의 원본 존재 여부를 별도로
+판정하지 않는다.
+
+## 성공 응답
+
+성공 응답은 `200 OK`이며 기존 이벤트 수신 응답의 `AttentionItemResponse` 표현을
+재사용한다.
+
+| 필드 | 의미 |
+|---|---|
+| `reasonCode` | 규칙 v1에서 `eventType`과 같은 설명 이유 코드 |
+| `severity` | 규칙 v1이 정한 `HIGH` 또는 `MEDIUM` |
+| `sourceReference` | 길이가 제한된 불투명 원본 참조 |
+| `status` | 현재 `ACTIVE` 또는 `RESOLVED` 상태 |
+| `observedAt` | 마지막 적용 이벤트의 정규화된 원본 관측 시각 |
+| `aggregateRevision` | 마지막 적용 집계 리비전 |
+| `ruleVersion` | 현재 투영 규칙 버전 |
+| `revisionGap` | 지금까지 적용한 리비전에 공백이 있었는지 여부 |
+
+원본 payload, fingerprint, 수신 시각, 충돌 지문, SQL·예외 상세와 불필요한 PII는
+반환하지 않는다.
+
+## 영속성과 호환성
+
+- Flyway V4가 정의한 `attention_item`의
+  `(workspace_id, season_id, event_type, source_reference)` 복합 기본 키를 그대로
+  사용한다.
+- 이벤트 적용이 사용하던 동일한 단건 조회를 애플리케이션 포트로 승격해 재사용한다.
+- 새 테이블, 열, 인덱스, Flyway 마이그레이션과 별도 응답 DTO를 추가하지 않는다.
+- 조회는 수신 기록, 현재 투영과 불변 에디션을 생성·수정·삭제하지 않는다.
+- 현재 투영은 변경 가능하므로 PRD-0012의 불변 에디션 `ETag` 계약을 적용하지 않는다.
+
+## 수용 기준
+
+- 정확한 네 정체성 값이 같은 현재 항목 한 건을 반환한다.
+- 재구축 뒤에도 마지막 적용 리비전, 상태와 리비전 공백 근거가 재현된다.
+- 후속 `RESOLVED` 이벤트를 적용하면 같은 조회가 증가한 리비전과 해소 상태를 반환한다.
+- 다른 작업공간·시즌·이벤트 종류·원본 참조의 항목을 반환하지 않는다.
+- 현재 항목이 없으면 `404 Not Found`다.
+- 잘못된 입력은 저장 상태를 바꾸지 않고 `400 Bad Request`다.
+
+## 명시적 비목표
+
+- 현재 관심 항목 목록, 검색, 정렬 선택, 전체 개수와 페이지네이션
+- 과거 투영 상태 이력과 변경 이력
+- 현재 항목을 수정·해소·재처리하는 명령
+- 새 스키마·인덱스·마이그레이션과 캐시 검증자
+- BATON 멤버십 판정, 인증·인가, 외부 공개와 운영 배포
+
+## 현재 구현과 검증
+
+기존 이벤트 적용이 사용하던 복합 기본 키 단건 조회를 `BriefPersistencePort`와
+`BriefUseCases`에 노출하고, 웹 어댑터는 기존 `AttentionItemResponse`를 반환한다. 별도
+조회 모델, DTO, SQL 도우미와 마이그레이션은 추가하지 않았다.
+
+기존 `ingestion distinguishes duplicate conflict unsupported stale and gap` PostgreSQL
+통합 시나리오를 확장해 다음을 확인했다.
+
+- 리비전 공백을 포함한 현재 `ACTIVE` 항목을 재구축 뒤 리비전 `3`과 함께 조회한다.
+- 후속 리비전 `4`의 `RESOLVED` 이벤트를 적용하면 같은 조회가 해소 상태를 반환한다.
+- 다른 작업공간 범위는 `404`, 빈 `sourceReference`는 `400`이다.
+
+대상 PostgreSQL 통합 테스트와 `./gradlew --no-daemon clean test :bootstrap:bootJar`가
+성공해 저장소 전체 테스트와 실행 JAR 생성을 확인했다.

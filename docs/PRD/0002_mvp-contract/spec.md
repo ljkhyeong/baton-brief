@@ -26,6 +26,9 @@ PRD-0012는 생성·전역 최신·주간 최신·단건 에디션 응답에 불
 `ETag`를 제공하고, 적용 대상 `GET`의 `If-None-Match` 조건부 조회를 Spring MVC 표준
 처리로 지원한다.
 
+PRD-0013은 작업공간·시즌·이벤트 종류·원본 참조로 현재 관심 항목 한 건을 조회하는
+읽기 전용 경로를 추가한다. 현재 투영은 변경 가능하며 불변 에디션이나 과거 이력이 아니다.
+
 PostgreSQL 18.4 통합 시나리오, 저장소 전체 정리 후 테스트와 실행 JAR 생성, Compose
 PostgreSQL에 대한 Java 21 비웹 실행 환경/Flyway 기동 점검으로 로컬 MVP를 검증했다. MockMvc 기반
 HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워크 종단 간 검증으로
@@ -47,6 +50,7 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 | 메서드 | 경로 | 의미 |
 |---|---|---|
 | `POST` | `/api/v1/events` | 이벤트 v1 수신과 멱등 투영 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | PRD-0013의 현재 관심 항목 단건 조회 |
 | `POST` | `/api/v1/projections/rebuild` | 보존한 수신 기록으로 현재 투영 전체 재구축 |
 | `POST` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions` | 주간 에디션 생성 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest` | 작업공간·시즌 전역 최신 완료 에디션 조회 |
@@ -151,6 +155,11 @@ HTTP 상태와 응답 본문은 다음과 같다.
   않는다.
 - 표시 가능한 항목은 작업공간·시즌, 이유 코드, 심각도, 불투명 원본 참조,
   원본의 `occurredAt`, 적용 리비전과 규칙 버전을 보존한다.
+
+PRD-0013의 단건 조회는 `(workspaceId, seasonId, eventType, sourceReference)`가 정확히
+일치하는 현재 항목을 반환한다. `ACTIVE`와 `RESOLVED`를 모두 현재 상태로 취급하며,
+미존재는 `404 Not Found`다. 목록·검색·과거 이력이나 현재 상태 변경 명령은 포함하지
+않는다.
 
 ## 투영 재구축
 
