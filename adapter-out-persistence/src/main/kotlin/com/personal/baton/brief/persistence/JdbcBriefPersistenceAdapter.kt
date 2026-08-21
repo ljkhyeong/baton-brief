@@ -165,7 +165,7 @@ class JdbcBriefPersistenceAdapter(
 
     @Transactional
     override fun rebuild(
-        project: (SourceEvent, AttentionItem?, Instant) -> ProjectionDecision,
+        project: (SourceEvent, AttentionItem?) -> ProjectionDecision,
     ): RebuildResult {
         lockExclusive(PROJECTION_LOCK)
         val current = linkedMapOf<EventIdentity, AttentionItem>()
@@ -173,24 +173,24 @@ class JdbcBriefPersistenceAdapter(
         jdbc.sql(
             """
             SELECT event_id, event_type, event_version, workspace_id, season_id,
-                   source_reference, aggregate_revision, occurred_at, event_state, received_at
+                   source_reference, aggregate_revision, occurred_at, event_state
               FROM source_event_receipt
              WHERE processing_outcome <> 'UNSUPPORTED'
              ORDER BY ingestion_sequence
             """.trimIndent(),
         ).withFetchSize(500)
-            .query(::mapReceiptEvent)
+            .query(::mapSourceEvent)
             .stream()
-            .use { receipts ->
-                receipts.forEachOrdered { receipt ->
+            .use { events ->
+                events.forEachOrdered { event ->
                     receiptCount += 1
                     val identity = EventIdentity(
-                        receipt.event.workspaceId,
-                        receipt.event.seasonId,
-                        receipt.event.eventType,
-                        receipt.event.sourceReference,
+                        event.workspaceId,
+                        event.seasonId,
+                        event.eventType,
+                        event.sourceReference,
                     )
-                    when (val decision = project(receipt.event, current[identity], receipt.receivedAt)) {
+                    when (val decision = project(event, current[identity])) {
                         is ProjectionDecision.Applied -> current[identity] = decision.item
                         ProjectionDecision.Stale -> Unit
                     }
@@ -427,17 +427,16 @@ class JdbcBriefPersistenceAdapter(
             """
             INSERT INTO attention_item (
                 workspace_id, season_id, event_type, source_reference, reason_code, severity,
-                item_status, observed_at, projected_at, rule_version, last_revision, revision_gap
+                item_status, observed_at, rule_version, last_revision, revision_gap
             ) VALUES (
                 :workspaceId, :seasonId, :eventType, :sourceReference, :reasonCode, :severity,
-                :itemStatus, :observedAt, :projectedAt, :ruleVersion, :lastRevision, :revisionGap
+                :itemStatus, :observedAt, :ruleVersion, :lastRevision, :revisionGap
             )
             ON CONFLICT (workspace_id, season_id, event_type, source_reference) DO UPDATE SET
                 reason_code = EXCLUDED.reason_code,
                 severity = EXCLUDED.severity,
                 item_status = EXCLUDED.item_status,
                 observed_at = EXCLUDED.observed_at,
-                projected_at = EXCLUDED.projected_at,
                 rule_version = EXCLUDED.rule_version,
                 last_revision = EXCLUDED.last_revision,
                 revision_gap = EXCLUDED.revision_gap
@@ -452,7 +451,6 @@ class JdbcBriefPersistenceAdapter(
                 "severity" to item.severity.name,
                 "itemStatus" to item.status.name,
                 "observedAt" to item.observedAt.jdbcValue(),
-                "projectedAt" to item.projectedAt.jdbcValue(),
                 "ruleVersion" to item.ruleVersion,
                 "lastRevision" to item.lastRevision,
                 "revisionGap" to item.revisionGap,
@@ -646,28 +644,24 @@ class JdbcBriefPersistenceAdapter(
         severity = Severity.valueOf(result.getString("severity")),
         status = AttentionStatus.valueOf(result.getString("item_status")),
         observedAt = result.instant("observed_at"),
-        projectedAt = result.instant("projected_at"),
         ruleVersion = result.getInt("rule_version"),
         lastRevision = result.getLong("last_revision"),
         revisionGap = result.getBoolean("revision_gap"),
     )
 
-    private fun mapReceiptEvent(
+    private fun mapSourceEvent(
         result: ResultSet,
         @Suppress("UNUSED_PARAMETER") rowNumber: Int,
-    ): ReceiptEvent = ReceiptEvent(
-        event = SourceEvent(
-            eventId = result.getObject("event_id", UUID::class.java),
-            eventType = SourceEventType.valueOf(result.getString("event_type")),
-            eventVersion = result.getInt("event_version"),
-            workspaceId = result.getObject("workspace_id", UUID::class.java),
-            seasonId = result.getObject("season_id", UUID::class.java),
-            sourceReference = result.getString("source_reference"),
-            aggregateRevision = result.getLong("aggregate_revision"),
-            occurredAt = result.instant("occurred_at"),
-            state = SourceEventState.valueOf(result.getString("event_state")),
-        ),
-        receivedAt = result.instant("received_at"),
+    ): SourceEvent = SourceEvent(
+        eventId = result.getObject("event_id", UUID::class.java),
+        eventType = SourceEventType.valueOf(result.getString("event_type")),
+        eventVersion = result.getInt("event_version"),
+        workspaceId = result.getObject("workspace_id", UUID::class.java),
+        seasonId = result.getObject("season_id", UUID::class.java),
+        sourceReference = result.getString("source_reference"),
+        aggregateRevision = result.getLong("aggregate_revision"),
+        occurredAt = result.instant("occurred_at"),
+        state = SourceEventState.valueOf(result.getString("event_state")),
     )
 
     private fun mapSourceEventReceipt(
@@ -719,11 +713,6 @@ class JdbcBriefPersistenceAdapter(
         getObject(column, OffsetDateTime::class.java).toInstant()
 
     private fun Instant.jdbcValue(): OffsetDateTime = atOffset(ZoneOffset.UTC)
-
-    private data class ReceiptEvent(
-        val event: SourceEvent,
-        val receivedAt: Instant,
-    )
 
     private data class EventIdentity(
         val workspaceId: UUID,

@@ -32,7 +32,7 @@ class BriefService(
         }
 
         return persistence.processEvent(normalizedEvent, fingerprint, receivedAt) { current ->
-            projector.project(normalizedEvent, current, receivedAt)
+            projector.project(normalizedEvent, current)
         }
     }
 

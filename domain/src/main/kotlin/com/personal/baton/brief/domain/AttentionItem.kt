@@ -22,7 +22,6 @@ data class AttentionItem(
     val severity: Severity,
     val status: AttentionStatus,
     val observedAt: Instant,
-    val projectedAt: Instant,
     val ruleVersion: Int,
     val lastRevision: Long,
     val revisionGap: Boolean,
@@ -41,7 +40,6 @@ class AttentionProjector {
     fun project(
         event: SourceEvent,
         current: AttentionItem?,
-        projectedAt: Instant,
     ): ProjectionDecision {
         if (current != null && event.aggregateRevision <= current.lastRevision) {
             return ProjectionDecision.Stale
@@ -68,7 +66,6 @@ class AttentionProjector {
                     SourceEventState.RESOLVED -> AttentionStatus.RESOLVED
                 },
                 observedAt = event.occurredAt,
-                projectedAt = projectedAt,
                 ruleVersion = RULE_VERSION,
                 lastRevision = event.aggregateRevision,
                 revisionGap = current?.revisionGap == true || hasGap,

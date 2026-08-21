@@ -7,11 +7,10 @@ import org.junit.jupiter.api.Test
 
 class AttentionProjectorTest {
     private val projector = AttentionProjector()
-    private val projectedAt = Instant.parse("2026-08-13T01:00:00Z")
 
     @Test
     fun `maps a blocked handoff to a high severity item`() {
-        val decision = projector.project(event(), null, projectedAt) as ProjectionDecision.Applied
+        val decision = projector.project(event(), null) as ProjectionDecision.Applied
 
         assertThat(decision.item.reasonCode).isEqualTo(SourceEventType.HANDOFF_BLOCKED)
         assertThat(decision.item.severity).isEqualTo(Severity.HIGH)
@@ -21,8 +20,8 @@ class AttentionProjectorTest {
 
     @Test
     fun `ignores a stale revision and records a revision gap`() {
-        val first = projector.project(event(revision = 2), null, projectedAt) as ProjectionDecision.Applied
-        val stale = projector.project(event(revision = 1), first.item, projectedAt)
+        val first = projector.project(event(revision = 2), null) as ProjectionDecision.Applied
+        val stale = projector.project(event(revision = 1), first.item)
 
         assertThat(first.hasRevisionGap).isTrue()
         assertThat(stale).isEqualTo(ProjectionDecision.Stale)

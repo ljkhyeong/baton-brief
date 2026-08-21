@@ -165,13 +165,13 @@ interface BriefPersistencePort {
     fun recordUnsupported(
         event: SourceEvent,
         fingerprint: String,
-        receivedAt: java.time.Instant,
+        receivedAt: Instant,
     ): IngestResult
 
     fun processEvent(
         event: SourceEvent,
         fingerprint: String,
-        receivedAt: java.time.Instant,
+        receivedAt: Instant,
         project: (AttentionItem?) -> ProjectionDecision,
     ): IngestResult
 
@@ -184,12 +184,12 @@ interface BriefPersistencePort {
         limit: Int,
     ): EventReceiptAnomalyResult
 
-    fun rebuild(project: (SourceEvent, AttentionItem?, java.time.Instant) -> ProjectionDecision): RebuildResult
+    fun rebuild(project: (SourceEvent, AttentionItem?) -> ProjectionDecision): RebuildResult
 
     fun createEdition(
         command: GenerateEditionCommand,
         window: WeeklyWindow,
-        currentTime: () -> java.time.Instant,
+        currentTime: () -> Instant,
         selectContent: (List<AttentionItem>) -> EditionContent,
     ): EditionResult
 

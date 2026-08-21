@@ -367,8 +367,8 @@ class BriefMvpIntegrationTest(
             .single()
         val projector = AttentionProjector()
         assertThatThrownBy {
-            persistence.rebuild { event, current, projectedAt ->
-                when (val decision = projector.project(event, current, projectedAt)) {
+            persistence.rebuild { event, current ->
+                when (val decision = projector.project(event, current)) {
                     is ProjectionDecision.Applied -> if (event.sourceReference == "routine:weekly") {
                         decision.copy(item = decision.item.copy(ruleVersion = 0))
                     } else {
@@ -745,10 +745,10 @@ class BriefMvpIntegrationTest(
 
         Executors.newFixedThreadPool(2).use { executor ->
             val rebuild = executor.submit<RebuildResult> {
-                persistence.rebuild { receivedEvent, current, projectedAt ->
+                persistence.rebuild { receivedEvent, current ->
                     rebuildStarted.countDown()
                     check(releaseRebuild.await(10, TimeUnit.SECONDS))
-                    projector.project(receivedEvent, current, projectedAt)
+                    projector.project(receivedEvent, current)
                 }
             }
             try {
@@ -759,7 +759,7 @@ class BriefMvpIntegrationTest(
                         fingerprint = "a".repeat(64),
                         receivedAt = receivedAt,
                     ) { current ->
-                        projector.project(supportedEvent, current, receivedAt)
+                        projector.project(supportedEvent, current)
                     }
                 }
 
