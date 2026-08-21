@@ -347,7 +347,7 @@ class BriefMvpIntegrationTest(
 
         val currentAttentionPath =
             "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
-        mockMvc.perform(
+        val currentAttention = mockMvc.perform(
             get(currentAttentionPath)
                 .param("eventType", "HANDOFF_BLOCKED")
                 .param("sourceReference", "handoff:1"),
@@ -355,6 +355,14 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.status").value("ACTIVE"))
             .andExpect(jsonPath("$.aggregateRevision").value(3))
             .andExpect(jsonPath("$.revisionGap").value(true))
+            .andReturn()
+        val currentAttentionEtag = checkNotNull(currentAttention.response.getHeader(HttpHeaders.ETAG))
+        mockMvc.perform(
+            get(currentAttentionPath)
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "handoff:1")
+                .header(HttpHeaders.IF_NONE_MATCH, currentAttentionEtag),
+        ).andExpect(status().isNotModified)
 
         val attentionItemsPath =
             "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
@@ -405,10 +413,15 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(
             get(currentAttentionPath)
                 .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1"),
+                .param("sourceReference", "handoff:1")
+                .header(HttpHeaders.IF_NONE_MATCH, currentAttentionEtag),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("RESOLVED"))
             .andExpect(jsonPath("$.aggregateRevision").value(4))
+            .andExpect { result ->
+                assertThat(checkNotNull(result.response.getHeader(HttpHeaders.ETAG)))
+                    .isNotEqualTo(currentAttentionEtag)
+            }
 
         mockMvc.perform(get(attentionItemsPath))
             .andExpect(status().isOk)
