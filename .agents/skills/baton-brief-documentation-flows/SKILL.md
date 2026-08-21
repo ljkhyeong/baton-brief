@@ -74,6 +74,9 @@ description: BATON BRIEF 문서화 작업 절차. 제품 코드를 주로 변경
   직접 증거로 확대하지 않는다. 검증한 상호작용과 미검증 상호작용을 구분한다.
 - 로컬 통합·기동 근거를 실제 네트워크, 생산자 연동, 운영 배포, 전달 완전성 또는 보존·
   격리 운영이 검증되었다는 주장으로 확대하지 않는다.
+- 빈 데이터베이스의 Flyway 전체 적용과 기존 데이터가 있는 이전 버전 스키마의 업그레이드
+  검증을 구분한다. 실제 대표 행과 순차 SQL을 확인하지 않았다면 기존 데이터 호환성을
+  성공으로 기록하지 않는다.
 - 최소 상태 확인에는 Spring Boot Actuator의 표준 aggregate health와 자동 구성된 DB
   contributor만 사용한다. 커스텀 controller, DTO, `HealthIndicator`와 확인 SQL이 있는
   것처럼 기록하지 않는다. Spring Boot 4.1의 health probes 기본값은 `true`이므로 배포
