@@ -25,6 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.test.context.TestConstructor
@@ -288,6 +289,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items[1].severity").value("MEDIUM"))
             .andReturn()
         val firstEditionId = JsonPath.read<String>(firstResult.response.contentAsString, "$.editionId")
+        val firstEditionEtag = checkNotNull(firstResult.response.getHeader(HttpHeaders.ETAG))
         assertThat(firstResult.response.getHeader("Location"))
             .isEqualTo("/api/v1/editions/$firstEditionId")
 
@@ -395,6 +397,10 @@ class BriefMvpIntegrationTest(
             .andReturn()
         assertThat(rebuiltSnapshot.response.contentAsString)
             .isEqualTo(firstResult.response.contentAsString)
+        mockMvc.perform(
+            get("/api/v1/editions/$firstEditionId")
+                .header(HttpHeaders.IF_NONE_MATCH, firstEditionEtag),
+        ).andExpect(status().isNotModified)
 
         val nextWeekRequest = """{"weekStart":"2026-08-17","zoneId":"Asia/Seoul"}"""
         postEdition(generationPath, nextWeekRequest)
@@ -402,6 +408,12 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.generation").value(4))
             .andExpect(jsonPath("$.items.length()").value(1))
             .andExpect(jsonPath("$.items[0].sourceReference").value("decision:next-week"))
+
+        val previousLatest = mockMvc.perform(get("$generationPath/latest"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.generation").value(4))
+            .andReturn()
+        val previousLatestEtag = checkNotNull(previousLatest.response.getHeader(HttpHeaders.ETAG))
 
         postEvent(
             eventJson(
@@ -422,17 +434,30 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items.length()").value(1))
             .andExpect(jsonPath("$.items[0].sourceReference").value(blockedReference))
 
-        mockMvc.perform(get("$generationPath/latest"))
+        mockMvc.perform(
+            get("$generationPath/latest")
+                .header(HttpHeaders.IF_NONE_MATCH, previousLatestEtag),
+        )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.generation").value(5))
 
         val weeklyLatestPath = "$generationPath/weekly/latest"
-        mockMvc.perform(
+        val nextWeekLatest = mockMvc.perform(
             get(weeklyLatestPath)
                 .param("weekStart", "2026-08-17")
                 .param("zoneId", "Asia/Seoul"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.generation").value(4))
+            .andReturn()
+        mockMvc.perform(
+            get(weeklyLatestPath)
+                .param("weekStart", "2026-08-17")
+                .param("zoneId", "Asia/Seoul")
+                .header(
+                    HttpHeaders.IF_NONE_MATCH,
+                    checkNotNull(nextWeekLatest.response.getHeader(HttpHeaders.ETAG)),
+                ),
+        ).andExpect(status().isNotModified)
 
         mockMvc.perform(
             get(weeklyLatestPath)
