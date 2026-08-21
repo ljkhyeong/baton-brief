@@ -26,6 +26,10 @@ PRD-0011에서 작업공간·시즌별 과거 이상 수신 증거를 `ingestion
 조회하는 계약을 채택하고 구현했다. 기존 PostgreSQL 수신 통합 시나리오와 저장소 전체
 테스트·실행 JAR 생성이 성공했다.
 
+PRD-0012에서 생성·전역 최신·주간 최신·단건 에디션에 `ETag`를 제공하고 Spring MVC의
+표준 `If-None-Match` 조건부 조회를 사용하는 계약을 채택하고 구현했다. 대상 PostgreSQL
+통합 시나리오와 저장소 전체 테스트·실행 JAR 생성이 성공했다.
+
 관심 항목에서 실제 소비되지 않던 `item_id` 대리키는 Flyway V4에서 제거했다. 기존
 `(workspace_id, season_id, event_type, source_reference)` 정체성을 복합 기본 키로 사용하며,
 제품 API와 투영 의미는 바꾸지 않았다.
@@ -75,6 +79,9 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - PRD-0011에서 `APPLIED_WITH_GAP`, `STALE`, `UNSUPPORTED` 또는 최초 충돌이 있는 수신
   기록을 작업공간·시즌 범위에서 탐색하는 읽기 전용 계약을 채택했다. 충돌이 있는
   `APPLIED`도 포함하며, 페이지 커서는 스냅샷 토큰으로 해석하지 않는다.
+- PRD-0012에서 전체 불변 에디션 응답의 불투명 `ETag`와 적용 대상 `GET`의 표준
+  `If-None-Match` 조건부 조회를 채택했다. 최신 조회의 검증자는 요청 시점에 선택된
+  에디션을 나타내며 캐시 TTL과 외부 공개 정책은 포함하지 않는다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -137,6 +144,15 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   `removed`는 기준 순서를 유지한다.
 - 비교는 저장된 스냅샷만 읽으므로 이후 투영 변경이나 재구축에도 기존 비교 결과가
   달라지지 않는다.
+
+## 구현한 불변 에디션 조건부 조회
+
+- 생성·전역 최신·주간 최신·단건 에디션 응답에 API v1 표현과 `editionId`에 결합한 강한
+  `ETag`를 제공한다. 호출자는 값을 해석하지 않고 그대로 재사용한다.
+- 적용 대상 `GET`의 `If-None-Match` 처리는 Spring MVC가 `ResponseEntity` 헤더로 자동
+  수행한다. 별도 헤더 파서, 직접 `304` 분기, 본문 해시와 캐시 저장소를 추가하지 않았다.
+- 특정 에디션은 투영 변경·재구축 뒤에도 같은 검증자를 유지한다. 전역·주간 최신은 선택된
+  에디션이 바뀔 때 검증자도 바뀐다.
 
 ## 구현한 최소 상태 확인
 
@@ -201,6 +217,10 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 
 ## 현재 검증
 
+- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition is idempotent immutable generated and reproducible after rebuild'`:
+  성공. PostgreSQL 18.4 Testcontainers에서 재구축 뒤 불변 단건 에디션의 `304`, 전역
+  최신 세대 변경 뒤 이전 검증자에 대한 `200`과 새 본문, 같은 주간 최신의 `304`를 확인
+
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition is idempotent immutable generated and reproducible after rebuild' --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.serializes concurrent duplicate ingestion edition generation and rebuild'`:
   성공. PostgreSQL 18.4 Testcontainers에서 재구축 중 데이터베이스 제약 위반 뒤
   이전 관심 항목 수가 복원되고 기존 에디션이 재사용되는 원자적 롤백, 재구축의 전역
@@ -229,6 +249,8 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
     재사용, 정방향·역방향 비교의 `1`·`false` ↔ `3`·`true`, 재구축 뒤 비교 불변성
   - 작업공간·시즌 전역 최신과 주간 범위 최신의 분리, 작업공간·시즌·주간·시간대 격리,
     월요일·IANA 시간대 입력 오류와 미존재 범위 `404`
+  - 불변 단건 에디션의 일치 검증자 `304`, 전역 최신 세대 변경 뒤 이전 검증자에 대한
+    `200`과 새 본문, 같은 주간 최신의 일치 검증자 `304`
   - 엄격한 HTTP 표현 검증과 대표 `400`·`404`의 표준 `ProblemDetail`
   - 동시 중복 수신과 동시 에디션 생성
   - 재구축 강제 실패의 원자적 롤백과 재구축·지원 이벤트 수신 잠금 직렬화

@@ -19,6 +19,9 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 성공했다.
 > PRD-0011의 작업공간·시즌별 이상 수신 증거 이력 조회도 구현했고, 기존 PostgreSQL
 > 수신 시나리오와 전체 테스트·실행 JAR 생성이 성공했다.
+> PRD-0012의 생성·전역 최신·주간 최신·단건 에디션 `ETag`와 표준 `If-None-Match`
+> 조건부 조회도 구현했고 대상 PostgreSQL 통합 테스트와 전체 테스트·실행 JAR 생성이
+> 성공했다.
 
 ## 왜 BRIEF인가
 
@@ -107,6 +110,9 @@ BRIEF가 소유하지 않는다.
 - PRD-0010은 새 에디션 항목의 집계 리비전·리비전 공백 근거를 응답과 상태 지문에
   포함하고, 근거만 달라진 항목도 비교 `changed`로 분류하도록 확장한다. 투영·에디션
   `ruleVersion`은 계속 `1`이며 로컬 구현과 검증을 완료했다.
+- PRD-0012는 불변 에디션 전체 응답에 `ETag`를 제공한다. 적용 대상 `GET`은 Spring
+  MVC의 표준 `If-None-Match` 처리로 같은 에디션이면 `304`, 선택된 최신 에디션이
+  바뀌면 새 본문과 `200`을 반환한다.
 - 재구축은 `UNSUPPORTED`를 제외한 보존 수신 기록을 순서대로 재생하는 동기 전역 명령이다.
   현재 투영만 전역 잠금과 하나의 트랜잭션으로 교체하며 수신 증거와 불변 에디션은
   바꾸지 않는다. 숫자 TTL과 재구축 SLO는 아직 정하지 않았다.
@@ -127,7 +133,8 @@ BRIEF가 소유하지 않는다.
 [수신 증거 보존·재구축 운영 경계](docs/PRD/0008_retention-rebuild-boundary/spec.md),
 [주간 범위 최신 불변 에디션 조회 계약](docs/PRD/0009_weekly-latest-edition/spec.md)과
 [불변 에디션 리비전 근거 계약](docs/PRD/0010_edition-revision-evidence/spec.md),
-[이상 이벤트 수신 증거 이력 조회 계약](docs/PRD/0011_event-receipt-anomalies/spec.md)을
+[이상 이벤트 수신 증거 이력 조회 계약](docs/PRD/0011_event-receipt-anomalies/spec.md)과
+[불변 에디션 조건부 조회 계약](docs/PRD/0012_edition-etag/spec.md)을
 따른다.
 인증·인가, 브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
@@ -144,6 +151,7 @@ BRIEF가 소유하지 않는다.
 - [주간 범위 최신 불변 에디션 조회 계약](docs/PRD/0009_weekly-latest-edition/spec.md)
 - [불변 에디션 리비전 근거 계약](docs/PRD/0010_edition-revision-evidence/spec.md)
 - [이상 이벤트 수신 증거 이력 조회 계약](docs/PRD/0011_event-receipt-anomalies/spec.md)
+- [불변 에디션 조건부 조회 계약](docs/PRD/0012_edition-etag/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)
