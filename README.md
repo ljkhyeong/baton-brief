@@ -28,6 +28,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 성공했다. 전체 테스트·실행 JAR 생성도 성공했다.
 > PRD-0015의 현재 관심 항목 상태 필터도 구현했고 대상 PostgreSQL 통합 테스트가
 > 성공했다. 전체 테스트·실행 JAR 생성도 성공했다.
+> PRD-0016의 실제 적용 상태 전이 증거 이력도 구현했고 대상 PostgreSQL 통합 테스트가
+> 성공했다. 전체 테스트·실행 JAR 생성도 성공했다.
 
 ## 왜 BRIEF인가
 
@@ -70,7 +72,8 @@ BRIEF가 소유하지 않는다.
 
 1. BATON이 커밋 후 발행한 소수의 버전이 있는 이벤트만 수신한다.
 2. `reasonCode`, `severity`, `sourceReference`, `observedAt`을 가진 설명 가능한
-   `AttentionItem`을 만들고 정확한 복합 정체성 단건과 현재 상태별 목록으로 조회한다.
+   `AttentionItem`을 만들고 정확한 복합 정체성 단건, 현재 상태별 목록과 실제 적용 상태
+   전이 증거를 조회한다.
 3. 작업공간/시즌 단위의 주간 `BriefEdition`을 결정적으로 생성한다.
 4. 전역 최신·주간 범위 최신·특정 에디션과 작업공간·시즌별 에디션 이력을 조회한다.
 5. 동일 이벤트 재생을 멱등 처리하고 투영 전체 재구축을 지원한다.
@@ -126,6 +129,8 @@ BRIEF가 소유하지 않는다.
   페이지부터 다시 조회한다.
 - PRD-0015는 같은 목록의 기본 `ACTIVE` 동작을 보존하면서 `status=RESOLVED`로 현재 해소
   항목을 조회하게 한다. 해소 목록도 과거 상태 이력은 아니다.
+- PRD-0016은 같은 복합 정체성에 실제 적용된 상태 전이를 집계 리비전 내림차순으로
+  조회한다. `STALE`·`UNSUPPORTED`, 중복과 충돌은 전이에서 제외한다.
 - 재구축은 `UNSUPPORTED`를 제외한 보존 수신 기록을 순서대로 재생하는 동기 전역 명령이다.
   현재 투영만 전역 잠금과 하나의 트랜잭션으로 교체하며 수신 증거와 불변 에디션은
   바꾸지 않는다. 숫자 TTL과 재구축 SLO는 아직 정하지 않았다.
@@ -150,7 +155,8 @@ BRIEF가 소유하지 않는다.
 [불변 에디션 조건부 조회 계약](docs/PRD/0012_edition-etag/spec.md),
 [현재 관심 항목 단건 조회 계약](docs/PRD/0013_current-attention-item/spec.md)과
 [현재 활성 관심 항목 키셋 조회 계약](docs/PRD/0014_active-attention-items/spec.md)과
-[현재 관심 항목 상태 필터 조회 계약](docs/PRD/0015_attention-item-status-filter/spec.md)을
+[현재 관심 항목 상태 필터 조회 계약](docs/PRD/0015_attention-item-status-filter/spec.md),
+[현재 관심 항목 상태 전이 증거 이력 계약](docs/PRD/0016_attention-item-transitions/spec.md)을
 따른다.
 인증·인가, 브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
@@ -171,6 +177,7 @@ BRIEF가 소유하지 않는다.
 - [현재 관심 항목 단건 조회 계약](docs/PRD/0013_current-attention-item/spec.md)
 - [현재 활성 관심 항목 키셋 조회 계약](docs/PRD/0014_active-attention-items/spec.md)
 - [현재 관심 항목 상태 필터 조회 계약](docs/PRD/0015_attention-item-status-filter/spec.md)
+- [현재 관심 항목 상태 전이 증거 이력 계약](docs/PRD/0016_attention-item-transitions/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)

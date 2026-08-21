@@ -35,6 +35,9 @@ PRD-0014는 작업공간·시즌의 현재 `ACTIVE` 관심 항목을 복합 정�
 PRD-0015는 같은 목록 경로에 선택적인 `status`를 추가한다. 생략 시 기존 `ACTIVE`를
 유지하고 `RESOLVED`를 선택해 현재 해소 항목을 탐색할 수 있다. 과거 상태 이력은 아니다.
 
+PRD-0016은 복합 정체성에 실제 적용된 상태 전이 증거를 집계 리비전 내림차순 키셋으로
+조회한다. 현재 규칙으로 과거 투영 전체를 재계산하는 경로가 아니다.
+
 PostgreSQL 18.4 통합 시나리오, 저장소 전체 정리 후 테스트와 실행 JAR 생성, Compose
 PostgreSQL에 대한 Java 21 비웹 실행 환경/Flyway 기동 점검으로 로컬 MVP를 검증했다. MockMvc 기반
 HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워크 종단 간 검증으로
@@ -58,6 +61,7 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 | `POST` | `/api/v1/events` | 이벤트 v1 수신과 멱등 투영 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | PRD-0013의 현재 관심 항목 단건 조회 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items` | PRD-0014·0015의 현재 관심 항목 상태별 키셋 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions` | PRD-0016의 적용 상태 전이 증거 이력 |
 | `POST` | `/api/v1/projections/rebuild` | 보존한 수신 기록으로 현재 투영 전체 재구축 |
 | `POST` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions` | 주간 에디션 생성 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest` | 작업공간·시즌 전역 최신 완료 에디션 조회 |
@@ -171,6 +175,10 @@ PRD-0014·0015의 목록은 작업공간·시즌과 선택한 `status`가 일치
 `eventType`, `sourceReference` 오름차순의 배타 키셋으로 반환한다. `status` 생략 시
 `ACTIVE`이며 `RESOLVED`도 선택할 수 있다. 자유 검색·정렬, 과거 이력과 현재 상태 변경
 명령은 포함하지 않는다.
+
+PRD-0016의 전이 이력은 같은 복합 정체성의 `APPLIED`·`APPLIED_WITH_GAP` 최초 수신 기록만
+`aggregateRevision` 내림차순의 배타 키셋으로 반환한다. `STALE`·`UNSUPPORTED`, 중복과
+충돌은 투영 전이가 아니다.
 
 ## 투영 재구축
 
