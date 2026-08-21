@@ -1,6 +1,8 @@
 package com.personal.baton.brief.persistence
 
+import com.personal.baton.brief.application.AttentionItemCursor
 import com.personal.baton.brief.application.BriefPersistencePort
+import com.personal.baton.brief.application.CurrentAttentionItemPage
 import com.personal.baton.brief.application.EditionContent
 import com.personal.baton.brief.application.EditionHistoryResult
 import com.personal.baton.brief.application.EditionResult
@@ -190,6 +192,53 @@ class JdbcBriefPersistenceAdapter(
             "sourceReference" to sourceReference,
         ),
     ).query(::mapAttention).optional().getOrNull()
+
+    override fun findActiveAttentionItems(
+        workspaceId: UUID,
+        seasonId: UUID,
+        after: AttentionItemCursor?,
+        limit: Int,
+    ): CurrentAttentionItemPage {
+        val afterClause = if (after == null) {
+            ""
+        } else {
+            """
+            AND (event_type, source_reference) > (:afterEventType, :afterSourceReference)
+            """.trimIndent()
+        }
+        val parameters = mutableMapOf<String, Any>(
+            "workspaceId" to workspaceId,
+            "seasonId" to seasonId,
+            "fetchLimit" to limit + 1,
+        )
+        if (after != null) {
+            parameters["afterEventType"] = after.eventType.name
+            parameters["afterSourceReference"] = after.sourceReference
+        }
+
+        val fetched = jdbc.sql(
+            """
+            SELECT * FROM attention_item
+             WHERE workspace_id = :workspaceId
+               AND season_id = :seasonId
+               AND item_status = 'ACTIVE'
+               $afterClause
+             ORDER BY event_type, source_reference
+             LIMIT :fetchLimit
+            """.trimIndent(),
+        ).params(parameters)
+            .query(::mapAttention)
+            .list()
+        val items = fetched.take(limit)
+        return CurrentAttentionItemPage(
+            items = items,
+            nextCursor = if (fetched.size > limit) {
+                items.last().let { AttentionItemCursor(it.eventType, it.sourceReference) }
+            } else {
+                null
+            },
+        )
+    }
 
     @Transactional
     override fun rebuild(

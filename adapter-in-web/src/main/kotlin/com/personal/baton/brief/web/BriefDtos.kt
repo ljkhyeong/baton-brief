@@ -1,5 +1,7 @@
 package com.personal.baton.brief.web
 
+import com.personal.baton.brief.application.AttentionItemCursor
+import com.personal.baton.brief.application.CurrentAttentionItemPage
 import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
@@ -79,6 +81,24 @@ data class EditionWeekRequest(
     )
 }
 
+data class CurrentAttentionItemPageRequest(
+    val afterEventType: SourceEventType? = null,
+    @field:Size(max = 128)
+    val afterSourceReference: String? = null,
+) {
+    @get:AssertTrue(message = "afterEventType and afterSourceReference must be provided together")
+    val validCursor: Boolean
+        get() = if (afterEventType == null) {
+            afterSourceReference == null
+        } else {
+            !afterSourceReference.isNullOrBlank()
+        }
+
+    fun toCursor(): AttentionItemCursor? = afterEventType?.let {
+        AttentionItemCursor(it, checkNotNull(afterSourceReference))
+    }
+}
+
 data class IngestResponse(
     val eventId: UUID,
     val status: IngestStatus,
@@ -114,6 +134,19 @@ data class AttentionItemResponse(
             ruleVersion = item.ruleVersion,
             revisionGap = item.revisionGap,
         )
+    }
+}
+
+data class CurrentAttentionItemPageResponse(
+    val items: List<AttentionItemResponse>,
+    val nextCursor: AttentionItemCursor?,
+) {
+    companion object {
+        fun from(page: CurrentAttentionItemPage): CurrentAttentionItemPageResponse =
+            CurrentAttentionItemPageResponse(
+                items = page.items.map(AttentionItemResponse::from),
+                nextCursor = page.nextCursor,
+            )
     }
 }
 

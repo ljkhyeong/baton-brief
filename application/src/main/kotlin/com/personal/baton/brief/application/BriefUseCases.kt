@@ -49,6 +49,16 @@ data class EventReceiptAnomalyResult(
     val nextBeforeIngestionSequence: Long?,
 )
 
+data class AttentionItemCursor(
+    val eventType: SourceEventType,
+    val sourceReference: String,
+)
+
+data class CurrentAttentionItemPage(
+    val items: List<AttentionItem>,
+    val nextCursor: AttentionItemCursor?,
+)
+
 data class RebuildResult(
     val receiptCount: Int,
     val itemCount: Int,
@@ -142,6 +152,13 @@ interface BriefUseCases {
         sourceReference: String,
     ): AttentionItem?
 
+    fun findActiveAttentionItems(
+        workspaceId: UUID,
+        seasonId: UUID,
+        after: AttentionItemCursor?,
+        limit: Int,
+    ): CurrentAttentionItemPage
+
     fun rebuild(): RebuildResult
 
     fun generateEdition(command: GenerateEditionCommand): EditionResult
@@ -197,6 +214,13 @@ interface BriefPersistencePort {
         eventType: SourceEventType,
         sourceReference: String,
     ): AttentionItem?
+
+    fun findActiveAttentionItems(
+        workspaceId: UUID,
+        seasonId: UUID,
+        after: AttentionItemCursor?,
+        limit: Int,
+    ): CurrentAttentionItemPage
 
     fun rebuild(project: (SourceEvent, AttentionItem?) -> ProjectionDecision): RebuildResult
 

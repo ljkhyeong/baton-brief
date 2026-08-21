@@ -60,6 +60,18 @@ class BriefService(
         sourceReference,
     )
 
+    override fun findActiveAttentionItems(
+        workspaceId: UUID,
+        seasonId: UUID,
+        after: AttentionItemCursor?,
+        limit: Int,
+    ): CurrentAttentionItemPage = persistence.findActiveAttentionItems(
+        workspaceId,
+        seasonId,
+        after,
+        limit,
+    )
+
     override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)
 
     override fun generateEdition(command: GenerateEditionCommand): EditionResult {
