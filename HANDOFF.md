@@ -38,6 +38,10 @@ PRD-0014에서 작업공간·시즌의 현재 `ACTIVE` 관심 항목을 복합 �
 조회하는 계약을 채택하고 구현했다. 대상 PostgreSQL 수신 통합 시나리오와 저장소 전체
 테스트·실행 JAR 생성이 성공했다.
 
+PRD-0015에서 같은 목록 경로의 기본 `ACTIVE` 동작을 유지하면서 `RESOLVED` 현재 항목을
+선택하는 상태 필터 계약을 채택하고 구현했다. 대상 PostgreSQL 수신 통합 시나리오와
+저장소 전체 테스트·실행 JAR 생성이 성공했다.
+
 관심 항목에서 실제 소비되지 않던 `item_id` 대리키는 Flyway V4에서 제거했다. 기존
 `(workspace_id, season_id, event_type, source_reference)` 정체성을 복합 기본 키로 사용하며,
 제품 API와 투영 의미는 바꾸지 않았다.
@@ -96,6 +100,8 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - PRD-0014에서 작업공간·시즌의 현재 `ACTIVE` 항목을 `eventType`·`sourceReference`
   순서의 배타 키셋으로 탐색하는 계약을 채택했다. 커서는 요청 간 스냅샷이 아니며 최신
   상태는 첫 페이지부터 다시 조회한다.
+- PRD-0015에서 같은 키셋 목록에 선택적인 `status`를 추가했다. 생략 시 `ACTIVE`이고
+  `RESOLVED`를 선택할 수 있으며, 어느 쪽도 과거 상태 이력으로 해석하지 않는다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -130,14 +136,15 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - 현재 항목은 후속 지원 이벤트와 재구축 결과에 따라 바뀔 수 있다. 불변 에디션이나 과거
   투영 이력으로 해석하지 않는다.
 
-## 구현한 현재 활성 관심 항목 키셋 조회
+## 구현한 현재 관심 항목 상태별 키셋 조회
 
 - `GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items`가 현재
-  `ACTIVE` 항목을 복합 정체성 오름차순으로 반환한다.
+  항목을 `status`와 복합 정체성 오름차순으로 반환한다. `status`를 생략하면 기존처럼
+  `ACTIVE`이고 `RESOLVED`도 선택할 수 있다.
 - 두 값이 함께 있는 `AttentionItemCursor`와 PostgreSQL 행 값 비교를 사용하고,
   `limit + 1`로 다음 커서를 판단한다. offset, 전체 개수와 새 인덱스는 없다.
-- 기존 `AttentionItemResponse`를 재사용하며 `RESOLVED` 목록, 검색·정렬 선택과 불변
-  에디션 미리보기는 포함하지 않는다.
+- 기존 `AttentionItemResponse`와 한 SQL 경로를 재사용하며 검색·정렬 선택, 과거 상태
+  이력과 불변 에디션 미리보기는 포함하지 않는다.
 
 ## 구현한 주간 범위 최신 조회
 
@@ -252,7 +259,7 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.ingestion distinguishes duplicate conflict unsupported stale and gap'`:
   성공. PostgreSQL 18.4 Testcontainers에서 수신 증거와 이상 증거 키셋, 재구축 뒤 현재
   단건의 리비전·공백 근거, 현재 `ACTIVE` 세 종류의 복합 키셋 페이지, 후속 `RESOLVED`
-  갱신과 활성 목록 제외, 범위 격리와 대표 입력 오류를 확인
+  갱신과 활성 목록 제외·해소 목록 포함, 범위 격리와 대표 입력 오류를 확인
 
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition is idempotent immutable generated and reproducible after rebuild'`:
   성공. PostgreSQL 18.4 Testcontainers에서 재구축 뒤 불변 단건 에디션의 `304`, 전역

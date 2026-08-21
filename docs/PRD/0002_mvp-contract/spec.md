@@ -32,6 +32,9 @@ PRD-0013은 작업공간·시즌·이벤트 종류·원본 참조로 현재 관�
 PRD-0014는 작업공간·시즌의 현재 `ACTIVE` 관심 항목을 복합 정체성 키셋으로 발견하는
 읽기 전용 목록을 추가한다. 이 목록은 요청 간 스냅샷이나 불변 에디션 미리보기가 아니다.
 
+PRD-0015는 같은 목록 경로에 선택적인 `status`를 추가한다. 생략 시 기존 `ACTIVE`를
+유지하고 `RESOLVED`를 선택해 현재 해소 항목을 탐색할 수 있다. 과거 상태 이력은 아니다.
+
 PostgreSQL 18.4 통합 시나리오, 저장소 전체 정리 후 테스트와 실행 JAR 생성, Compose
 PostgreSQL에 대한 Java 21 비웹 실행 환경/Flyway 기동 점검으로 로컬 MVP를 검증했다. MockMvc 기반
 HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워크 종단 간 검증으로
@@ -54,7 +57,7 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 |---|---|---|
 | `POST` | `/api/v1/events` | 이벤트 v1 수신과 멱등 투영 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | PRD-0013의 현재 관심 항목 단건 조회 |
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items` | PRD-0014의 현재 활성 관심 항목 키셋 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items` | PRD-0014·0015의 현재 관심 항목 상태별 키셋 조회 |
 | `POST` | `/api/v1/projections/rebuild` | 보존한 수신 기록으로 현재 투영 전체 재구축 |
 | `POST` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions` | 주간 에디션 생성 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest` | 작업공간·시즌 전역 최신 완료 에디션 조회 |
@@ -164,9 +167,10 @@ PRD-0013의 단건 조회는 `(workspaceId, seasonId, eventType, sourceReference
 일치하는 현재 항목을 반환한다. `ACTIVE`와 `RESOLVED`를 모두 현재 상태로 취급하며,
 미존재는 `404 Not Found`다.
 
-PRD-0014의 목록은 작업공간·시즌이 일치하는 `ACTIVE` 항목만 `eventType`,
-`sourceReference` 오름차순의 배타 키셋으로 반환한다. `RESOLVED` 목록, 자유 검색·정렬,
-과거 이력과 현재 상태 변경 명령은 포함하지 않는다.
+PRD-0014·0015의 목록은 작업공간·시즌과 선택한 `status`가 일치하는 현재 항목을
+`eventType`, `sourceReference` 오름차순의 배타 키셋으로 반환한다. `status` 생략 시
+`ACTIVE`이며 `RESOLVED`도 선택할 수 있다. 자유 검색·정렬, 과거 이력과 현재 상태 변경
+명령은 포함하지 않는다.
 
 ## 투영 재구축
 
