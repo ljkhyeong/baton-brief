@@ -34,6 +34,10 @@ PRD-0013에서 기존 복합 정체성으로 현재 관심 항목 한 건을 조
 구현했다. 대상 PostgreSQL 수신 통합 시나리오와 저장소 전체 테스트·실행 JAR 생성이
 성공했다.
 
+PRD-0014에서 작업공간·시즌의 현재 `ACTIVE` 관심 항목을 복합 정체성 배타 키셋으로
+조회하는 계약을 채택하고 구현했다. 대상 PostgreSQL 수신 통합 시나리오와 저장소 전체
+테스트·실행 JAR 생성이 성공했다.
+
 관심 항목에서 실제 소비되지 않던 `item_id` 대리키는 Flyway V4에서 제거했다. 기존
 `(workspace_id, season_id, event_type, source_reference)` 정체성을 복합 기본 키로 사용하며,
 제품 API와 투영 의미는 바꾸지 않았다.
@@ -89,6 +93,9 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - PRD-0013에서 `(workspaceId, seasonId, eventType, sourceReference)`가 정확히 같은 현재
   관심 항목 단건 조회를 채택했다. `ACTIVE`와 `RESOLVED`를 모두 반환하며 목록·검색·과거
   상태 이력은 포함하지 않는다.
+- PRD-0014에서 작업공간·시즌의 현재 `ACTIVE` 항목을 `eventType`·`sourceReference`
+  순서의 배타 키셋으로 탐색하는 계약을 채택했다. 커서는 요청 간 스냅샷이 아니며 최신
+  상태는 첫 페이지부터 다시 조회한다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -122,6 +129,15 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   `AttentionItemResponse`를 반환한다. 새 DTO, SQL 도우미, 스키마와 인덱스는 없다.
 - 현재 항목은 후속 지원 이벤트와 재구축 결과에 따라 바뀔 수 있다. 불변 에디션이나 과거
   투영 이력으로 해석하지 않는다.
+
+## 구현한 현재 활성 관심 항목 키셋 조회
+
+- `GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items`가 현재
+  `ACTIVE` 항목을 복합 정체성 오름차순으로 반환한다.
+- 두 값이 함께 있는 `AttentionItemCursor`와 PostgreSQL 행 값 비교를 사용하고,
+  `limit + 1`로 다음 커서를 판단한다. offset, 전체 개수와 새 인덱스는 없다.
+- 기존 `AttentionItemResponse`를 재사용하며 `RESOLVED` 목록, 검색·정렬 선택과 불변
+  에디션 미리보기는 포함하지 않는다.
 
 ## 구현한 주간 범위 최신 조회
 
@@ -234,9 +250,9 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 ## 현재 검증
 
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.ingestion distinguishes duplicate conflict unsupported stale and gap'`:
-  성공. PostgreSQL 18.4 Testcontainers에서 재구축 뒤 현재 `ACTIVE` 항목의 리비전 `3`과
-  공백 근거, 후속 리비전 `4`의 `RESOLVED` 갱신, 다른 작업공간 `404`와 빈 원본 참조
-  `400`을 확인
+  성공. PostgreSQL 18.4 Testcontainers에서 수신 증거와 이상 증거 키셋, 재구축 뒤 현재
+  단건의 리비전·공백 근거, 현재 `ACTIVE` 세 종류의 복합 키셋 페이지, 후속 `RESOLVED`
+  갱신과 활성 목록 제외, 범위 격리와 대표 입력 오류를 확인
 
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.edition is idempotent immutable generated and reproducible after rebuild'`:
   성공. PostgreSQL 18.4 Testcontainers에서 재구축 뒤 불변 단건 에디션의 `304`, 전역
@@ -248,10 +264,6 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   배타 잠금 동안 지원 이벤트 수신의 투영 단계가 대기하고 종료 뒤 두 작업이 순서대로
   성공하는 동작을 확인
 
-- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.ingestion distinguishes duplicate conflict unsupported stale and gap'`:
-  성공, PostgreSQL 18.4 Testcontainers에서 최초 수신 결과, 동일 재전달과 충돌 뒤 불변성,
-  fingerprint 비노출, 재구축 뒤 동일 응답, `UNSUPPORTED`와 미존재 `404 ProblemDetail`을
-  확인
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.health exposes aggregate status without deployment probes'`:
   성공, PostgreSQL 18.4 Testcontainers에서 `/actuator/health`의 `200`·`UP`, 상세 비노출,
   탐색 페이지와 대표 probe 경로의 `404`를 확인
@@ -263,6 +275,8 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
     최초 수신 증거의 읽기 전용 조회·재구축 뒤 불변성·fingerprint 비노출
   - 복합 정체성의 현재 관심 항목 단건 조회, 재구축 뒤 리비전·공백 근거와 후속
     `RESOLVED` 갱신, 범위 격리와 입력 검증
+  - 현재 `ACTIVE` 항목의 복합 정체성 순서, 배타 키셋 다음 페이지, 다른 작업공간의 빈
+    범위, 반쪽 커서 거부와 후속 `RESOLVED` 항목 제외
   - 작업공간·시즌별 이상 수신 증거의 선정, 충돌 뒤 `APPLIED` 포함, 수신 순서 내림차순
     배타 페이지와 다른 시즌·작업공간의 빈 범위
   - 에디션 멱등성·불변성·`generation`/최신 조회, 실제 동일 전체 스냅샷
