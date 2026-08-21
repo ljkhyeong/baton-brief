@@ -32,7 +32,7 @@ data class BriefEditionItem(
     val sourceReference: String,
     val reasonCode: SourceEventType,
     val severity: Severity,
-    val status: AttentionStatus,
+    val status: SourceEventState,
     val observedAt: Instant,
     val ruleVersion: Int,
     val aggregateRevision: Long?,

@@ -13,7 +13,6 @@ import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
 import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.AttentionProjector
-import com.personal.baton.brief.domain.AttentionStatus
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.ProjectionDecision
@@ -29,6 +28,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
+import kotlin.jvm.optionals.getOrNull
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -111,7 +111,7 @@ class JdbcBriefPersistenceAdapter(
     ).param("eventId", eventId)
         .query(::mapSourceEventReceipt)
         .optional()
-        .orElse(null)
+        .getOrNull()
 
     override fun findEventReceiptAnomalies(
         workspaceId: UUID,
@@ -328,7 +328,7 @@ class JdbcBriefPersistenceAdapter(
     ).param("eventId", eventId)
         .query(String::class.java)
         .optional()
-        .orElse(null)
+        .getOrNull()
 
     private fun insertReceipt(
         event: SourceEvent,
@@ -400,7 +400,7 @@ class JdbcBriefPersistenceAdapter(
             "eventType" to event.eventType.name,
             "sourceReference" to event.sourceReference,
         ),
-    ).query(::mapAttention).optional().orElse(null)
+    ).query(::mapAttention).optional().getOrNull()
 
     private fun findAttentionForWindow(
         command: GenerateEditionCommand,
@@ -589,7 +589,7 @@ class JdbcBriefPersistenceAdapter(
         ).params(parameters)
             .query(::mapEditionWithoutItems)
             .optional()
-            .orElse(null)
+            .getOrNull()
             ?: return null
         return edition.copy(items = findEditionItems(edition.editionId))
     }
@@ -608,7 +608,7 @@ class JdbcBriefPersistenceAdapter(
                 sourceReference = result.getString("source_reference"),
                 reasonCode = SourceEventType.valueOf(result.getString("reason_code")),
                 severity = Severity.valueOf(result.getString("severity")),
-                status = AttentionStatus.valueOf(result.getString("item_status")),
+                status = SourceEventState.valueOf(result.getString("item_status")),
                 observedAt = result.instant("observed_at"),
                 ruleVersion = result.getInt("rule_version"),
                 aggregateRevision = result.getObject("aggregate_revision", Long::class.javaObjectType),
@@ -619,15 +619,15 @@ class JdbcBriefPersistenceAdapter(
     private fun lockExclusive(key: String) {
         jdbc.sql("SELECT pg_advisory_xact_lock(hashtextextended(:lockKey, 0))")
             .param("lockKey", key)
-            .query { _, _ -> Unit }
-            .single()
+            .query()
+            .singleValue()
     }
 
     private fun lockShared(key: String) {
         jdbc.sql("SELECT pg_advisory_xact_lock_shared(hashtextextended(:lockKey, 0))")
             .param("lockKey", key)
-            .query { _, _ -> Unit }
-            .single()
+            .query()
+            .singleValue()
     }
 
     private fun mapAttention(
@@ -639,7 +639,7 @@ class JdbcBriefPersistenceAdapter(
         eventType = SourceEventType.valueOf(result.getString("event_type")),
         sourceReference = result.getString("source_reference"),
         severity = Severity.valueOf(result.getString("severity")),
-        status = AttentionStatus.valueOf(result.getString("item_status")),
+        status = SourceEventState.valueOf(result.getString("item_status")),
         observedAt = result.instant("observed_at"),
         ruleVersion = result.getInt("rule_version"),
         lastRevision = result.getLong("last_revision"),

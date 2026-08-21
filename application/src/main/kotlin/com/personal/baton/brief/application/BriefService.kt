@@ -2,20 +2,18 @@ package com.personal.baton.brief.application
 
 import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.AttentionProjector
-import com.personal.baton.brief.domain.AttentionStatus
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.SourceEvent
+import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.WeeklyWindow
 import java.io.DataOutputStream
 import java.io.OutputStream
-import java.nio.charset.StandardCharsets
 import java.security.DigestOutputStream
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.HexFormat
 import java.util.UUID
 
 class BriefService(
@@ -119,7 +117,7 @@ class BriefService(
     private fun selectEditionContent(items: List<AttentionItem>): EditionContent {
         val selected = items
             .asSequence()
-            .filter { it.status == AttentionStatus.ACTIVE }
+            .filter { it.status == SourceEventState.ACTIVE }
             .sortedWith(
                 compareByDescending<AttentionItem> { it.severity }
                     .thenBy { it.reasonCode.name }
@@ -175,12 +173,12 @@ class BriefService(
             DigestOutputStream(OutputStream.nullOutputStream(), digest),
         ).use { output ->
             values.forEach { value ->
-                val encoded = value.toString().toByteArray(StandardCharsets.UTF_8)
+                val encoded = value.toString().encodeToByteArray()
                 output.writeInt(encoded.size)
                 output.write(encoded)
             }
         }
-        return HexFormat.of().formatHex(digest.digest())
+        return digest.digest().toHexString()
     }
 
     companion object {

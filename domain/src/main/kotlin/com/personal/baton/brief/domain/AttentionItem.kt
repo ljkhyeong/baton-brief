@@ -8,18 +8,13 @@ enum class Severity {
     HIGH,
 }
 
-enum class AttentionStatus {
-    ACTIVE,
-    RESOLVED,
-}
-
 data class AttentionItem(
     val workspaceId: UUID,
     val seasonId: UUID,
     val eventType: SourceEventType,
     val sourceReference: String,
     val severity: Severity,
-    val status: AttentionStatus,
+    val status: SourceEventState,
     val observedAt: Instant,
     val ruleVersion: Int,
     val lastRevision: Long,
@@ -62,10 +57,7 @@ object AttentionProjector {
                 eventType = event.eventType,
                 sourceReference = event.sourceReference,
                 severity = severity,
-                status = when (event.state) {
-                    SourceEventState.ACTIVE -> AttentionStatus.ACTIVE
-                    SourceEventState.RESOLVED -> AttentionStatus.RESOLVED
-                },
+                status = event.state,
                 observedAt = event.occurredAt,
                 ruleVersion = RULE_VERSION,
                 lastRevision = event.aggregateRevision,

@@ -4,7 +4,6 @@ import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.domain.AttentionItem
-import com.personal.baton.brief.domain.AttentionStatus
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.Severity
@@ -98,7 +97,7 @@ data class AttentionItemResponse(
     val reasonCode: SourceEventType,
     val severity: Severity,
     val sourceReference: String,
-    val status: AttentionStatus,
+    val status: SourceEventState,
     val observedAt: Instant,
     val aggregateRevision: Long,
     val ruleVersion: Int,
