@@ -19,7 +19,7 @@ PRD-0009에서 기존 작업공간·시즌 전역 `latest`를 유지하면서 �
 
 PRD-0010에서 새 에디션 항목에 `aggregateRevision`과 `revisionGap`을 함께 고정하고,
 이전 항목의 미기록 값은 `null`로 유지하는 계약을 채택하고 구현했다. PostgreSQL
-Testcontainers 빈 데이터베이스의 V1~V4 적용, 대상 통합 시나리오와 저장소 전체
+Testcontainers 빈 데이터베이스의 V1~V5 적용, 대상 통합 시나리오와 저장소 전체
 테스트·실행 JAR 생성이 성공했다.
 
 PRD-0011에서 작업공간·시즌별 과거 이상 수신 증거를 `ingestionSequence` 배타 키셋으로
@@ -29,6 +29,10 @@ PRD-0011에서 작업공간·시즌별 과거 이상 수신 증거를 `ingestion
 관심 항목에서 실제 소비되지 않던 `item_id` 대리키는 Flyway V4에서 제거했다. 기존
 `(workspace_id, season_id, event_type, source_reference)` 정체성을 복합 기본 키로 사용하며,
 제품 API와 투영 의미는 바꾸지 않았다.
+
+조회·선정·지문·비교·재구축·응답에서 소비되지 않던 `attention_item.projected_at`은
+Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.received_at`은 수신 시각
+계약이므로 그대로 유지했다.
 
 ## 채택한 기반
 
@@ -114,7 +118,7 @@ PRD-0011에서 작업공간·시즌별 과거 이상 수신 증거를 `ingestion
 - 처음 리비전 근거를 포함한 생성은 이전 지문과 달라 새 `generation`을 만들고, 이후 같은
   근거는 멱등하게 재사용한다. 기존 에디션은 수정하지 않는다.
 - 새 경로, 인증, 생산자·브로커 변경, 인덱스와 규칙 버전 변경은 포함하지 않는다.
-- PostgreSQL Testcontainers 빈 데이터베이스에 Flyway V1~V4를 적용한 대상 시나리오에서
+- PostgreSQL Testcontainers 빈 데이터베이스에 Flyway V1~V5를 적용한 대상 시나리오에서
   신규 근거 고정, 근거만 다른 새 세대와 즉시 멱등 재사용, 정방향·역방향 비교의
   `1`·`false` ↔ `3`·`true`, 재구축 뒤 비교 불변성과 실제 동일 전체 스냅샷
   `A → B → A`의 새 역사적 세대를 확인했다.
@@ -207,7 +211,7 @@ PRD-0011에서 작업공간·시즌별 과거 이상 수신 증거를 `ingestion
   성공, PostgreSQL 18.4 Testcontainers에서 `/actuator/health`의 `200`·`UP`, 상세 비노출,
   탐색 페이지와 대표 probe 경로의 `404`를 확인
 - `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 다섯 모듈의 전체 테스트,
-  PostgreSQL Testcontainers 빈 데이터베이스의 Flyway V1~V4 적용과
+  PostgreSQL Testcontainers 빈 데이터베이스의 Flyway V1~V5 적용과
   `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
   - 최소 aggregate health의 `UP`·상세 비노출과 탐색 페이지·대표 probe 경로 미노출
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백, 이벤트별 충돌 증거 상한과
@@ -231,11 +235,11 @@ PRD-0011에서 작업공간·시즌별 과거 이상 수신 증거를 `ingestion
   Java 21.0.10에서 Compose PostgreSQL 18.4에 연결해 성공. Flyway가 V1 마이그레이션을
   검증·적용했고 Spring 컨텍스트가 시작됨
 
-위 비웹 실행 JAR 기동 점검은 V2 추가 전 V1 기준이다. 현재 V1~V4는 PostgreSQL 18.4
+위 비웹 실행 JAR 기동 점검은 V2 추가 전 V1 기준이다. 현재 V1~V5는 PostgreSQL 18.4
 Testcontainers 빈 데이터베이스에서 실제 적용했고 실행 JAR 생성까지 확인했으며, 같은
 Compose 실행 환경 기동은 중복 수행하지 않았다. 기존 데이터가 있는 V2 데이터베이스의
-V3 업그레이드, V3 데이터베이스의 V4 기본 키 전환과 잘못된 값에 대한 CHECK 제약 거부는
-별도 업그레이드 시나리오로 직접 검증하지 않았다.
+V3 업그레이드, V3 데이터베이스의 V4 기본 키 전환, V4 데이터베이스의 V5 열 제거와
+잘못된 값에 대한 CHECK 제약 거부는 별도 업그레이드 시나리오로 직접 검증하지 않았다.
 
 실행 점검은 비웹 모드이므로 실제 수신 포트를 통한 HTTP 네트워크 동작은 입증하지 않는다.
 HTTP 경로와 영속성 동작은 위 PostgreSQL Testcontainers·MockMvc 통합 시나리오가 입증한다.
