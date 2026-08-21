@@ -9,10 +9,13 @@ import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
 import com.personal.baton.brief.domain.BriefEdition
+import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
+import jakarta.validation.constraints.Size
 import java.net.URI
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -69,6 +72,20 @@ class BriefController(
         beforeIngestionSequence,
         limit,
     )
+
+    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current")
+    fun findAttentionItem(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @RequestParam("eventType") eventType: SourceEventType,
+        @RequestParam("sourceReference") @NotBlank @Size(max = 128) sourceReference: String,
+    ): AttentionItemResponse = brief.findAttentionItem(
+        workspaceId,
+        seasonId,
+        eventType,
+        sourceReference,
+    )?.let(AttentionItemResponse::from)
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "attention item not found")
 
     @PostMapping("/projections/rebuild")
     fun rebuild(): RebuildResult = brief.rebuild()

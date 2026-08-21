@@ -78,7 +78,13 @@ class JdbcBriefPersistenceAdapter(
         lockExclusive(
             "attention:${event.workspaceId}:${event.seasonId}:${event.eventType.name}:${event.sourceReference}",
         )
-        return when (val decision = project(findAttention(event))) {
+        val current = findAttentionItem(
+            event.workspaceId,
+            event.seasonId,
+            event.eventType,
+            event.sourceReference,
+        )
+        return when (val decision = project(current)) {
             ProjectionDecision.Stale -> {
                 insertReceipt(event, fingerprint, IngestStatus.STALE, receivedAt)
                 IngestResult(event.eventId, IngestStatus.STALE)
@@ -162,6 +168,28 @@ class JdbcBriefPersistenceAdapter(
             nextBeforeIngestionSequence = if (hasNextPage) receipts.last().ingestionSequence else null,
         )
     }
+
+    override fun findAttentionItem(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType,
+        sourceReference: String,
+    ): AttentionItem? = jdbc.sql(
+        """
+        SELECT * FROM attention_item
+         WHERE workspace_id = :workspaceId
+           AND season_id = :seasonId
+           AND event_type = :eventType
+           AND source_reference = :sourceReference
+        """.trimIndent(),
+    ).params(
+        mapOf(
+            "workspaceId" to workspaceId,
+            "seasonId" to seasonId,
+            "eventType" to eventType.name,
+            "sourceReference" to sourceReference,
+        ),
+    ).query(::mapAttention).optional().getOrNull()
 
     @Transactional
     override fun rebuild(
@@ -384,23 +412,6 @@ class JdbcBriefPersistenceAdapter(
             ),
         ).update()
     }
-
-    private fun findAttention(event: SourceEvent): AttentionItem? = jdbc.sql(
-        """
-        SELECT * FROM attention_item
-         WHERE workspace_id = :workspaceId
-           AND season_id = :seasonId
-           AND event_type = :eventType
-           AND source_reference = :sourceReference
-        """.trimIndent(),
-    ).params(
-        mapOf(
-            "workspaceId" to event.workspaceId,
-            "seasonId" to event.seasonId,
-            "eventType" to event.eventType.name,
-            "sourceReference" to event.sourceReference,
-        ),
-    ).query(::mapAttention).optional().getOrNull()
 
     private fun findAttentionForWindow(
         command: GenerateEditionCommand,

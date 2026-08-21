@@ -6,6 +6,7 @@ import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
+import com.personal.baton.brief.domain.SourceEventType
 import com.personal.baton.brief.domain.WeeklyWindow
 import java.io.DataOutputStream
 import java.io.OutputStream
@@ -45,6 +46,18 @@ class BriefService(
         seasonId,
         beforeIngestionSequence,
         limit,
+    )
+
+    override fun findAttentionItem(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType,
+        sourceReference: String,
+    ): AttentionItem? = persistence.findAttentionItem(
+        workspaceId,
+        seasonId,
+        eventType,
+        sourceReference,
     )
 
     override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)

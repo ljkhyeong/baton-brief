@@ -135,6 +135,13 @@ interface BriefUseCases {
         limit: Int,
     ): EventReceiptAnomalyResult
 
+    fun findAttentionItem(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType,
+        sourceReference: String,
+    ): AttentionItem?
+
     fun rebuild(): RebuildResult
 
     fun generateEdition(command: GenerateEditionCommand): EditionResult
@@ -183,6 +190,13 @@ interface BriefPersistencePort {
         beforeIngestionSequence: Long?,
         limit: Int,
     ): EventReceiptAnomalyResult
+
+    fun findAttentionItem(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType,
+        sourceReference: String,
+    ): AttentionItem?
 
     fun rebuild(project: (SourceEvent, AttentionItem?) -> ProjectionDecision): RebuildResult
 
