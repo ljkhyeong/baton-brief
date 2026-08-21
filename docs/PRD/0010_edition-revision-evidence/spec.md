@@ -98,7 +98,7 @@ PRD-0005의 비교 키 `(reasonCode, sourceReference)`와 정렬은 그대로 �
 ## 검증 범위
 
 `./gradlew --no-daemon clean test :bootstrap:bootJar`가 성공했다. PostgreSQL
-Testcontainers의 빈 데이터베이스에 Flyway V1부터 V3까지 적용한 통합 시나리오에서 다음을
+Testcontainers의 빈 데이터베이스에 Flyway V1부터 V6까지 적용한 통합 시나리오에서 다음을
 확인했다.
 
 - 신규 에디션 항목이 `aggregateRevision`과 `revisionGap`을 함께 고정하고 응답한다.
@@ -110,9 +110,10 @@ Testcontainers의 빈 데이터베이스에 Flyway V1부터 V3까지 적용한 �
 - 전체 항목 스냅샷이 실제로 `A → B → A`로 돌아온 경우 과거 `A`를 재사용하지 않고 새
   역사적 `generation`을 만든다.
 
-기존 데이터가 있는 V2 데이터베이스를 V3로 올리는 별도 업그레이드 하네스와 CHECK 제약에
-잘못된 값을 직접 삽입해 거부되는 시나리오는 실행하지 않았다. 따라서 빈 데이터베이스의
-V1~V3 적용 성공을 이 두 동작의 직접 검증으로 확대하지 않는다.
+별도 PostgreSQL 스키마에는 V1·V2 SQL과 대표 기존 에디션 항목을 준비한 뒤 V3~V6 SQL을
+순서대로 적용했다. 기존 항목의 두 근거가 `null`로 유지되고, 한쪽 근거만 있거나 리비전이
+양수가 아닌 변경은 CHECK 제약으로 거부됨을 확인했다. 같은 시나리오에서 대표 현재 투영
+행의 V4 복합 기본 키 전환과 V5·V6 열 제거 뒤 행 보존도 확인했다.
 
 ## 명시적 비목표
 
