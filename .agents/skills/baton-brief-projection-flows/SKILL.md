@@ -26,6 +26,9 @@ description: BATON BRIEF의 관심 항목 투영 작업 절차. AttentionItem, r
 - 규칙 v1처럼 현재 투영의 `reasonCode`가 `eventType`과 항상 같으면 독립 상태로 중복
   저장하지 않고 도메인에서 파생한다. 불변 에디션에는 생성 당시 `reasonCode`를 계속
   고정해 과거 스냅샷과 비교 키를 보존한다.
+- 규칙 v1의 원본 `state`와 관심 항목 `status`가 같은 `ACTIVE`·`RESOLVED` 의미라면
+  `SourceEventState`를 함께 사용하고 항등 enum 변환을 만들지 않는다. 수신 기록, 현재
+  투영과 불변 에디션의 상태 열은 서로 다른 저장 사실이므로 합치지 않는다.
 - 원본 계약의 집계 리비전으로 오래된 효과를 거부하고 공백을 식별한다. 로컬 수신 기록의
   `sourceCursor`는 에디션 근거이지 원본 워터마크가 아니다. 전달 순서로 최신 상태를
   추론하지 않는다.
