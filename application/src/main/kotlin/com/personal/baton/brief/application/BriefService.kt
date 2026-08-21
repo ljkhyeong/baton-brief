@@ -7,9 +7,10 @@ import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.WeeklyWindow
-import java.nio.charset.StandardCharsets
-import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
+import java.io.OutputStream
+import java.nio.charset.StandardCharsets
+import java.security.DigestOutputStream
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
@@ -169,19 +170,17 @@ class BriefService(
     )
 
     private fun sha256(values: Sequence<Any?>): String {
-        val canonical = ByteArrayOutputStream().use { bytes ->
-            DataOutputStream(bytes).use { output ->
-                values.forEach { value ->
-                    val encoded = value.toString().toByteArray(StandardCharsets.UTF_8)
-                    output.writeInt(encoded.size)
-                    output.write(encoded)
-                }
+        val digest = MessageDigest.getInstance("SHA-256")
+        DataOutputStream(
+            DigestOutputStream(OutputStream.nullOutputStream(), digest),
+        ).use { output ->
+            values.forEach { value ->
+                val encoded = value.toString().toByteArray(StandardCharsets.UTF_8)
+                output.writeInt(encoded.size)
+                output.write(encoded)
             }
-            bytes.toByteArray()
         }
-        return HexFormat.of().formatHex(
-            MessageDigest.getInstance("SHA-256").digest(canonical),
-        )
+        return HexFormat.of().formatHex(digest.digest())
     }
 
     companion object {
