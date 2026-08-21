@@ -267,9 +267,9 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.aggregateRevision").value(3))
             .andExpect(jsonPath("$.revisionGap").value(true))
 
-        val activeAttentionPath =
+        val attentionItemsPath =
             "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
-        mockMvc.perform(get(activeAttentionPath).param("limit", "2"))
+        mockMvc.perform(get(attentionItemsPath).param("limit", "2"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(2))
             .andExpect(jsonPath("$.items[0].reasonCode").value("DECISION_FOLLOW_UP_OVERDUE"))
@@ -280,7 +280,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.nextCursor.sourceReference").value("handoff:1"))
 
         mockMvc.perform(
-            get(activeAttentionPath)
+            get(attentionItemsPath)
                 .param("afterEventType", "HANDOFF_BLOCKED")
                 .param("afterSourceReference", "handoff:1")
                 .param("limit", "2"),
@@ -299,7 +299,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items").isEmpty)
 
         mockMvc.perform(
-            get(activeAttentionPath)
+            get(attentionItemsPath)
                 .param("afterEventType", "HANDOFF_BLOCKED"),
         ).andExpect(status().isBadRequest)
 
@@ -321,12 +321,18 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.status").value("RESOLVED"))
             .andExpect(jsonPath("$.aggregateRevision").value(4))
 
-        mockMvc.perform(get(activeAttentionPath))
+        mockMvc.perform(get(attentionItemsPath))
             .andExpect(status().isOk)
             .andExpect(
                 jsonPath("$.items[*].sourceReference")
                     .value(contains("decision:current", "routine:current")),
             )
+
+        mockMvc.perform(get(attentionItemsPath).param("status", "RESOLVED"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].sourceReference").value("handoff:1"))
+            .andExpect(jsonPath("$.items[0].status").value("RESOLVED"))
 
         mockMvc.perform(
             get(
