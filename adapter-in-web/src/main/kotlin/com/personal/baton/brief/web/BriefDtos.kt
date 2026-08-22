@@ -11,6 +11,7 @@ import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
+import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
@@ -27,6 +28,7 @@ data class SourceEventRequest(
     val eventType: SourceEventType,
     @field:Positive
     val eventVersion: Int,
+    val sourceSeverity: SourceEventSeverity? = null,
     val workspaceId: UUID,
     val seasonId: UUID,
     @field:NotBlank
@@ -43,6 +45,10 @@ data class SourceEventRequest(
     val validOccurredAt: Boolean
         get() = occurredAtInstant != null
 
+    @get:AssertTrue(message = "eventVersion, eventType and sourceSeverity must match")
+    val validVersionContract: Boolean
+        get() = SourceEvent.isReceivable(eventVersion, eventType, sourceSeverity)
+
     fun toDomain(): SourceEvent = SourceEvent(
         eventId = eventId,
         eventType = eventType,
@@ -53,6 +59,7 @@ data class SourceEventRequest(
         aggregateRevision = aggregateRevision,
         occurredAt = checkNotNull(occurredAtInstant),
         state = state,
+        sourceSeverity = sourceSeverity,
     )
 }
 

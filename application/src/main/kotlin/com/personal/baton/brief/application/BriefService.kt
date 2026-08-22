@@ -25,7 +25,7 @@ class BriefService(
         val normalizedEvent = event.copy(occurredAt = event.occurredAt.truncatedTo(ChronoUnit.MICROS))
         val receivedAt = clock.instant().truncatedTo(ChronoUnit.MICROS)
         val fingerprint = fingerprint(normalizedEvent)
-        if (normalizedEvent.eventVersion != SUPPORTED_EVENT_VERSION) {
+        if (!normalizedEvent.isSupported) {
             return persistence.recordUnsupported(normalizedEvent, fingerprint, receivedAt)
         }
 
@@ -196,8 +196,8 @@ class BriefService(
         )
     }
 
-    private fun fingerprint(event: SourceEvent): String = sha256(
-        sequenceOf(
+    private fun fingerprint(event: SourceEvent): String {
+        val values = sequenceOf(
             event.eventId,
             event.eventType.name,
             event.eventVersion,
@@ -207,8 +207,9 @@ class BriefService(
             event.aggregateRevision,
             event.occurredAt,
             event.state.name,
-        ),
-    )
+        )
+        return sha256(event.sourceSeverity?.let { values + it.name } ?: values)
+    }
 
     private fun sha256(values: Sequence<Any?>): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -222,9 +223,5 @@ class BriefService(
             }
         }
         return digest.digest().toHexString()
-    }
-
-    companion object {
-        private const val SUPPORTED_EVENT_VERSION = 1
     }
 }

@@ -22,6 +22,7 @@ import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.ProjectionDecision
 import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEvent
+import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
 import com.personal.baton.brief.domain.WeeklyWindow
@@ -110,7 +111,7 @@ class JdbcBriefPersistenceAdapter(
     override fun findEventReceipt(eventId: UUID): SourceEventReceipt? = jdbc.sql(
         """
         SELECT receipt.event_id, receipt.ingestion_sequence, receipt.event_type,
-               receipt.event_version, receipt.workspace_id, receipt.season_id,
+               receipt.event_version, receipt.source_severity, receipt.workspace_id, receipt.season_id,
                receipt.source_reference, receipt.aggregate_revision, receipt.occurred_at,
                receipt.event_state, receipt.processing_outcome, receipt.received_at,
                conflict.detected_at AS conflict_detected_at
@@ -146,7 +147,7 @@ class JdbcBriefPersistenceAdapter(
         val fetched = jdbc.sql(
             """
             SELECT receipt.event_id, receipt.ingestion_sequence, receipt.event_type,
-                   receipt.event_version, receipt.workspace_id, receipt.season_id,
+                   receipt.event_version, receipt.source_severity, receipt.workspace_id, receipt.season_id,
                    receipt.source_reference, receipt.aggregate_revision, receipt.occurred_at,
                    receipt.event_state, receipt.processing_outcome, receipt.received_at,
                    conflict.detected_at AS conflict_detected_at
@@ -313,7 +314,7 @@ class JdbcBriefPersistenceAdapter(
         var receiptCount = 0
         jdbc.sql(
             """
-            SELECT event_id, event_type, event_version, workspace_id, season_id,
+            SELECT event_id, event_type, event_version, source_severity, workspace_id, season_id,
                    source_reference, aggregate_revision, occurred_at, event_state
               FROM source_event_receipt
              WHERE processing_outcome <> 'UNSUPPORTED'
@@ -480,19 +481,20 @@ class JdbcBriefPersistenceAdapter(
         jdbc.sql(
             """
             INSERT INTO source_event_receipt (
-                event_id, event_type, event_version, workspace_id, season_id, source_reference,
+                event_id, event_type, event_version, source_severity, workspace_id, season_id, source_reference,
                 aggregate_revision, occurred_at, event_state, payload_fingerprint,
                 processing_outcome, received_at
             ) VALUES (
-                :eventId, :eventType, :eventVersion, :workspaceId, :seasonId, :sourceReference,
+                :eventId, :eventType, :eventVersion, :sourceSeverity, :workspaceId, :seasonId, :sourceReference,
                 :aggregateRevision, :occurredAt, :eventState, :fingerprint, :outcome, :receivedAt
             )
             """.trimIndent(),
         ).params(
-            mapOf(
+            mapOf<String, Any?>(
                 "eventId" to event.eventId,
                 "eventType" to event.eventType.name,
                 "eventVersion" to event.eventVersion,
+                "sourceSeverity" to event.sourceSeverity?.name,
                 "workspaceId" to event.workspaceId,
                 "seasonId" to event.seasonId,
                 "sourceReference" to event.sourceReference,
@@ -777,6 +779,7 @@ class JdbcBriefPersistenceAdapter(
         eventId = result.getObject("event_id", UUID::class.java),
         eventType = SourceEventType.valueOf(result.getString("event_type")),
         eventVersion = result.getInt("event_version"),
+        sourceSeverity = result.getString("source_severity")?.let(SourceEventSeverity::valueOf),
         workspaceId = result.getObject("workspace_id", UUID::class.java),
         seasonId = result.getObject("season_id", UUID::class.java),
         sourceReference = result.getString("source_reference"),
@@ -793,6 +796,7 @@ class JdbcBriefPersistenceAdapter(
         ingestionSequence = result.getLong("ingestion_sequence"),
         eventType = SourceEventType.valueOf(result.getString("event_type")),
         eventVersion = result.getInt("event_version"),
+        sourceSeverity = result.getString("source_severity")?.let(SourceEventSeverity::valueOf),
         workspaceId = result.getObject("workspace_id", UUID::class.java),
         seasonId = result.getObject("season_id", UUID::class.java),
         sourceReference = result.getString("source_reference"),

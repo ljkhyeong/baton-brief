@@ -6,6 +6,7 @@ import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.ProjectionDecision
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
+import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventType
 import com.personal.baton.brief.domain.WeeklyWindow
 import java.time.Instant
@@ -33,6 +34,7 @@ data class SourceEventReceipt(
     val ingestionSequence: Long,
     val eventType: SourceEventType,
     val eventVersion: Int,
+    val sourceSeverity: SourceEventSeverity?,
     val workspaceId: UUID,
     val seasonId: UUID,
     val sourceReference: String,

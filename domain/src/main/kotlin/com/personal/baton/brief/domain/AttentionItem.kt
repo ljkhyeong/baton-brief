@@ -43,11 +43,21 @@ object AttentionProjector {
         }
 
         val hasGap = event.aggregateRevision > (current?.lastRevision ?: 0) + 1
-        val severity = when (event.eventType) {
-            SourceEventType.HANDOFF_BLOCKED -> Severity.HIGH
-            SourceEventType.ROUTINE_MISSED,
-            SourceEventType.DECISION_FOLLOW_UP_OVERDUE,
-            -> Severity.MEDIUM
+        val severity = when (event.eventVersion) {
+            1 -> when (event.eventType) {
+                SourceEventType.HANDOFF_BLOCKED -> Severity.HIGH
+                SourceEventType.ROUTINE_MISSED,
+                SourceEventType.DECISION_FOLLOW_UP_OVERDUE,
+                -> Severity.MEDIUM
+                else -> error("unsupported event type for version 1")
+            }
+
+            2 -> when (checkNotNull(event.sourceSeverity)) {
+                SourceEventSeverity.CRITICAL -> Severity.HIGH
+                SourceEventSeverity.WARNING -> Severity.MEDIUM
+            }
+
+            else -> error("unsupported event version")
         }
 
         return ProjectionDecision.Applied(
