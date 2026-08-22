@@ -70,6 +70,7 @@ BRIEF가 PRD-0008에 따라 보존하는 최초 수신 기록과 이벤트별 �
 | `ingestionSequence` | BRIEF가 부여한 불변 로컬 수신 순서 |
 | `eventType` | 최초 저장한 이벤트 종류 |
 | `eventVersion` | 최초 저장한 이벤트 버전 |
+| `sourceSeverity` | v2가 저장한 BATON 원본 심각도, v1·기존 미지원 기록은 `null` |
 | `workspaceId` | 불투명 작업공간 참조 |
 | `seasonId` | 불투명 시즌 참조 |
 | `sourceReference` | 길이가 제한된 불투명 원본 참조 |

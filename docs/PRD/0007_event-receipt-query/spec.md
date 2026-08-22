@@ -42,6 +42,7 @@ PRD-0011이 별도로 소유한다.
 | `ingestionSequence` | BRIEF가 부여한 로컬 수신 순서이자 에디션 `sourceCursor`의 기준 |
 | `eventType` | 최초 저장한 이벤트 종류 |
 | `eventVersion` | 최초 저장한 이벤트 버전 |
+| `sourceSeverity` | v2가 저장한 BATON 원본 심각도, v1·기존 미지원 기록은 `null` |
 | `workspaceId` | 불투명 작업공간 참조 |
 | `seasonId` | 불투명 시즌 참조 |
 | `sourceReference` | 최초 저장한 이벤트의 길이가 제한된 불투명 원본 참조 |
@@ -89,6 +90,8 @@ PRD-0011이 별도로 소유한다.
 - 동일 재전달, 충돌 탐지와 투영 재구축 뒤에도 최초 저장 필드와 처리 결과가
   달라지지 않는다.
 - 기존 `POST /api/v1/events`의 HTTP 상태와 `IngestResponse`를 바꾸지 않는 추가 계약이다.
+- PRD-0019의 v2 수신 뒤에도 같은 최초 기록 표현을 사용하며 `sourceSeverity`만 nullable
+  안전 필드로 포함한다.
 - PRD-0011의 이상 이력 조회는 이 단건 응답과 같은 안전한 필드를 반환하지만,
   `APPLIED_WITH_GAP`, `STALE`, `UNSUPPORTED` 또는 최초 충돌이 있는 기록만 선정한다.
 - 기존 `source_event_receipt`와 `source_event_conflict`를 읽으며 새 테이블, 열, 인덱스와

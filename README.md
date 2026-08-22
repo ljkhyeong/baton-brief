@@ -15,7 +15,7 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > PRD-0009의 주간 범위 최신 불변 에디션 조회도 구현했고 PostgreSQL 통합 테스트와 전체
 > 테스트·실행 JAR 생성이 성공했다.
 > PRD-0010의 새 에디션 항목 리비전 근거 고정과 이전 항목 `null` 호환성도 구현했다.
-> PostgreSQL Testcontainers 빈 데이터베이스의 V1~V6 적용, 대표 V2 데이터의 V3~V6
+> PostgreSQL Testcontainers 빈 데이터베이스의 V1~V7 적용, 대표 V2 데이터의 V3~V7
 > 업그레이드와 전체 테스트·실행 JAR 생성이 성공했다.
 > PRD-0011의 작업공간·시즌별 이상 수신 증거 이력 조회도 구현했고, 기존 PostgreSQL
 > 수신 시나리오와 전체 테스트·실행 JAR 생성이 성공했다.
@@ -34,7 +34,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 대상 PostgreSQL 통합 테스트와 전체 테스트·실행 JAR 생성이 성공했다.
 > PRD-0018에서 현재 BATON 신호와 BRIEF 이벤트 v1의 의미·정체성·리비전·전송 불일치를
 > 확인하고 생산자 연동 선행조건을 채택했다. BATON은 다섯 신호·신호별 리비전·시간 재조정
-> 의미를 별도 PRD로 채택했지만 BRIEF 이벤트 v2와 BATON 생산자 구현은 아직 없다.
+> 의미를 별도 PRD로 채택했다. PRD-0019의 BRIEF 이벤트 v2 소비와 V7 저장·재구축은
+> 구현·검증했지만 BATON 생산자 outbox·송신기와 종단 간 연동은 아직 없다.
 
 ## 왜 BRIEF인가
 
@@ -104,9 +105,9 @@ BRIEF가 소유하지 않는다.
 
 ## 채택한 로컬 계약
 
-- 인증 없는 내부 HTTP로 이벤트 v1을 수신한다.
-- `HANDOFF_BLOCKED`, `ROUTINE_MISSED`, `DECISION_FOLLOW_UP_OVERDUE`를 규칙 v1로
-  결정적으로 투영한다.
+- 인증 없는 내부 HTTP로 이벤트 v1·v2를 수신한다.
+- v1 세 타입은 기존 규칙을 유지하고, v2의 BATON 다섯 연속성 신호는 원본
+  `CRITICAL`·`WARNING`을 보존해 `HIGH`·`MEDIUM`으로 일대일 표시한다.
 - 이벤트 지문과 집계 리비전으로 `DUPLICATE`, `CONFLICT`, `STALE`과 리비전 공백을 구분한다.
 - 이벤트 식별자로 최초 수신 결과와 제한된 충돌 탐지 시각을 조회한다. fingerprint와
   원문 payload는 조회 응답에 노출하지 않는다.
@@ -166,7 +167,8 @@ BRIEF가 소유하지 않는다.
 [현재 관심 항목 상태 필터 조회 계약](docs/PRD/0015_attention-item-status-filter/spec.md),
 [현재 관심 항목 상태 전이 증거 이력 계약](docs/PRD/0016_attention-item-transitions/spec.md)과
 [현재 관심 항목 조건부 조회 계약](docs/PRD/0017_current-attention-item-etag/spec.md)과
-[BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)을
+[BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)과
+[BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)을
 따른다.
 인증·인가, 브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
@@ -190,6 +192,7 @@ BRIEF가 소유하지 않는다.
 - [현재 관심 항목 상태 전이 증거 이력 계약](docs/PRD/0016_attention-item-transitions/spec.md)
 - [현재 관심 항목 조건부 조회 계약](docs/PRD/0017_current-attention-item-etag/spec.md)
 - [BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)
+- [BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)

@@ -38,6 +38,9 @@ PRD-0015는 같은 목록 경로에 선택적인 `status`를 추가한다. 생�
 PRD-0016은 복합 정체성에 실제 적용된 상태 전이 증거를 집계 리비전 내림차순 키셋으로
 조회한다. 현재 규칙으로 과거 투영 전체를 재계산하는 경로가 아니다.
 
+PRD-0019는 기존 v1을 보존하면서 BATON이 판정한 다섯 연속성 신호와 원본 심각도를 이벤트
+v2로 수신·재생하는 계약을 추가한다.
+
 PostgreSQL 18.4 통합 시나리오, 저장소 전체 정리 후 테스트와 실행 JAR 생성, Compose
 PostgreSQL에 대한 Java 21 비웹 실행 환경/Flyway 기동 점검으로 로컬 MVP를 검증했다. MockMvc 기반
 HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워크 종단 간 검증으로
@@ -58,7 +61,7 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 
 | 메서드 | 경로 | 의미 |
 |---|---|---|
-| `POST` | `/api/v1/events` | 이벤트 v1 수신과 멱등 투영 |
+| `POST` | `/api/v1/events` | 이벤트 v1·v2 수신과 멱등 투영 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | PRD-0013의 현재 관심 항목 단건 조회 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items` | PRD-0014·0015의 현재 관심 항목 상태별 키셋 조회 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions` | PRD-0016의 적용 상태 전이 증거 이력 |
@@ -71,7 +74,7 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 로컬 MVP의 엔드포인트는 인증 없는 내부 API다. 호출자가 전달한 작업공간·시즌에
 대한 권한을 BRIEF가 자체 판정하지 않는다.
 
-## 이벤트 v1
+## 이벤트 v1·v2
 
 ### 요청 봉투
 
@@ -80,8 +83,9 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 | 필드 | 형식 | 제약 |
 |---|---|---|
 | `eventId` | UUID | 이벤트 식별자 |
-| `eventType` | 열거형 | 아래 세 종류 중 하나 |
-| `eventVersion` | 정수 | 양수이며 소비자가 지원하는 값은 정확히 `1` |
+| `eventType` | 열거형 | 아래 버전별 종류 중 하나 |
+| `eventVersion` | 정수 | 양수이며 소비자가 지원하는 값은 `1`과 `2` |
+| `sourceSeverity` | 열거형 또는 `null` | v1은 생략·`null`, v2는 `CRITICAL` 또는 `WARNING` 필수 |
 | `workspaceId` | UUID | 불투명 원본 참조 범위 |
 | `seasonId` | UUID | 불투명 원본 참조 범위 |
 | `sourceReference` | 문자열 | 비어 있지 않은 불투명 식별자, 최대 128자 |
@@ -89,11 +93,23 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 | `occurredAt` | JSON 문자열의 ISO-8601 시점 | 원본이 사실을 관측한 시각 |
 | `state` | 열거형 | `ACTIVE` 또는 `RESOLVED` |
 
-지원하는 `eventType`은 다음과 같다.
+v1에서 지원하는 `eventType`은 다음과 같다.
 
 - `HANDOFF_BLOCKED`
 - `ROUTINE_MISSED`
 - `DECISION_FOLLOW_UP_OVERDUE`
+
+v2에서 지원하는 `eventType`은 다음과 같다.
+
+- `ROLE_UNASSIGNED`
+- `ROLE_SUCCESSOR_MISSING`
+- `ROLE_PREPARATION_INCOMPLETE`
+- `ROUTINE_REPEATEDLY_OVERDUE`
+- `HANDOFF_INCOMPLETE`
+
+v2 지원 전 `UNSUPPORTED`로 보존할 수 있었던 `eventVersion=2`·v1 타입·심각도 없음 조합은
+동일 재전달 호환성을 위해 계속 `UNSUPPORTED`로만 기록한다. 새 v2 타입에 심각도가 없거나
+그 밖의 지원 버전 조합이 어긋나면 수신 기록 없이 `400 Bad Request`다.
 
 ### 수신 결과
 
@@ -112,8 +128,8 @@ PostgreSQL `TIMESTAMPTZ`와 저장·응답 스냅샷의 정밀도를 맞추기 �
 - `CONFLICT`: 같은 `eventId`에 다른 지문이 들어왔다. 먼저 수락한 수신 기록과
   투영을 덮어쓰지 않고, 원문 페이로드나 비밀 값 없이 크기가 제한되고 정제된 격리
   증거를 남긴다.
-- `UNSUPPORTED`: 양수인 `eventVersion`이 `1`이 아니다. 수신 기록을 `UNSUPPORTED` 결과로
-  보존하고 투영을 부분 적용하지 않는다.
+- `UNSUPPORTED`: 양수인 `eventVersion`이 `1`·`2`가 아니거나 위의 기존 v2 호환 조합이다.
+  수신 기록을 `UNSUPPORTED` 결과로 보존하고 투영을 부분 적용하지 않는다.
 - `STALE`: 이미 적용한 현재 리비전 이하의 이벤트다. 수신 기록에는 결과를 남기지만
   투영을 변경하지 않는다.
 
@@ -159,6 +175,8 @@ HTTP 상태와 응답 본문은 다음과 같다.
 | `HANDOFF_BLOCKED` | `HANDOFF_BLOCKED` | `HIGH` |
 | `ROUTINE_MISSED` | `ROUTINE_MISSED` | `MEDIUM` |
 | `DECISION_FOLLOW_UP_OVERDUE` | `DECISION_FOLLOW_UP_OVERDUE` | `MEDIUM` |
+| v2 다섯 타입 + `sourceSeverity=CRITICAL` | 수신한 `eventType` | `HIGH` |
+| v2 다섯 타입 + `sourceSeverity=WARNING` | 수신한 `eventType` | `MEDIUM` |
 
 - `ACTIVE`는 해당 원본 참조의 관심 항목을 활성 상태로 투영한다.
 - `RESOLVED`는 해당 관심 항목을 해소 상태로 투영한다.
@@ -269,11 +287,11 @@ MVC의 표준 처리로 `304 Not Modified`를 반환하며, 에디션 선택 결
 
 ## 호환성과 오류 경계
 
-- v1 소비자는 명시적으로 채택한 이벤트 종류와 `eventVersion=1`만 처리한다.
+- 소비자는 명시적으로 채택한 v1·v2 이벤트 종류와 버전별 심각도 조합만 처리한다.
 - 생산자가 기존 필드 의미, 식별자 범위, 리비전 의미 또는 열거형을 바꾸려면 새 버전과
   생산자·소비자 호환성 검증이 필요하다.
-- PRD-0018의 BATON 생산자 선행조건을 충족하기 전에는 현재 BATON 조회 신호를 이벤트 v1에
-  이름만 대응하거나 소비자 고정값을 실제 생산자 계약으로 간주하지 않는다.
+- PRD-0018과 BATON PRD-0006의 생산 의미에 따라 현재 BATON 신호는 이벤트 v2로만
+  수용한다. 소비자 고정값을 실제 생산자 직렬화나 종단 간 전달 성공으로 간주하지 않는다.
 - 응답과 격리 증거는 크기가 제한되어야 하며 원문 페이로드, PII, 자격 증명, 원문 URL과
   비밀 값을 포함하지 않는다.
 - BRIEF 실패는 원본 트랜잭션을 롤백시키지 않는다. 로컬 MVP에서 생산자 변경은
@@ -285,7 +303,8 @@ MVC의 표준 처리로 `304 Not Modified`를 반환하며, 에디션 선택 결
 - 지원하지 않는 이벤트의 완전히 같은 재생은 안정적으로 `UNSUPPORTED`를 반환하고 같은
   식별자의 다른 지문은 `CONFLICT`가 된다. 충돌 증거는 이벤트별 한 건을 넘지 않는다.
 - 오래된 리비전은 투영을 변경하지 않고, 리비전 간격은 명시적인 증거를 남긴다.
-- 세 이벤트 종류의 `ACTIVE`/`RESOLVED` 투영이 규칙 v1에 맞다.
+- v1 세 이벤트 종류의 `ACTIVE`/`RESOLVED` 투영이 기존 규칙에 맞다.
+- 이벤트 v2 다섯 종류가 BATON 원본 심각도 대응과 함께 적용되고 v1과 함께 재구축된다.
 - 재구축 결과가 같은 수락 수신 기록의 실시간 투영과 같다.
 - 월요일 검증, IANA 시간대와 DST 경계의 `[start, end)` 계산이 고정 시간 테스트로 확인된다.
 - 같은 요청 범위의 직전 `stateFingerprint`와 동일한 반복 요청은 에디션을 중복 생성하지

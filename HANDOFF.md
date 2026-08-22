@@ -53,7 +53,18 @@ PRD-0017에서 현재 관심 항목 단건 응답에 규칙 버전과 마지막 
 PRD-0018에서 BATON `ccfbc46`의 현재 연속성 신호와 BRIEF 이벤트 v1을 읽기 전용으로
 대조했다. 이후 BATON `dc1a7f8`의 PRD-0006에서 현재 다섯 신호와 `CRITICAL`·`WARNING`,
 영속 신호 정체성, 신호별 연속 리비전과 시간 재조정 의미를 채택했다. BRIEF 이벤트 v2와
-BATON 전용 outbox·송신기·실제 직렬화 아티팩트는 아직 구현하지 않았다.
+BATON 전용 outbox·송신기·실제 직렬화 아티팩트는 당시 구현하지 않았다.
+
+PRD-0019에서 기존 v1을 보존하면서 BATON 다섯 신호와 필수 `sourceSeverity`를 수용하는
+이벤트 v2를 구현했다. `CRITICAL → HIGH`, `WARNING → MEDIUM` 일대일 표시, nullable 최초
+수신 증거, 심각도를 포함한 v2 지문, V7 저장 제약과 v1·v2 재구축을 검증했다. BRIEF 소비자
+구현만 완료했으며 BATON 생산자 outbox·송신기와 실제 종단 간 전달은 아직 없다.
+
+- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.migrations preserve representative V2 data through V7' --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.ingestion distinguishes duplicate conflict unsupported stale and gap' --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.consumes BATON continuity event v2 and reproduces it after rebuild' --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.rejects representations outside the HTTP contract and reports missing editions'`:
+  성공. 대표 V2 데이터 업그레이드, v1 호환, v2 다섯 타입·심각도·충돌·해소·재구축과
+  잘못된 v2 봉투 거부를 PostgreSQL 18.4에서 확인했다.
+- `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 빈 데이터베이스 V1~V7 적용,
+  전체 테스트와 `bootstrap-0.1.0-SNAPSHOT.jar` 생성을 확인했다.
 
 관심 항목에서 실제 소비되지 않던 `item_id` 대리키는 Flyway V4에서 제거했다. 기존
 `(workspace_id, season_id, event_type, source_reference)` 정체성을 복합 기본 키로 사용하며,
@@ -123,7 +134,9 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - PRD-0018에서 BATON 생산자 연동 전에 권위 있는 신호 의미, 안정적 정체성·상태 생명주기,
   JPA 버전과 분리된 외부 집계 리비전, 시간 경계 재조정, 전용 transactional outbox와 실제
   직렬화·종단 간 검증을 모두 갖추도록 선행 게이트를 채택했다. BATON PRD-0006에서 생산
-  의미는 결정했으며 다음 진입점은 BRIEF 이벤트 v2 소비 계약이다.
+  의미를 결정했고 PRD-0019에서 BRIEF 이벤트 v2 소비를 구현했다.
+- PRD-0019에서 v1 세 타입과 fingerprint를 보존하고 v2 다섯 타입·원본 심각도·V7 저장과
+  재구축을 추가했다. 실제 생산자 직렬화 아티팩트와 전달은 다음 교차 저장소 진입점이다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -311,12 +324,9 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.health exposes aggregate status without deployment probes'`:
   성공, PostgreSQL 18.4 Testcontainers에서 `/actuator/health`의 `200`·`UP`, 상세 비노출,
   탐색 페이지와 대표 probe 경로의 `404`를 확인
-- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.migrations preserve representative V2 data through V6'`:
-  성공. PostgreSQL 18.4의 별도 스키마에서 대표 V2 행을 V3~V6 SQL로 업그레이드해 행 보존,
-  복합 기본 키, 제거 열, 이전 근거의 두 `null`과 쌍·양수 CHECK 제약 거부를 확인
 - `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 다섯 모듈의 전체 테스트,
-  PostgreSQL Testcontainers 빈 데이터베이스의 Flyway V1~V6 적용, 대표 V2 데이터의
-  V3~V6 업그레이드와
+  PostgreSQL Testcontainers 빈 데이터베이스의 Flyway V1~V7 적용, 대표 V2 데이터의
+  V3~V7 업그레이드와
   `bootstrap-0.1.0-SNAPSHOT.jar` 생성 확인
   - 최소 aggregate health의 `UP`·상세 비노출과 탐색 페이지·대표 probe 경로 미노출
   - 수신의 중복/충돌/미지원/오래된 리비전/리비전 공백, 이벤트별 충돌 증거 상한과
@@ -363,8 +373,8 @@ Compose 컨테이너·네트워크·이름 있는 볼륨을 모두 제거했다.
 ## 현재 제한
 
 - 로컬 MVP만 구현했다. 운영 준비와 배포 검증은 완료하지 않았다.
-- BATON, WATCH, RELAY, GO 생산자와의 종단 간 연동은 없다. BATON 연속성 신호의 생산
-  의미는 결정했지만 BRIEF 이벤트 v2, 실제 생산자 직렬화와 종단 간 전달은 아직 없다.
+- BATON, WATCH, RELAY, GO 생산자와의 종단 간 연동은 없다. BRIEF 이벤트 v2 소비는
+  구현했지만 실제 BATON 생산자 직렬화, outbox·송신기와 종단 간 전달은 아직 없다.
 - 브로커, 스케줄러, 외부 시스템 연동 어댑터와 운영 인증·인가 계약은 없다.
 - 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관은 구현하지 않았다. 숫자 보존 기간,
   용량 상한, 재구축 SLO·잠금 제한 시간, 체크포인트와 운영 복구 목표도 미결정이다.
