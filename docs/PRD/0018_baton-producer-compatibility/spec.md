@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: 호환성 평가 완료, 생산자 연동 미구현
+- 구현 상태: BATON 생산 의미 계약 채택, 생산자·소비자 v2 미구현
 - 범위: BATON이 BRIEF 이벤트 v1 생산자가 되기 전에 해결할 의미·식별자·전송 계약
 
 ## 목적
@@ -91,6 +91,23 @@ BATON의 기존 WATCH transactional outbox는 원본 변경과 같은 트랜잭�
 
 ## BRIEF 소비자 호환성
 
+BATON은 `PRD-0006: BATON–BRIEF 연속성 신호 생산 계약`에서 다음 생산 의미를 채택했다.
+
+- 현재 다섯 `ContinuitySignalType`을 권위 있는 신호 종류로 유지하고 BRIEF 이벤트 v1에
+  이름만 대응하지 않는다.
+- BATON의 `CRITICAL`·`WARNING` 심각도를 원본 사실로 전달하는 이벤트 v2를 선행한다.
+- `teamId`를 `workspaceId`로 사용하고, 시즌·신호 종류·역할과 필요한 경우 루틴으로 자연
+  정체성을 구성해 영속 `signalId`와 `baton-continuity:<signalId>` 참조를 부여한다.
+- `aggregateRevision`은 전역 outbox 번호나 JPA `@Version`이 아니라 같은 `signalId` 안에서
+  `1`부터 연속 증가한다.
+- 원본 변경과 시간 경계 재조정은 같은 신호 계산·저장 경계를 사용하고, 동일 상태에서는
+  새 리비전과 outbox를 만들지 않는다.
+- BRIEF 전용 불변 outbox와 커밋 뒤 최소 한 번 전달을 사용하되, 이벤트 v2 소비 계약과 실제
+  직렬화 아티팩트가 준비되기 전에는 생산자 구현을 시작하지 않는다.
+
+이 결정은 선행조건 중 권위 있는 의미·정체성·리비전·시간 재조정 방향을 확정한 것이며,
+BRIEF 이벤트 v2 지원이나 생산자 연동 완료를 뜻하지 않는다.
+
 - 이번 결정은 PRD-0002의 이벤트 v1, 수신 결과, fingerprint, 투영 규칙과 HTTP 상태를
   변경하지 않는다.
 - BATON 의미 정합화 결과가 v1과 손실 없이 맞지 않으면 BRIEF가 임의 매핑을 수용하지 않고
@@ -118,10 +135,11 @@ BATON의 기존 WATCH transactional outbox는 원본 변경과 같은 트랜잭�
 
 ## 현재 검증과 남은 작업
 
-BATON `ccfbc46`의 `ContinuitySignalType`, 워크스페이스 조회 계약과
+초기 호환성 평가는 BATON `ccfbc46`의 `ContinuitySignalType`, 워크스페이스 조회 계약과
 `WorkspaceProjectionReader`, `Decision`, WATCH outbox ADR·구현을 BRIEF PRD-0002와
-읽기 전용으로 대조했다. BATON 저장소는 변경하지 않았고 빌드·테스트를 실행하지 않았다.
+읽기 전용으로 대조했다. 이후 BATON `dc1a7f8`에서 PRD-0006으로 위 생산 의미와 구현 순서를
+채택했다. 두 문서 변경은 Java/Kotlin 코드·Flyway·HTTP 계약을 수정하지 않았으므로 코드
+테스트를 실행하지 않았다.
 
-다음 구현 진입점은 BATON이 소유하는 신호 의미·정체성·외부 리비전 결정이다. 그 결정을
-포함한 BATON 저장소 작업이 별도 범위로 승인된 뒤에만 생산자 outbox와 실제 계약
-아티팩트를 구현한다.
+다음 구현 진입점은 BRIEF 이벤트 v2 소비 계약이다. 다섯 신호와 BATON 심각도, 기존 v1
+수신·재생 호환성, 지문 입력과 투영 규칙을 먼저 채택한 뒤 실제 계약 아티팩트를 구현한다.
