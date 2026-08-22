@@ -11,6 +11,9 @@ description: BATON BRIEF의 관심 항목 투영 작업 절차. AttentionItem, r
 - PRD-0002 규칙 v1을 사용한다. `HANDOFF_BLOCKED`는 같은 이유 코드와 `HIGH` 심각도로,
   `ROUTINE_MISSED`와 `DECISION_FOLLOW_UP_OVERDUE`는 같은 이유 코드와 `MEDIUM` 심각도로
   변환한다. 오래된 리비전/공백 처리와 채택한 전체 재구축 경계에는 집계 리비전을 사용한다.
+- PRD-0019의 v2 다섯 타입은 수신한 타입을 이유 코드로 유지하고 BATON `CRITICAL`을
+  `HIGH`, `WARNING`을 `MEDIUM`으로 일대일 표시한다. v1 규칙과 `ruleVersion=1`을
+  바꾸지 않고 저장한 원본 심각도로 재구축한다.
 - PRD-0008을 동기 전역 재구축 경계로 사용한다. `UNSUPPORTED`를 제외한 보존 수신 기록을
   `ingestion_sequence` 순서로 재생하고 현재 투영만 원자적으로 교체한다. 현재 구현·검증
   근거와 직접 증명한 범위는 `HANDOFF.md`에서 확인한다.
