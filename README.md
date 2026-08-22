@@ -32,6 +32,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 성공했다. 전체 테스트·실행 JAR 생성도 성공했다.
 > PRD-0017의 현재 관심 항목 단건 `ETag`와 표준 `If-None-Match` 조건부 조회도 구현했고
 > 대상 PostgreSQL 통합 테스트와 전체 테스트·실행 JAR 생성이 성공했다.
+> PRD-0018에서 현재 BATON 신호와 BRIEF 이벤트 v1의 의미·정체성·리비전·전송 불일치를
+> 확인하고 생산자 연동 선행조건을 채택했다. BATON 생산자 구현은 아직 없다.
 
 ## 왜 BRIEF인가
 
@@ -162,7 +164,8 @@ BRIEF가 소유하지 않는다.
 [현재 활성 관심 항목 키셋 조회 계약](docs/PRD/0014_active-attention-items/spec.md)과
 [현재 관심 항목 상태 필터 조회 계약](docs/PRD/0015_attention-item-status-filter/spec.md),
 [현재 관심 항목 상태 전이 증거 이력 계약](docs/PRD/0016_attention-item-transitions/spec.md)과
-[현재 관심 항목 조건부 조회 계약](docs/PRD/0017_current-attention-item-etag/spec.md)을
+[현재 관심 항목 조건부 조회 계약](docs/PRD/0017_current-attention-item-etag/spec.md)과
+[BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)을
 따른다.
 인증·인가, 브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
@@ -185,6 +188,7 @@ BRIEF가 소유하지 않는다.
 - [현재 관심 항목 상태 필터 조회 계약](docs/PRD/0015_attention-item-status-filter/spec.md)
 - [현재 관심 항목 상태 전이 증거 이력 계약](docs/PRD/0016_attention-item-transitions/spec.md)
 - [현재 관심 항목 조건부 조회 계약](docs/PRD/0017_current-attention-item-etag/spec.md)
+- [BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)
