@@ -33,3 +33,18 @@ INSERT INTO brief_edition_item (
     'HANDOFF_BLOCKED', 'HIGH', 'ACTIVE',
     TIMESTAMPTZ '2026-08-12T09:00:00Z', 1
 );
+
+INSERT INTO source_event_receipt (
+    event_id, event_type, event_version, workspace_id, season_id, source_reference,
+    aggregate_revision, occurred_at, event_state, payload_fingerprint,
+    processing_outcome, received_at
+) VALUES (
+    '83000000-0000-0000-0000-000000000001',
+    'HANDOFF_BLOCKED', 2,
+    '81000000-0000-0000-0000-000000000002',
+    '81000000-0000-0000-0000-000000000003',
+    'handoff:legacy-unsupported', 1,
+    TIMESTAMPTZ '2026-08-12T09:00:00Z', 'ACTIVE',
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    'UNSUPPORTED', TIMESTAMPTZ '2026-08-12T09:00:01Z'
+);

@@ -83,7 +83,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `migrations preserve representative V2 data through V6`() {
+    fun `migrations preserve representative V2 data through V7`() {
         val schema = "brief_migration_upgrade"
         jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         jdbc.sql("CREATE SCHEMA $schema").update()
@@ -101,6 +101,7 @@ class BriefMvpIntegrationTest(
                             "db/migration/V4__remove_attention_item_surrogate_key.sql",
                             "db/migration/V5__remove_unused_projection_timestamp.sql",
                             "db/migration/V6__derive_attention_reason_code.sql",
+                            "db/migration/V7__support_baton_continuity_events.sql",
                         ).map(::ClassPathResource).toTypedArray(),
                     ).populate(connection)
                 } finally {
@@ -162,6 +163,12 @@ class BriefMvpIntegrationTest(
                     """.trimIndent(),
                 ).update()
             }.isInstanceOf(DataIntegrityViolationException::class.java)
+            assertThat(
+                jdbc.sql(
+                    "SELECT source_severity FROM $schema.source_event_receipt",
+                ).query(String::class.java)
+                    .optional(),
+            ).isEmpty()
         } finally {
             jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         }
@@ -218,6 +225,7 @@ class BriefMvpIntegrationTest(
                 "ingestionSequence",
                 "eventType",
                 "eventVersion",
+                "sourceSeverity",
                 "workspaceId",
                 "seasonId",
                 "sourceReference",
@@ -493,6 +501,111 @@ class BriefMvpIntegrationTest(
         val missingReceiptPath = "/api/v1/events/30000000-0000-0000-0000-000000000099/receipt"
         mockMvc.perform(get(missingReceiptPath))
             .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `consumes BATON continuity event v2 and reproduces it after rebuild`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000008"
+        val seasonId = "20000000-0000-0000-0000-000000000008"
+        val signals = listOf(
+            "ROLE_UNASSIGNED" to "CRITICAL",
+            "ROLE_SUCCESSOR_MISSING" to "WARNING",
+            "ROLE_PREPARATION_INCOMPLETE" to "WARNING",
+            "ROUTINE_REPEATEDLY_OVERDUE" to "CRITICAL",
+            "HANDOFF_INCOMPLETE" to "WARNING",
+        )
+
+        signals.forEachIndexed { index, (type, sourceSeverity) ->
+            postEvent(
+                eventJson(
+                    eventId = "70000000-0000-0000-0000-${"%012d".format(index + 1)}",
+                    workspaceId = workspaceId,
+                    seasonId = seasonId,
+                    sourceReference = "baton-continuity:${index + 1}",
+                    revision = 1,
+                    type = type,
+                    eventVersion = 2,
+                    sourceSeverity = sourceSeverity,
+                ),
+            ).andExpect(status().isAccepted)
+                .andExpect(jsonPath("$.item.reasonCode").value(type))
+                .andExpect(
+                    jsonPath("$.item.severity").value(
+                        if (sourceSeverity == "CRITICAL") "HIGH" else "MEDIUM",
+                    ),
+                )
+        }
+
+        val firstEventId = "70000000-0000-0000-0000-000000000001"
+        val firstReference = "baton-continuity:1"
+        postEvent(
+            eventJson(
+                eventId = firstEventId,
+                workspaceId = workspaceId,
+                seasonId = seasonId,
+                sourceReference = firstReference,
+                revision = 1,
+                type = "ROLE_UNASSIGNED",
+                eventVersion = 2,
+                sourceSeverity = "WARNING",
+            ),
+        ).andExpect(status().isConflict)
+
+        mockMvc.perform(get("/api/v1/events/$firstEventId/receipt"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.sourceSeverity").value("CRITICAL"))
+
+        postEvent(
+            eventJson(
+                eventId = "70000000-0000-0000-0000-000000000006",
+                workspaceId = workspaceId,
+                seasonId = seasonId,
+                sourceReference = firstReference,
+                revision = 2,
+                type = "ROLE_UNASSIGNED",
+                eventVersion = 2,
+                sourceSeverity = "WARNING",
+            ),
+        ).andExpect(status().isAccepted)
+            .andExpect(jsonPath("$.item.severity").value("MEDIUM"))
+
+        postEvent(
+            eventJson(
+                eventId = "70000000-0000-0000-0000-000000000007",
+                workspaceId = workspaceId,
+                seasonId = seasonId,
+                sourceReference = firstReference,
+                revision = 3,
+                state = "RESOLVED",
+                type = "ROLE_UNASSIGNED",
+                eventVersion = 2,
+                sourceSeverity = "WARNING",
+            ),
+        ).andExpect(status().isAccepted)
+
+        val currentPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
+        val beforeRebuild = mockMvc.perform(
+            get(currentPath)
+                .param("eventType", "ROLE_UNASSIGNED")
+                .param("sourceReference", firstReference),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("RESOLVED"))
+            .andExpect(jsonPath("$.aggregateRevision").value(3))
+            .andReturn()
+
+        mockMvc.perform(post("/api/v1/projections/rebuild"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.receiptCount").value(7))
+            .andExpect(jsonPath("$.itemCount").value(5))
+
+        val afterRebuild = mockMvc.perform(
+            get(currentPath)
+                .param("eventType", "ROLE_UNASSIGNED")
+                .param("sourceReference", firstReference),
+        ).andExpect(status().isOk)
+            .andReturn()
+        assertThat(afterRebuild.response.contentAsString)
+            .isEqualTo(beforeRebuild.response.contentAsString)
     }
 
     @Test
@@ -941,6 +1054,18 @@ class BriefMvpIntegrationTest(
             .replace("\"occurredAt\": \"2026-08-12T09:00:00Z\"", "\"occurredAt\": 1786525200")
         postEvent(numericInstant).andExpect(status().isBadRequest)
 
+        postEvent(
+            eventJson(
+                eventId = eventId,
+                workspaceId = workspaceId,
+                seasonId = seasonId,
+                sourceReference = "invalid",
+                revision = 1,
+                type = "ROLE_UNASSIGNED",
+                eventVersion = 2,
+            ),
+        ).andExpect(status().isBadRequest)
+
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         postEdition(path, """{"weekStart":[2026,8,10],"zoneId":"Asia/Seoul"}""")
             .andExpect(status().isBadRequest)
@@ -1112,11 +1237,12 @@ class BriefMvpIntegrationTest(
         type: String = "HANDOFF_BLOCKED",
         occurredAt: String = "2026-08-12T09:00:00Z",
         eventVersion: Int = 1,
+        sourceSeverity: String? = null,
     ): String = """
         {
           "eventId": "$eventId",
           "eventType": "$type",
-          "eventVersion": $eventVersion,
+          "eventVersion": $eventVersion${sourceSeverity?.let { ",\n          \"sourceSeverity\": \"$it\"" }.orEmpty()},
           "workspaceId": "$workspaceId",
           "seasonId": "$seasonId",
           "sourceReference": "$sourceReference",
