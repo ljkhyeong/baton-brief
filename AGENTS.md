@@ -41,6 +41,9 @@
   BATON의 다섯 연속성 신호와 필수 `CRITICAL`·`WARNING`을 원본 수신 증거에 보존하고 각각
   `HIGH`·`MEDIUM`으로 일대일 표시한다. v1·기존 미지원 기록의 `sourceSeverity`는 `null`을
   유지하며 v1 fingerprint 입력을 바꾸지 않는다.
+- 이벤트 v2의 언어 중립 요청 계약은 `contracts/VERSION`과 JSON Schema·예시를 기준으로
+  관리한다. BRIEF 통합 시나리오는 같은 예시를 직접 수신하며 별도 고정 요청을 복제하지
+  않는다. RC 계약 팩만으로 BATON 실제 serializer나 종단 간 전달 완료를 주장하지 않는다.
 - 수신 증거 조회는 최초 기록의 `processingOutcome`을 반환한다. `DUPLICATE`와
   `CONFLICT`로 이를 덮어쓰지 않고 충돌은 선택적인 최초 탐지 시각으로만 표현하며,
   fingerprint와 원문 payload를 응답에 노출하지 않는다.
@@ -97,6 +100,8 @@
 - 영속성은 Spring JDBC `JdbcClient`와 Flyway로 구현하며 JPA를 추가하지 않는다.
 - 테스트 의존성은 실제 테스트가 있는 모듈에만 둔다. PostgreSQL 통합 테스트가
   생기기 전에는 Testcontainers를 미리 추가하지 않는다.
+- JSON Schema 검증기는 계약 테스트가 있는 `bootstrap`의 테스트 의존성으로만 둔다.
+  계약 팩은 별도 플러그인·공유 DTO JAR 없이 Gradle 표준 `contractsZip` 작업으로 생성한다.
 - 모듈은 `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`,
   `bootstrap` 다섯 개로 유지한다.
 - 의존은 `bootstrap`/어댑터 -> `application` -> `domain`으로만 향하게 한다. 두 어댑터가
@@ -152,6 +157,8 @@
   데이터베이스의 전체 마이그레이션 성공만으로 기존 데이터 호환성을 주장하지 않는다.
 - 저장소 전체 기준 검증으로 `./gradlew test`와 `./gradlew :bootstrap:bootJar`를 실행한다.
   실행하지 못한 명령이나 확인하지 않은 실행 환경 동작은 성공으로 기록하지 않는다.
+- 이벤트 계약을 바꾸면 JSON Schema·예시 검증과 `contractsZip` 생성을 확인하고, BATON
+  실제 serializer가 검증되지 않았다면 계약 버전을 RC로 유지한다.
 
 ## Git
 
