@@ -508,80 +508,44 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000008"
         val seasonId = "20000000-0000-0000-0000-000000000008"
         val signals = listOf(
-            "ROLE_UNASSIGNED" to "CRITICAL",
-            "ROLE_SUCCESSOR_MISSING" to "WARNING",
-            "ROLE_PREPARATION_INCOMPLETE" to "WARNING",
-            "ROUTINE_REPEATEDLY_OVERDUE" to "CRITICAL",
-            "HANDOFF_INCOMPLETE" to "WARNING",
+            Triple("role-unassigned.active-r1-critical.json", "ROLE_UNASSIGNED", "HIGH"),
+            Triple("role-successor-missing.active-r1-warning.json", "ROLE_SUCCESSOR_MISSING", "MEDIUM"),
+            Triple(
+                "role-preparation-incomplete.active-r1-warning.json",
+                "ROLE_PREPARATION_INCOMPLETE",
+                "MEDIUM",
+            ),
+            Triple(
+                "routine-repeatedly-overdue.active-r1-critical.json",
+                "ROUTINE_REPEATEDLY_OVERDUE",
+                "HIGH",
+            ),
+            Triple("handoff-incomplete.active-r1-warning.json", "HANDOFF_INCOMPLETE", "MEDIUM"),
         )
 
-        signals.forEachIndexed { index, (type, sourceSeverity) ->
-            postEvent(
-                eventJson(
-                    eventId = "70000000-0000-0000-0000-${"%012d".format(index + 1)}",
-                    workspaceId = workspaceId,
-                    seasonId = seasonId,
-                    sourceReference = "baton-continuity:${index + 1}",
-                    revision = 1,
-                    type = type,
-                    eventVersion = 2,
-                    sourceSeverity = sourceSeverity,
-                ),
-            ).andExpect(status().isAccepted)
+        signals.forEach { (fileName, type, severity) ->
+            postEvent(contractEvent(fileName)).andExpect(status().isAccepted)
                 .andExpect(jsonPath("$.item.reasonCode").value(type))
-                .andExpect(
-                    jsonPath("$.item.severity").value(
-                        if (sourceSeverity == "CRITICAL") "HIGH" else "MEDIUM",
-                    ),
-                )
+                .andExpect(jsonPath("$.item.severity").value(severity))
         }
 
         val firstEventId = "70000000-0000-0000-0000-000000000001"
-        val firstReference = "baton-continuity:1"
+        val firstReference = "baton-continuity:60000000-0000-0000-0000-000000000001"
         postEvent(
-            eventJson(
-                eventId = firstEventId,
-                workspaceId = workspaceId,
-                seasonId = seasonId,
-                sourceReference = firstReference,
-                revision = 1,
-                type = "ROLE_UNASSIGNED",
-                eventVersion = 2,
-                sourceSeverity = "WARNING",
-            ),
+            contractEvent("role-unassigned.active-r1-critical.json")
+                .replace("\"sourceSeverity\": \"CRITICAL\"", "\"sourceSeverity\": \"WARNING\""),
         ).andExpect(status().isConflict)
 
         mockMvc.perform(get("/api/v1/events/$firstEventId/receipt"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.sourceSeverity").value("CRITICAL"))
 
-        postEvent(
-            eventJson(
-                eventId = "70000000-0000-0000-0000-000000000006",
-                workspaceId = workspaceId,
-                seasonId = seasonId,
-                sourceReference = firstReference,
-                revision = 2,
-                type = "ROLE_UNASSIGNED",
-                eventVersion = 2,
-                sourceSeverity = "WARNING",
-            ),
-        ).andExpect(status().isAccepted)
+        postEvent(contractEvent("role-unassigned.active-r2-warning.json"))
+            .andExpect(status().isAccepted)
             .andExpect(jsonPath("$.item.severity").value("MEDIUM"))
 
-        postEvent(
-            eventJson(
-                eventId = "70000000-0000-0000-0000-000000000007",
-                workspaceId = workspaceId,
-                seasonId = seasonId,
-                sourceReference = firstReference,
-                revision = 3,
-                state = "RESOLVED",
-                type = "ROLE_UNASSIGNED",
-                eventVersion = 2,
-                sourceSeverity = "WARNING",
-            ),
-        ).andExpect(status().isAccepted)
+        postEvent(contractEvent("role-unassigned.resolved-r3-warning.json"))
+            .andExpect(status().isAccepted)
 
         val currentPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
         val beforeRebuild = mockMvc.perform(
@@ -1226,6 +1190,11 @@ class BriefMvpIntegrationTest(
                 }
             }.map { it.get(10, TimeUnit.SECONDS) }.sorted()
         }
+
+    private fun contractEvent(fileName: String): String =
+        ClassPathResource("contracts/examples/$fileName").inputStream
+            .reader()
+            .use { it.readText() }
 
     private fun eventJson(
         eventId: String,
