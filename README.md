@@ -35,7 +35,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > PRD-0018에서 현재 BATON 신호와 BRIEF 이벤트 v1의 의미·정체성·리비전·전송 불일치를
 > 확인하고 생산자 연동 선행조건을 채택했다. BATON은 다섯 신호·신호별 리비전·시간 재조정
 > 의미를 별도 PRD로 채택했다. PRD-0019의 BRIEF 이벤트 v2 소비와 V7 저장·재구축은
-> 구현·검증했지만 BATON 생산자 outbox·송신기와 종단 간 연동은 아직 없다.
+> 구현·검증했다. 이벤트 v2 JSON Schema·예시를 담은 `2.0.0-rc.1` 계약 팩도 생성했지만
+> BATON 실제 serializer, outbox·송신기와 종단 간 연동은 아직 없다.
 
 ## 왜 BRIEF인가
 
@@ -172,6 +173,19 @@ BRIEF가 소유하지 않는다.
 따른다.
 인증·인가, 브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
 
+## 이벤트 v2 계약 팩
+
+[이벤트 계약 팩](contracts/README.md)은 BATON 생산자가 사용할 v2 요청 JSON Schema와
+다섯 신호·심각도 변경·해소 예시를 제공한다. 현재 `2.0.0-rc.1`은 BRIEF 소비자만 검증한
+사전 버전이며 BATON 생산자 호환 완료를 뜻하지 않는다.
+
+```shell
+./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefEventContractTest'
+./gradlew --no-daemon contractsZip
+```
+
+생성 파일은 `build/distributions/baton-brief-contracts-2.0.0-rc.1.zip`이다.
+
 ## 문서
 
 - [제품 기준](docs/PRD/0001_product-baseline/spec.md)
@@ -193,6 +207,7 @@ BRIEF가 소유하지 않는다.
 - [현재 관심 항목 조건부 조회 계약](docs/PRD/0017_current-attention-item-etag/spec.md)
 - [BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)
 - [BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)
+- [이벤트 v2 계약 팩](contracts/README.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [인수인계](HANDOFF.md)

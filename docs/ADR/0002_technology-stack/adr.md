@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-11
-- 수정일: 2026-08-18
+- 수정일: 2026-08-25
 
 ## 맥락
 
@@ -40,6 +40,10 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   Flyway를 기본 활성화한다.
 - 테스트는 필요한 모듈에만 두고 BOM이 관리하는 JUnit Jupiter, AssertJ와 PostgreSQL
   Testcontainers를 사용한다. 개별 라이브러리 버전은 별도로 고정하지 않는다.
+- 이벤트 v2의 언어 중립 계약은 Draft 2020-12 JSON Schema와 JSON 예시로 제공한다.
+  `contracts/VERSION`을 계약 팩 버전의 단일 기준으로 사용하고 Gradle 표준 `Zip` 작업으로
+  `contracts/**`와 해당 PRD를 묶는다. 계약 스키마 검증기는 제품 런타임이 아닌
+  `bootstrap` 테스트에만 두며 Spring Boot BOM이 관리하지 않으므로 버전을 명시한다.
 - 실행 상태 확인에는 `spring-boot-starter-actuator`의 표준 aggregate health와 `DataSource`
   기반 DB health contributor 자동 구성을 사용한다. 제품 API와 분리된
   `/actuator/health`에서 aggregate 상태만 노출하며 별도 controller, DTO,
@@ -76,6 +80,10 @@ bootstrap ─┬─> adapter-in-web ──────────> application 
 현재 브로커나 외부 시스템 연동 어댑터를 채택하지 않는다. 운영 배포 방식도
 결정하지 않는다. 로컬 MVP의 내부 HTTP 엔드포인트와 인증 없는 경계는 PRD-0002에서
 채택하며, 운영 인증·인가 계약은 별도 결정 전까지 만들지 않는다.
+
+계약 팩을 게시할 저장소 릴리스·CI artifact와 장기 배포 위치는 아직 채택하지 않는다.
+현재 RC ZIP 생성은 로컬 재현성과 BATON 생산자 검증 입력을 준비하는 범위이며, 게시나
+생산자 버전 고정을 완료했다는 뜻이 아니다.
 
 상세 health 정보, 탐색 페이지, 배포 probe, 별도 관리 포트와 커스텀 상태 코드는 채택하지
 않는다. liveness·readiness와 외부 의존성 포함 정책은 컨테이너 또는 오케스트레이터 배포

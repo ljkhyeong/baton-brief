@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: 로컬 구현 및 검증 완료
+- 구현 상태: 로컬 소비자·계약 팩 구현 및 검증 완료, BATON 생산자 미검증
 - 범위: 기존 내부 이벤트 수신 경로에서 BATON의 권위 있는 다섯 연속성 신호를 v1과 함께 수용하는 계약
 
 ## 목적
@@ -67,6 +67,24 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 저장한 `sourceSeverity`를 사용해 실시간 처리와 같은 현재 투영을 만든다. v1 기록은 기존
 타입 기반 심각도 규칙으로 재생한다.
 
+## 언어 중립 계약 팩
+
+- `contracts/schemas/source-event.v2.schema.json`을 이벤트 v2 요청의 기계 판독 기준으로
+  제공한다.
+- `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
+  설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
+- 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 실제 serializer가 아직
+  검증하지 않았으므로 현재 버전은 `2.0.0-rc.1`이다.
+- Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD를
+  `baton-brief-contracts-2.0.0-rc.1.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
+  배포 플러그인은 만들지 않는다.
+- BRIEF의 기존 v2 PostgreSQL 통합 시나리오는 계약 예시를 직접 요청 본문으로 사용한다.
+  예시를 위한 별도 제품 시나리오를 복제하지 않는다.
+
+이 팩은 BRIEF 소비자와 언어 중립 요청 형식의 일치를 증명한다. BATON 저장소가 버전을
+고정하고 실제 serializer 출력과 outbox·송신 경계를 검증하기 전에는 생산자 호환 완료나
+안정 버전으로 표시하지 않는다.
+
 ## 호환성과 오류 경계
 
 - v1 요청·응답·fingerprint 의미와 기존 수신 기록은 바꾸지 않는다.
@@ -88,12 +106,16 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - 재구축 뒤 v1·v2 현재 투영이 실시간 처리 결과와 같다.
 - 대표 기존 행에 마이그레이션을 적용했을 때 새 열은 `null`이고 기존 현재 투영·에디션
   항목을 보존한다.
+- 이벤트 v2 계약 예시가 JSON Schema와 일치하고 같은 예시가 실제 BRIEF 수신·재구축
+  시나리오에서 처리된다.
+- `contracts/VERSION`에서 이름을 정한 계약 팩 ZIP에 스키마·예시와 이 PRD가 포함된다.
 - 전체 테스트와 실행 JAR 생성이 성공한다.
 
 ## 명시적 비목표
 
 - BATON 생산자 outbox·송신기·시간 재조정 구현
 - 실제 생산자 serializer와 종단 간 전달 성공 주장
+- 계약 팩 게시·릴리스와 BATON 저장소의 버전 고정
 - v1 타입 삭제·이름 변경 또는 기존 에디션 재작성
 - BRIEF가 BATON 신호 종류·심각도를 다시 판정하는 규칙
 - 운영 인증·인가, 브로커, 재시도 시간과 배포 설정
@@ -107,6 +129,12 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
   재구축 뒤 동일 현재 투영을 확인했다.
 - 기존 v1 수신 시나리오가 동일 재전달·충돌·stale·gap과 과거 v2 `UNSUPPORTED` 재전달을
   유지하고, HTTP 계약 시나리오가 v2 필수 심각도 누락을 `400`으로 거부함을 확인했다.
+- `BriefEventContractTest`에서 모든 v2 예시를 Draft 2020-12 JSON Schema로 검증했고, 기존
+  v2 PostgreSQL 통합 시나리오가 같은 예시를 직접 수신해 다섯 타입·심각도·해소·재구축을
+  확인했다.
+- `./gradlew --no-daemon contractsZip`으로
+  `build/distributions/baton-brief-contracts-2.0.0-rc.1.zip`을 생성하고 `contracts/**`와
+  이 PRD가 포함된 것을 확인했다.
 - `./gradlew --no-daemon clean test :bootstrap:bootJar`가 성공해 빈 PostgreSQL의 V1~V7
   적용, 전체 테스트와 실행 JAR 생성을 확인했다.
 
@@ -117,4 +145,5 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - [MVP 이벤트·투영·에디션 계약](../0002_mvp-contract/spec.md)
 - [이벤트 수신 증거 조회](../0007_event-receipt-query/spec.md)
 - [BATON 생산자 호환성 선행조건](../0018_baton-producer-compatibility/spec.md)
+- [이벤트 계약 팩](../../../contracts/README.md)
 - BATON `PRD-0006: BATON–BRIEF 연속성 신호 생산 계약`
