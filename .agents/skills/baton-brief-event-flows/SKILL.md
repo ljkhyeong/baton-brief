@@ -30,8 +30,8 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
   수신 증거와 fingerprint에 보존한다. v1·기존 미지원 기록의 `null`은 그대로 두고 v1
   fingerprint 바이트열을 바꾸지 않는다.
 - `contracts/VERSION`과 `contracts/schemas/source-event.v2.schema.json`을 언어 중립 v2
-  요청 계약 팩의 기준으로 사용한다. 현재 RC 예시는 BRIEF 소비자가 직접 검증하지만 BATON
-  실제 serializer 출력은 아니므로 생산자 호환 완료 근거로 확대하지 않는다.
+  요청 계약 팩의 기준으로 사용한다. 현재 RC 예시는 BRIEF 소비자와 BATON 실제
+  Java/Jackson serializer가 함께 검증하지만, 송신·종단 간 전달 성공 근거로 확대하지 않는다.
 - PRD-0008을 현재 보존 기준으로 사용한다. `UNSUPPORTED`를 포함한 모든 최초 수신 기록과
   이벤트별 최초 충돌 한 건은 대체 계약을 채택·마이그레이션·검증하기 전까지
   `retain-all`로 보존한다. 현재 구현·검증 근거는 `HANDOFF.md`에서 확인한다.

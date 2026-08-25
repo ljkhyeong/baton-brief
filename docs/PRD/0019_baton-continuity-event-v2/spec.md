@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: 로컬 소비자·계약 팩 구현 및 검증 완료, BATON 생산자 미검증
+- 구현 상태: 로컬 소비자·계약 팩·BATON 실제 직렬화·생산자 신호 스트림·불변 outbox·설정형 시간 재조정 검증 완료, 원본 변경 자동 연결·송신·종단 간 검증 미구현
 - 범위: 기존 내부 이벤트 수신 경로에서 BATON의 권위 있는 다섯 연속성 신호를 v1과 함께 수용하는 계약
 
 ## 목적
@@ -73,8 +73,8 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
   제공한다.
 - `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
-- 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 실제 serializer가 아직
-  검증하지 않았으므로 현재 버전은 `2.0.0-rc.1`이다.
+- 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 실제 serializer는 고정한
+  예시와 일치하지만 송신·종단 간 전달이 남아 있으므로 현재 버전은 `2.0.0-rc.1`이다.
 - Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD를
   `baton-brief-contracts-2.0.0-rc.1.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
   배포 플러그인은 만들지 않는다.
@@ -113,7 +113,7 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 
 ## 명시적 비목표
 
-- BATON 생산자 outbox·송신기·시간 재조정 구현
+- BATON 원본 변경 경로의 자동 재조정·outbox 송신기 구현
 - 실제 생산자 serializer와 종단 간 전달 성공 주장
 - 계약 팩 게시·릴리스와 BATON 저장소의 버전 고정
 - v1 타입 삭제·이름 변경 또는 기존 에디션 재작성
@@ -138,7 +138,10 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - `./gradlew --no-daemon clean test :bootstrap:bootJar`가 성공해 빈 PostgreSQL의 V1~V7
   적용, 전체 테스트와 실행 JAR 생성을 확인했다.
 
-실제 BATON serializer, outbox·송신기와 네트워크 종단 간 전달은 검증하지 않았다.
+BATON `codex/brief-producer-contract-20260822` 작업 브랜치에서 실제 Java/Jackson
+serializer가 계약 팩 예시와 일치하는지 검증했고, 신호별 연속 리비전·불변 outbox와 설정형
+시간 재조정을 구현해 전체 빌드를 통과했다. 원본 변경 경로의 같은 트랜잭션 자동 재조정,
+outbox 송신기와 네트워크 종단 간 전달은 검증하지 않았다.
 
 ## 관련 문서
 
