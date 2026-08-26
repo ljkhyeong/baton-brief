@@ -26,6 +26,8 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
 - BATON PRD-0006에서 채택한 다섯 신호와 `CRITICAL`·`WARNING`, 영속 `signalId`, 신호별
   연속 리비전과 멱등 시간 재조정을 생산자 의미의 기준으로 사용한다. 이를 v1 enum이나
   규칙에 끼워 맞추지 않고 BRIEF 이벤트 v2의 호환성·지문·투영 의미를 먼저 채택한다.
+- BATON 원본 변경과 자동 회차 생성은 신호에 영향을 주는 경로만 같은 트랜잭션 재조정에
+  연결한다. 이 연결과 원자적 롤백 근거를 outbox 송신·종단 간 전달 완료로 확대하지 않는다.
 - PRD-0019를 이벤트 v2 소비 기준으로 사용한다. `sourceSeverity`는 v2에 필수이며 최초
   수신 증거와 fingerprint에 보존한다. v1·기존 미지원 기록의 `null`은 그대로 두고 v1
   fingerprint 바이트열을 바꾸지 않는다.
