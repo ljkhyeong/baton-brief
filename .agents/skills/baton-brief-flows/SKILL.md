@@ -93,7 +93,9 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   서비스·저장소·DTO를 복제하지 않는다.
 - PRD-0020의 이벤트 수신 인증에는 Spring Security의 표준 Bearer resolver와 stateless
   filter chain을 사용한다. 직접 헤더 파서·세션·사용자 계정·token 저장소·오류 DTO를
-  만들지 않고, BATON은 Spring `RestClient`의 표준 Bearer 헤더 API를 사용한다.
+  만들지 않고, BATON은 Spring `RestClient`의 표준 Bearer 헤더 API를 사용한다. 수동
+  교체는 현재 token과 직전 token 한 건만 BRIEF에서 함께 허용하고 BATON 전환 뒤 직전
+  값을 제거한다. token 목록·회전 작업·별도 저장소를 만들지 않는다.
 - 이벤트 v2 계약 팩은 `contracts/VERSION`을 단일 버전 기준으로 삼고 JSON Schema·예시와
   PRD-0019만 Gradle 표준 `Zip`으로 묶는다. 공유 JVM DTO, 계약 서비스, 별도 배포 플러그인과
   예시 전용 제품 시나리오를 추가하지 않는다.

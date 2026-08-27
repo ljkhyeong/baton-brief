@@ -47,7 +47,8 @@
 - BATON 이벤트 수신 인증을 켜면 `POST /api/v1/events`만 전용 Bearer로 보호한다. Spring
   Security의 표준 Bearer 처리와 stateless filter chain을 사용하고 직접 헤더 파서·세션·
   사용자 계정·token 저장소를 만들지 않는다. 비밀은 설정·로그·응답·영속 데이터에
-  노출하지 않으며, loopback 밖의 BATON 기본 URL은 HTTPS origin만 허용한다.
+  노출하지 않는다. 교체 중에는 현재 token과 직전 token 한 건만 함께 허용하고 BATON
+  전환 뒤 직전 값을 제거한다. loopback 밖의 BATON 기본 URL은 HTTPS origin만 허용한다.
 - 수신 증거 조회는 최초 기록의 `processingOutcome`을 반환한다. `DUPLICATE`와
   `CONFLICT`로 이를 덮어쓰지 않고 충돌은 선택적인 최초 탐지 시각으로만 표현하며,
   fingerprint와 원문 payload를 응답에 노출하지 않는다.

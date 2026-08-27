@@ -58,8 +58,8 @@ description: BATON BRIEF 문서화 작업 절차. 제품 코드를 주로 변경
 - PRD-0019에는 v1 호환 이벤트 v2 봉투, BATON 다섯 신호와 원본 심각도, nullable 수신
   증거, 표시 심각도 대응, V7 저장·재구축, RC 계약 팩과 생산자 구현 비목표를 기록한다.
 - PRD-0020에는 BATON 이벤트 수신 전용 Bearer, 로컬 기본 비활성·필수 설정, 표준 Spring
-  Security 처리, `401`과 비밀 비노출, loopback 밖 HTTPS origin, 조회·운영 권한 및 실제
-  HTTPS 스테이징 비목표를 기록한다.
+  Security 처리, `401`과 비밀 비노출, 현재·직전 token 한 건의 수동 교체, loopback 밖
+  HTTPS origin, 조회·운영 권한 및 실제 HTTPS 스테이징 비목표를 기록한다.
 - ADR에는 채택한 장기 아키텍처, 기술, 전송, 저장, 보안 또는 운영 결정과
   그 장단점만 기록한다.
 - ADR-0002를 채택한 Kotlin/JVM, Java 도구 체인, 바이트코드 대상, 실행 환경, Spring Boot/BOM,

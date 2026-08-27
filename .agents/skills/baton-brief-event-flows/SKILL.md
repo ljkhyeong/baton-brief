@@ -36,7 +36,8 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
 - PRD-0020을 BATON 이벤트 수신 인증 기준으로 사용한다. 인증을 켠
   `POST /api/v1/events`만 환경별 전용 Bearer로 보호하고 Spring Security의 표준 token
   해석·stateless filter chain을 사용한다. token을 직접 파싱·저장·로그하거나 다른 조회·
-  운영 API의 권한으로 확대하지 않는다.
+  운영 API의 권한으로 확대하지 않는다. 순차 배포 중에는 현재 token과 직전 token 한
+  건만 함께 허용하고 BATON 전환 뒤 직전 값을 제거한다.
 - `contracts/VERSION`과 `contracts/schemas/source-event.v2.schema.json`을 언어 중립 v2
   요청 계약 팩의 기준으로 사용한다. 현재 RC 예시는 BRIEF 소비자와 BATON 실제
   Java/Jackson serializer·송신기가 함께 사용하고 로컬 원본 API·초기 정합화·실제
@@ -113,8 +114,10 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
 - 생산자 테스트 고정값을 소비자와 대조해 검증하고 BRIEF 실패가 BATON을 롤백할 수
   없음을 확인한다.
 - 인증 경계를 바꾸면 누락·오류 Bearer의 `401`, 정상 Bearer의 기존 수신 결과와 BATON
-  실제 `RestClient` 헤더를 검증한다. 실제 두 실행 JAR 검증은 Bearer를 켜되 loopback
-  HTTP 결과를 HTTPS·비밀 회전·스테이징 완료로 확대하지 않는다.
+  실제 `RestClient` 헤더를 검증한다. 수동 교체는 BRIEF가 새 값과 직전 값을 함께 허용한
+  상태에서 BATON의 직전 값 전달이 계속 성공하는지 기존 교차 서비스 시나리오에서
+  확인한다. loopback HTTP 결과를 실제 비밀 관리 제품의 회전·HTTPS·스테이징 완료로
+  확대하지 않는다.
 - 계약 팩 예시는 별도 수신 시나리오를 만들지 않고 기존 v2 PostgreSQL 통합 흐름의 실제
   요청 본문으로 사용한다. Schema 검증은 예시 형식만 소유하고 멱등성·충돌·재구축 의미를
   중복 검증하지 않는다.
