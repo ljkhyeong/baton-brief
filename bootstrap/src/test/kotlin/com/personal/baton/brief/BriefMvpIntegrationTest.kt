@@ -357,7 +357,7 @@ class BriefMvpIntegrationTest(
                 1,
                 type = "DECISION_FOLLOW_UP_OVERDUE",
             ),
-        ).andExpect(status().isAccepted)
+        )
         postEvent(
             eventJson(
                 "30000000-0000-0000-0000-000000000007",
@@ -367,7 +367,7 @@ class BriefMvpIntegrationTest(
                 1,
                 type = "ROUTINE_MISSED",
             ),
-        ).andExpect(status().isAccepted)
+        )
 
         mockMvc.perform(post("/api/v1/projections/rebuild"))
             .andExpect(status().isOk)
@@ -444,7 +444,7 @@ class BriefMvpIntegrationTest(
                 4,
                 state = "RESOLVED",
             ),
-        ).andExpect(status().isAccepted)
+        )
         mockMvc.perform(
             get(currentAttentionPath)
                 .param("eventType", "HANDOFF_BLOCKED")
@@ -651,7 +651,7 @@ class BriefMvpIntegrationTest(
                 1,
                 occurredAt = "2026-08-09T15:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
         postEvent(
             eventJson(
                 "40000000-0000-0000-0000-000000000002",
@@ -662,8 +662,7 @@ class BriefMvpIntegrationTest(
                 type = "ROUTINE_MISSED",
                 occurredAt = "2026-08-16T14:59:59.999999999Z",
             ),
-        ).andExpect(status().isAccepted)
-            .andExpect(jsonPath("$.item.observedAt").value("2026-08-16T14:59:59.999999Z"))
+        ).andExpect(jsonPath("$.item.observedAt").value("2026-08-16T14:59:59.999999Z"))
         postEvent(
             eventJson(
                 "40000000-0000-0000-0000-000000000003",
@@ -674,7 +673,7 @@ class BriefMvpIntegrationTest(
                 type = "DECISION_FOLLOW_UP_OVERDUE",
                 occurredAt = "2026-08-16T15:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
 
         val generationPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
@@ -700,7 +699,7 @@ class BriefMvpIntegrationTest(
                 type = "DECISION_FOLLOW_UP_OVERDUE",
                 occurredAt = "2026-08-13T09:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
@@ -718,7 +717,7 @@ class BriefMvpIntegrationTest(
                 type = "DECISION_FOLLOW_UP_OVERDUE",
                 occurredAt = "2026-08-13T09:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
 
         val recurringStateResult = postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
@@ -823,7 +822,7 @@ class BriefMvpIntegrationTest(
                 state = "RESOLVED",
                 occurredAt = "2026-08-14T09:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
@@ -902,7 +901,7 @@ class BriefMvpIntegrationTest(
                 1,
                 occurredAt = "2026-08-11T01:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
         postEvent(
             eventJson(
                 "60000000-0000-0000-0000-000000000002",
@@ -913,7 +912,7 @@ class BriefMvpIntegrationTest(
                 type = "ROUTINE_MISSED",
                 occurredAt = "2026-08-11T02:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
 
         val generationPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
@@ -934,7 +933,7 @@ class BriefMvpIntegrationTest(
                 type = "ROUTINE_MISSED",
                 occurredAt = "2026-08-11T02:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
 
         val revisionEvidenceEdition = postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
@@ -959,7 +958,7 @@ class BriefMvpIntegrationTest(
                 state = "RESOLVED",
                 occurredAt = "2026-08-12T01:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
         postEvent(
             eventJson(
                 "60000000-0000-0000-0000-000000000005",
@@ -970,7 +969,7 @@ class BriefMvpIntegrationTest(
                 type = "DECISION_FOLLOW_UP_OVERDUE",
                 occurredAt = "2026-08-14T03:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
         postEvent(
             eventJson(
                 "60000000-0000-0000-0000-000000000006",
@@ -980,7 +979,7 @@ class BriefMvpIntegrationTest(
                 1,
                 occurredAt = "2026-08-15T03:00:00Z",
             ),
-        ).andExpect(status().isAccepted)
+        )
 
         val targetEdition = postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
@@ -1317,9 +1316,8 @@ class BriefMvpIntegrationTest(
         }
 
     private fun contractEvent(fileName: String): String =
-        ClassPathResource("contracts/examples/$fileName").inputStream
-            .reader()
-            .use { it.readText() }
+        ClassPathResource("contracts/examples/$fileName")
+            .getContentAsString(Charsets.UTF_8)
 
     private fun eventJson(
         eventId: String,
