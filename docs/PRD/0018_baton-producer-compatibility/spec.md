@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: BATON 생산 의미·BRIEF 소비자 v2·RC 계약 팩·생산자 직렬화·신호 스트림·불변 outbox·설정형 시간 재조정·원본 변경 자동 연결·HTTP 송신과 로컬 outbox→BRIEF 종단 간 검증 완료
+- 구현 상태: BATON 생산 의미·BRIEF 소비자 v2·RC 계약 팩·생산자 직렬화·신호 스트림·불변 outbox·설정형 시간 재조정·원본 변경 자동 연결·HTTP 송신과 로컬 원본 API·초기 정합화→BRIEF 종단 간 검증 완료
 - 범위: BATON이 BRIEF 이벤트 v1 생산자가 되기 전에 해결할 의미·식별자·전송 계약
 
 ## 목적
@@ -85,8 +85,10 @@ BATON의 기존 WATCH transactional outbox는 원본 변경과 같은 트랜잭�
 
 - 의미 정합화 뒤 BATON 실제 직렬화기가 만드는 이벤트 예시를 고정 계약 아티팩트로 둔다.
 - BRIEF 소비자 고정값을 생산자 직렬화 성공 근거로 대신 사용하지 않는다.
-- 최초 전달, 응답 유실 뒤 동일 재전달, 해소 전이, 순서가 뒤바뀐 리비전, BRIEF 장애와
-  초기 정합화를 BATON→BRIEF PostgreSQL 종단 간 시나리오로 검증한다.
+- 최초 전달, 응답 유실 뒤 동일 재전달, 해소 전이, BRIEF 장애와 초기 정합화를 실제
+  BATON→BRIEF PostgreSQL 종단 간 시나리오로 검증한다.
+- 순서가 뒤바뀐 리비전은 BATON outbox 영속성 경계에서 선행 리비전 차단과 후속 재개를
+  검증한다.
 - 운영 인증을 채택하면 계약 아티팩트와 종단 간 검증에도 같은 인증 경계를 적용한다.
 
 ## BRIEF 소비자 호환성
@@ -109,10 +111,10 @@ BATON은 `PRD-0006: BATON–BRIEF 연속성 신호 생산 계약`에서 다음 �
 `codex/brief-producer-contract-20260822` 작업 브랜치에서 실제 Java/Jackson 직렬화,
 신호별 연속 리비전·불변 outbox와 설정형 시간 재조정을 구현했다. 신호에 영향을 주는
 원본 변경과 자동 회차 생성도 같은 트랜잭션 재조정에 연결했다. 이어 V23의 전달 상태와
-lease·신호별 순서, 기본 비활성 HTTP 송신기와 결과 분류를 구현했다. BATON `f81ee47`의
-선택 실행 테스트는 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL에서 outbox 이후의
-네트워크 장애 재시도, 동일 이벤트 재전달, 역순 리비전 차단, 심각도 변경과 해소 투영을
-검증했다.
+lease·신호별 순서, 기본 비활성 HTTP 송신기와 결과 분류를 구현했다. BATON `d30be0d`의
+선택 실행 테스트는 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL에서 원본 API 변경,
+초기 정합화, 네트워크 장애 재시도, 동일 이벤트 재전달, 심각도 변경과 해소 투영을
+검증했다. 역순 리비전 차단은 BATON outbox 영속성 검증이 별도로 담당한다.
 
 BRIEF는 `contracts/VERSION`의 `2.0.0-rc.1`을 기준으로 이벤트 v2 JSON Schema와 예시를
 제공하고, 같은 예시를 소비자 통합 시나리오에서 검증한다. 이 파일은 소비자 소유 계약
@@ -159,7 +161,7 @@ Java/Jackson 직렬화를, `957e794`·`db40e34`는 신호별 연속 리비전·�
 재조정에 연결하고 원본·outbox 원자적 롤백을 검증했다. `1763367`·`7fa5890`은 V23의 기존
 행 이관, 만료 lease 회수·오래된 token 거부·신호별 후속 리비전 차단과 실제 event record의
 JSON 요청·HTTP 결과 분류를 검증했다. `ab4b87a`는 BATON 문서를 같은 상태로 동기화했다.
-전체 빌드와 실행 JAR 생성도 성공했다. BATON `f81ee47`은 다음 선택 실행 테스트로 실제
+전체 빌드와 실행 JAR 생성도 성공했다. BATON `d30be0d`은 다음 선택 실행 테스트로 실제
 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4를 함께 기동했다.
 
 ```bash
@@ -167,13 +169,13 @@ BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4를 함께 기동했다.
   -PbriefBootJar=/absolute/path/to/baton-brief.jar
 ```
 
-V23 outbox에 리비전 `3 → 2 → 1` 순서로 행을 둔 뒤 리비전 1만 먼저 시도되는지 확인했다.
-BRIEF 미기동 상태의 네트워크 실패는 재시도로 남았고, BRIEF 기동 뒤 최초 `202`와 응답
-유실 상태를 재현한 동일 이벤트의 `200`이 모두 완료됐다. 최초 수신 증거는 동일 재전달
-뒤에도 바뀌지 않았고 `WARNING → CRITICAL`, `ACTIVE → RESOLVED`는 현재 관심 항목의 더
-큰 리비전으로 수렴했다.
+BATON 워크스페이스·역할 API가 담당자가 없는 미래 시작 시즌과 최초 outbox를 같이
+커밋했다. BRIEF 파생 신호·outbox만 비운 뒤 BATON을 재기동해, 초기 정합화 스케줄러가
+존재하는 원본에서 `WARNING` `ROLE_UNASSIGNED` 리비전 1을 다시 만들었다. BRIEF 미기동
+상태의 네트워크 실패는 재시도로 남았고, BRIEF 기동 뒤 최초 `202`와 응답 유실 상태를
+재현한 동일 이벤트 `200`이 모두 완료됐다. 최초 수신 증거는 바뀌지 않았고, BATON
+시즌 기간·역할 담당자 API 변경은 `WARNING → CRITICAL`, `ACTIVE → RESOLVED`를 BRIEF 현재 관심
+항목의 리비전 2·3으로 수렴시켰다.
 
-이 테스트는 V23 outbox 행에서 시작하므로 권위 있는 원본 변경·초기 정합화부터 outbox
-생성까지 한 흐름으로 다시 증명하지 않는다. 응답 유실도 실제 TCP 응답 절단이 아니라
-BRIEF 수신 뒤 BATON 행을 같은 재시도 상태로 되돌려 재현했다. 운영 인증·HTTPS·스테이징
-활성화와 계약 팩 안정 버전 승격은 남아 있다.
+응답 유실은 실제 TCP 응답 절단이 아니라 BRIEF 수신 뒤 BATON 행을 같은 재시도 상태로
+되돌려 재현했다. 운영 인증·HTTPS·스테이징 활성화와 계약 팩 안정 버전 승격은 남아 있다.

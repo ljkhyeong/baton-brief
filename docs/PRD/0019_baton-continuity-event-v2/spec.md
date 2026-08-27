@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: 로컬 소비자·계약 팩·BATON 실제 직렬화·생산자 신호 스트림·불변 outbox·설정형 시간 재조정·원본 변경 자동 연결·HTTP 송신과 로컬 outbox→BRIEF 종단 간 검증 완료
+- 구현 상태: 로컬 소비자·계약 팩·BATON 실제 직렬화·생산자 신호 스트림·불변 outbox·설정형 시간 재조정·원본 변경 자동 연결·HTTP 송신과 로컬 원본 API·초기 정합화→BRIEF 종단 간 검증 완료
 - 범위: 기존 내부 이벤트 수신 경로에서 BATON의 권위 있는 다섯 연속성 신호를 v1과 함께 수용하는 계약
 
 ## 목적
@@ -74,8 +74,8 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
 - 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 실제 serializer는 고정한
-  예시와 일치하고 송신기도 같은 record를 사용한다. 로컬 outbox→BRIEF 전달은 검증했지만
-  원본 변경·초기 정합화부터 시작하는 단일 흐름과 운영 인증·HTTPS가 남아 있으므로 현재
+  예시와 일치하고 송신기도 같은 record를 사용한다. 로컬 원본 API 변경·초기 정합화·
+  outbox→BRIEF 전달은 검증했지만 운영 인증·HTTPS·스테이징 활성화가 남아 있으므로 현재
   버전은 `2.0.0-rc.1`이다.
 - Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD를
   `baton-brief-contracts-2.0.0-rc.1.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
@@ -145,10 +145,10 @@ serializer가 계약 팩 예시와 일치하는지 검증했고, 신호별 연�
 시간 재조정을 구현했다. `75da34b`·`17919a7`에서는 신호에 영향을 주는 원본 변경과 자동
 회차 생성을 같은 트랜잭션 재조정에 연결하고 원본·outbox 원자적 롤백과 전체 빌드를
 확인했다. `1763367`·`7fa5890`에서는 V23 전달 상태·lease·신호별 순서와 같은 event record의
-HTTP 요청·결과 분류를 구현·검증했다. BATON `f81ee47`에서는 실제 BATON·BRIEF 실행 JAR과
-MySQL 8.4·PostgreSQL 18.4를 연결해 outbox 이후의 장애 재시도·동일 이벤트 재전달·역순
-리비전 차단·심각도 변경·해소 투영을 검증했다. 원본 변경·초기 정합화부터 outbox 생성까지
-한 교차 서비스 흐름과 운영 인증·HTTPS는 검증하지 않았다.
+HTTP 요청·결과 분류를 구현·검증했다. BATON `d30be0d`에서는 실제 BATON·BRIEF 실행 JAR과
+MySQL 8.4·PostgreSQL 18.4를 연결해 원본 API 변경·초기 정합화·장애 재시도·동일 이벤트
+재전달·심각도 변경·해소 투영을 검증했다. 역순 리비전 차단은 BATON outbox 영속성 테스트가
+담당하며, 운영 인증·HTTPS·스테이징 활성화는 검증하지 않았다.
 
 ## 관련 문서
 
