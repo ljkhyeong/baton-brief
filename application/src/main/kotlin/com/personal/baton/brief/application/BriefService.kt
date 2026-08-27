@@ -164,12 +164,12 @@ class BriefService(
             .filter { it.status == SourceEventState.ACTIVE }
             .sortedWith(
                 compareByDescending<AttentionItem> { it.severity }
-                    .thenBy { it.reasonCode.name }
+                    .thenBy { it.eventType.name }
                     .thenBy { it.sourceReference },
             ).map {
                 BriefEditionItem(
                     sourceReference = it.sourceReference,
-                    reasonCode = it.reasonCode,
+                    reasonCode = it.eventType,
                     severity = it.severity,
                     status = it.status,
                     observedAt = it.observedAt,

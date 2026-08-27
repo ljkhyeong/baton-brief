@@ -6,7 +6,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.DefaultValue
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.annotation.Order
 import org.springframework.http.HttpMethod
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.BadCredentialsException
@@ -33,10 +32,6 @@ class BriefEventReceiverSecurityProperties(
         return listOf(bearerToken, previousBearerToken)
     }
 
-    override fun toString(): String =
-        "BriefEventReceiverSecurityProperties[authenticationRequired=$authenticationRequired, " +
-            "bearerToken=<redacted>, previousBearerToken=<redacted>]"
-
     private fun validateBearerToken(
         token: String,
         name: String,
@@ -55,7 +50,6 @@ class BriefEventReceiverSecurityProperties(
 @EnableConfigurationProperties(BriefEventReceiverSecurityProperties::class)
 class BriefEventSecurityConfiguration {
     @Bean
-    @Order(1)
     fun eventIngestionSecurityFilterChain(
         http: HttpSecurity,
         properties: BriefEventReceiverSecurityProperties,
@@ -65,8 +59,6 @@ class BriefEventSecurityConfiguration {
             .csrf { it.disable() }
             .requestCache { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-            .formLogin { it.disable() }
-            .httpBasic { it.disable() }
             .logout { it.disable() }
 
         if (!properties.authenticationRequired) {
@@ -97,7 +89,6 @@ class BriefEventSecurityConfiguration {
             .exceptionHandling { it.authenticationEntryPoint(entryPoint) }
             .oauth2ResourceServer {
                 it.authenticationManagerResolver { authenticationManager }
-                it.authenticationEntryPoint(entryPoint)
             }
             .build()
     }

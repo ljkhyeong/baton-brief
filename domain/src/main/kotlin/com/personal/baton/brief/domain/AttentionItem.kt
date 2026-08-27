@@ -19,10 +19,7 @@ data class AttentionItem(
     val ruleVersion: Int,
     val lastRevision: Long,
     val revisionGap: Boolean,
-) {
-    val reasonCode: SourceEventType
-        get() = eventType
-}
+)
 
 sealed interface ProjectionDecision {
     data class Applied(
