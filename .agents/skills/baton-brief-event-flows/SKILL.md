@@ -38,11 +38,14 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
   해석·stateless filter chain을 사용한다. token을 직접 파싱·저장·로그하거나 다른 조회·
   운영 API의 권한으로 확대하지 않는다. 순차 배포 중에는 현재 token과 직전 token 한
   건만 함께 허용하고 BATON 전환 뒤 직전 값을 제거한다.
+- PRD-0021을 BRIEF 스테이징 수신 실행 경계로 사용한다. 현재·직전 token은 저장소 밖
+  파일에서 Compose secrets와 Spring config tree로 주입하고 인증 필수를 고정한다. 이
+  조립의 loopback HTTP 성공을 공개 HTTPS나 비밀 관리 제품 검증으로 확대하지 않는다.
 - `contracts/VERSION`과 `contracts/schemas/source-event.v2.schema.json`을 언어 중립 v2
   요청 계약 팩의 기준으로 사용한다. 현재 RC 예시는 BRIEF 소비자와 BATON 실제
   Java/Jackson serializer·송신기가 함께 사용하고 로컬 원본 API·초기 정합화·실제
-  전달과 전용 Bearer도 검증했다. HTTPS·스테이징 경계를 확인하기 전에는 안정 버전으로
-  승격하지 않는다.
+  전달과 전용 Bearer도 검증했다. 로컬 스테이징 컨테이너 조립만으로는 충분하지 않으며
+  실제 공개 HTTPS 생산자·소비자 경계를 확인하기 전에는 안정 버전으로 승격하지 않는다.
 - PRD-0008을 현재 보존 기준으로 사용한다. `UNSUPPORTED`를 포함한 모든 최초 수신 기록과
   이벤트별 최초 충돌 한 건은 대체 계약을 채택·마이그레이션·검증하기 전까지
   `retain-all`로 보존한다. 현재 구현·검증 근거는 `HANDOFF.md`에서 확인한다.
