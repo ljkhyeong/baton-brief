@@ -22,16 +22,29 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 class BriefEventReceiverSecurityProperties(
     @DefaultValue("false") val authenticationRequired: Boolean,
     @DefaultValue("") private val bearerToken: String,
+    @DefaultValue("") private val previousBearerToken: String,
 ) {
-    fun requiredBearerToken(): String {
-        require(BEARER_TOKEN_PATTERN.matches(bearerToken)) {
-            "BRIEF 이벤트 수신 bearer token은 32~200자의 URL-safe ASCII여야 합니다"
+    fun acceptedBearerTokens(): List<String> {
+        validateBearerToken(bearerToken, "현재")
+        if (previousBearerToken.isBlank()) {
+            return listOf(bearerToken)
         }
-        return bearerToken
+        validateBearerToken(previousBearerToken, "직전")
+        return listOf(bearerToken, previousBearerToken)
     }
 
     override fun toString(): String =
-        "BriefEventReceiverSecurityProperties[authenticationRequired=$authenticationRequired, bearerToken=<redacted>]"
+        "BriefEventReceiverSecurityProperties[authenticationRequired=$authenticationRequired, " +
+            "bearerToken=<redacted>, previousBearerToken=<redacted>]"
+
+    private fun validateBearerToken(
+        token: String,
+        name: String,
+    ) {
+        require(BEARER_TOKEN_PATTERN.matches(token)) {
+            "BRIEF 이벤트 수신 $name bearer token은 32~200자의 URL-safe ASCII여야 합니다"
+        }
+    }
 
     private companion object {
         val BEARER_TOKEN_PATTERN = Regex("[A-Za-z0-9._~-]{32,200}")
@@ -62,12 +75,16 @@ class BriefEventSecurityConfiguration {
                 .build()
         }
 
-        val expectedToken = properties.requiredBearerToken().encodeToByteArray()
+        val acceptedTokens = properties.acceptedBearerTokens().map(String::encodeToByteArray)
         val authenticationManager = AuthenticationManager { authentication ->
-            val presentedToken = (authentication as? BearerTokenAuthenticationToken)?.token
+            val presentedToken = (authentication as? BearerTokenAuthenticationToken)
+                ?.token
+                ?.encodeToByteArray()
             if (
                 presentedToken == null ||
-                !MessageDigest.isEqual(expectedToken, presentedToken.encodeToByteArray())
+                acceptedTokens.none { expectedToken ->
+                    MessageDigest.isEqual(expectedToken, presentedToken)
+                }
             ) {
                 throw BadCredentialsException("BRIEF 이벤트 수신 인증 정보가 올바르지 않습니다")
             }

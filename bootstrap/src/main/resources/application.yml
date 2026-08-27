@@ -15,6 +15,7 @@ brief:
   event-receiver:
     authentication-required: ${BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED:false}
     bearer-token: ${BRIEF_EVENT_RECEIVER_BEARER_TOKEN:}
+    previous-bearer-token: ${BRIEF_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN:}
 management:
   endpoints:
     web:
