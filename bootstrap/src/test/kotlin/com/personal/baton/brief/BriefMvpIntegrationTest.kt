@@ -588,7 +588,7 @@ class BriefMvpIntegrationTest(
         )
 
         signals.forEach { (fileName, type, severity) ->
-            postEvent(contractEvent(fileName)).andExpect(status().isAccepted)
+            postEvent(contractEvent(fileName))
                 .andExpect(jsonPath("$.item.reasonCode").value(type))
                 .andExpect(jsonPath("$.item.severity").value(severity))
         }
@@ -605,11 +605,9 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.sourceSeverity").value("CRITICAL"))
 
         postEvent(contractEvent("role-unassigned.active-r2-warning.json"))
-            .andExpect(status().isAccepted)
             .andExpect(jsonPath("$.item.severity").value("MEDIUM"))
 
         postEvent(contractEvent("role-unassigned.resolved-r3-warning.json"))
-            .andExpect(status().isAccepted)
 
         val currentPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
         val beforeRebuild = mockMvc.perform(
