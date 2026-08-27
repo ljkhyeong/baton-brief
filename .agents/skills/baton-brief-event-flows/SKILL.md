@@ -29,7 +29,8 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
 - BATON 원본 변경과 자동 회차 생성은 신호에 영향을 주는 경로만 같은 트랜잭션 재조정에
   연결한다. 생산자 outbox 송신은 lease와 신호별 리비전 순서를 지키고 같은 event record를
   재사용한다. 실제 두 실행 JAR의 로컬 검증은 원본 API 변경·초기 정합화·
-  outbox→HTTP→PostgreSQL 수렴을 포함한다. 이를 HTTPS·스테이징 완료로 확대하지 않는다.
+  outbox→HTTP→PostgreSQL 수렴을 포함한다. 이를 공인 HTTPS·원격 스테이징 완료로
+  확대하지 않는다.
 - PRD-0019를 이벤트 v2 소비 기준으로 사용한다. `sourceSeverity`는 v2에 필수이며 최초
   수신 증거와 fingerprint에 보존한다. v1·기존 미지원 기록의 `null`은 그대로 두고 v1
   fingerprint 바이트열을 바꾸지 않는다.
@@ -40,12 +41,15 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
   건만 함께 허용하고 BATON 전환 뒤 직전 값을 제거한다.
 - PRD-0021을 BRIEF 스테이징 수신 실행 경계로 사용한다. 현재·직전 token은 저장소 밖
   파일에서 Compose secrets와 Spring config tree로 주입하고 인증 필수를 고정한다. 이
-  조립의 loopback HTTP 성공을 공개 HTTPS나 비밀 관리 제품 검증으로 확대하지 않는다.
+  조립의 loopback HTTP 성공을 공인 HTTPS나 비밀 관리 제품 검증으로 확대하지 않는다.
+- PRD-0022를 스테이징 HTTPS 이벤트 수신 경계로 사용한다. Caddy는 정확한 수신 경로만
+  전달하고 다른 경로를 거부하며 Bearer 판정은 Spring Security에 남긴다. 로컬 내부 CA
+  검증을 공인 인증서나 실제 BATON 원격 전달로 확대하지 않는다.
 - `contracts/VERSION`과 `contracts/schemas/source-event.v2.schema.json`을 언어 중립 v2
   요청 계약 팩의 기준으로 사용한다. 현재 RC 예시는 BRIEF 소비자와 BATON 실제
   Java/Jackson serializer·송신기가 함께 사용하고 로컬 원본 API·초기 정합화·실제
-  전달과 전용 Bearer도 검증했다. 로컬 스테이징 컨테이너 조립만으로는 충분하지 않으며
-  실제 공개 HTTPS 생산자·소비자 경계를 확인하기 전에는 안정 버전으로 승격하지 않는다.
+  전달과 전용 Bearer, BRIEF 로컬 Caddy HTTPS 수신도 검증했다. 실제 BATON 스테이징
+  호스트의 공인 HTTPS 생산자·소비자 경계를 확인하기 전에는 안정 버전으로 승격하지 않는다.
 - PRD-0008을 현재 보존 기준으로 사용한다. `UNSUPPORTED`를 포함한 모든 최초 수신 기록과
   이벤트별 최초 충돌 한 건은 대체 계약을 채택·마이그레이션·검증하기 전까지
   `retain-all`로 보존한다. 현재 구현·검증 근거는 `HANDOFF.md`에서 확인한다.
@@ -119,12 +123,13 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
 - 인증 경계를 바꾸면 누락·오류 Bearer의 `401`, 정상 Bearer의 기존 수신 결과와 BATON
   실제 `RestClient` 헤더를 검증한다. 수동 교체는 BRIEF가 새 값과 직전 값을 함께 허용한
   상태에서 BATON의 직전 값 전달이 계속 성공하는지 기존 교차 서비스 시나리오에서
-  확인한다. loopback HTTP 결과를 실제 비밀 관리 제품의 회전·HTTPS·스테이징 완료로
-  확대하지 않는다.
+  확인한다. Caddy를 함께 바꾸면 신뢰한 HTTPS에서 같은 인증 결과와 비수신 경로 차단,
+  Authorization 로그 비노출만 추가로 확인한다. 로컬 결과를 비밀 관리 제품·공인 인증서·
+  원격 스테이징 완료로 확대하지 않는다.
 - 계약 팩 예시는 별도 수신 시나리오를 만들지 않고 기존 v2 PostgreSQL 통합 흐름의 실제
   요청 본문으로 사용한다. Schema 검증은 예시 형식만 소유하고 멱등성·충돌·재구축 의미를
   중복 검증하지 않는다.
 - 소비자 고정값이나 기존 WATCH outbox 패턴만으로 BATON→BRIEF 호환 완료를 주장하지
   않는다. outbox 이후의 실제 전달만 확인했다면 원본 변경·초기 정합화부터 시작하는 전체
-  흐름과 적용할 인증·HTTPS를 별도 미검증 범위로 남긴다.
+  흐름과 실제 배포 환경의 인증·공인 HTTPS를 별도 미검증 범위로 남긴다.
 - 저장소가 실제로 제공하는 검증 명령만 실행한다.
