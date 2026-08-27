@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-27
-- 구현 상태: 로컬 생산자·소비자 Bearer 인증 구현 및 검증 완료
+- 구현 상태: 로컬 생산자·소비자 Bearer 인증과 스테이징 파일 기반 주입 구현 및 검증 완료
 - 범위: BATON이 BRIEF `POST /api/v1/events`를 호출할 때 사용하는 서비스 간 인증
 
 ## 목적
@@ -59,8 +59,9 @@ BATON은 loopback 이외의 BRIEF 기본 URL에 HTTPS origin만 허용하는 기
 TLS 종단, 인증서 발급·회전, JDK 신뢰 저장소와 스테이징 주소는 배포 환경이 소유하며
 애플리케이션에 자체 인증서 검증기나 우회 가능한 trust-all client를 추가하지 않는다.
 
-이번 로컬 검증은 loopback HTTP 위에서 Bearer 계약과 현재·직전 token 중첩을 확인했다.
-실제 HTTPS 스테이징 전달과 비밀 관리 제품을 이용한 주입·회전은 아직 검증하지 않았다.
+PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secrets와 Spring config tree로
+주입하고 loopback HTTP에서 인증 필수 수신을 확인했다. 실제 HTTPS 스테이징 전달과 비밀
+관리 제품을 이용한 주입·회전은 아직 검증하지 않았다.
 
 ## 구현 원칙
 
@@ -99,9 +100,12 @@ TLS 종단, 인증서 발급·회전, JDK 신뢰 저장소와 스테이징 주�
 - 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4를 연결한 선택 실행 테스트가
   새 token과 직전 token을 함께 허용한 상태에서 BATON의 직전 token으로 원본 API·초기
   정합화·재전달·심각도 변경·해소 수렴을 완료했다.
+- 스테이징 컨테이너 조립에서 파일 기반 현재 token으로 기존 v2 계약 예시를 수신하고
+  token 없는 요청이 `401`로 거부되는 것을 확인했다.
 
 ## 관련 문서
 
 - [BATON 생산자 호환성 선행조건](../0018_baton-producer-compatibility/spec.md)
 - [BATON 연속성 신호 이벤트 v2](../0019_baton-continuity-event-v2/spec.md)
 - [서비스 간 이벤트 인증 결정](../../ADR/0003_baton-event-authentication/adr.md)
+- [스테이징 실행 계약](../0021_staging-runtime-boundary/spec.md)

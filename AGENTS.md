@@ -120,16 +120,21 @@
   PRD-0015의 현재 관심 항목 상태 필터 조회, PRD-0016의 현재 관심 항목 상태 전이 증거
   이력과 PRD-0017의 현재 관심 항목 조건부 조회, PRD-0018의 BATON 생산자 호환성
   선행조건, PRD-0019의 BATON 연속성 신호 이벤트 v2와 PRD-0020의 BATON 이벤트 수신
-  전용 Bearer 경계를 따른다.
+  전용 Bearer 경계, PRD-0021의 스테이징 컨테이너 실행 경계를 따른다.
   PRD-0008의 직접 동시성 검증 범위는 재구축과 지원 이벤트 수신이며, 에디션 생성·다른
   재구축은 같은 잠금 코드 경로의 근거를 대상 테스트 증거로 확대하지 않는다. 이를 운영
   인증·인가가 결정되거나 외부 공개가 허용된 것으로 확대 해석하지 않는다.
 - 최소 상태 확인은 Spring Boot Actuator의 표준 aggregate health와 자동 구성된 DB
   contributor를 사용한다. 커스텀 controller, DTO, `HealthIndicator`와 확인 SQL을 만들지
-  않는다. Spring Boot 4.1의 health probes 기본값은 `true`이므로 배포 계약을 채택하기
-  전에는 표준 속성으로 비활성 상태를 유지한다.
-- 브로커, 스케줄러, 원본 생산자 변경, 외부 시스템 연동 어댑터와 운영 배포는
-  아직 결정된 것으로 가정하지 않는다.
+  않는다. 스테이징 Docker healthcheck는 이 aggregate endpoint를 사용한다. Spring Boot
+  4.1의 health probes 기본값은 `true`이므로 오케스트레이터 계약 전에는 표준 속성으로
+  비활성 상태를 유지한다.
+- 스테이징 이미지는 ADR-0004의 digest로 고정한 Java 21 JDK/JRE, UID/GID `10001`, 읽기
+  전용 루트와 `/tmp` tmpfs를 유지한다. PostgreSQL과 Bearer 비밀은 파일 기반 Compose
+  secrets와 Spring config tree로 주입하고 일반 환경 변수·별도 비밀 로더를 만들지 않는다.
+- 스테이징 BRIEF HTTP는 기본 loopback 바인딩을 유지한다. 공개 DNS·TLS·reverse proxy,
+  방화벽, 백업·복구, registry와 실제 운영 배포를 구현되거나 검증된 것으로 가정하지 않는다.
+- 브로커, 스케줄러와 외부 시스템 연동 어댑터는 아직 결정된 것으로 가정하지 않는다.
 - 로컬 PostgreSQL은 `compose.yml`을 사용한다. 애플리케이션 설정에는 Spring Boot 표준
   데이터 원본/Flyway 속성을 사용하고 별도 환경변수 별칭을 만들지 않는다.
 
@@ -165,6 +170,9 @@
   실행하지 못한 명령이나 확인하지 않은 실행 환경 동작은 성공으로 기록하지 않는다.
 - 이벤트 계약을 바꾸면 JSON Schema·예시 검증과 `contractsZip` 생성을 확인하고, BATON
   실제 serializer가 검증되지 않았다면 계약 버전을 RC로 유지한다.
+- 스테이징 조립을 바꾸면 Compose 구문, 이미지 빌드, 비루트·읽기 전용 실행, DB aggregate
+  health와 파일 기반 Bearer 한 건을 확인한다. 제품 API 전체 시나리오나 Spring Security
+  자체 동작을 다시 검증하지 않고, loopback 결과를 공개 HTTPS 완료로 확대하지 않는다.
 
 ## Git
 

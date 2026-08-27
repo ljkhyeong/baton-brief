@@ -8,8 +8,9 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 두 불변 에디션의 읽기 전용 비교 API와 Spring Boot Actuator 표준 aggregate health를
 > 사용하는 최소 상태 확인, 최초 이벤트 수신 증거의 읽기 전용 단건 조회까지 구현했다.
 > PostgreSQL 통합 테스트와 전체 테스트·실행 JAR 생성, Java 21/PostgreSQL 18.4 실행
-> 점검이 통과했다. 운영 배포
-> 구성은 없다. PRD-0008의 수신 증거 `retain-all`과 동기 전역 원자적 재구축 경계는
+> 점검이 통과했다. PRD-0021의 비루트 실행 이미지, 내부 PostgreSQL과 파일 기반 비밀을
+> 사용하는 최소 스테이징 컨테이너 경계도 구현·검증했다. 공개 HTTPS와 운영 배포는
+> 아직 없다. PRD-0008의 수신 증거 `retain-all`과 동기 전역 원자적 재구축 경계는
 > 강제 실패 롤백과 재구축·지원 이벤트 수신 잠금 동시성 대상 테스트, 변경 뒤 전체
 > 테스트·실행 JAR 생성으로 검증했다.
 > PRD-0009의 주간 범위 최신 불변 에디션 조회도 구현했고 PostgreSQL 통합 테스트와 전체
@@ -42,8 +43,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > HTTP 송신기도 구현·검증했다. 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL을 연결한
 > 선택 실행 테스트로 원본 API 변경, 초기 정합화, 장애 재시도, 동일 이벤트 재전달,
 > 심각도 변경과 해소 투영을 검증했다. PRD-0020의 전용 Bearer 인증과 현재·직전 token을
-> 함께 허용하는 수동 교체 구간도 실제 두 프로세스 흐름에서 검증했다. HTTPS·스테이징
-> 활성화는 아직 없다.
+> 함께 허용하는 수동 교체 구간도 실제 두 프로세스 흐름에서 검증했다. BRIEF 스테이징
+> 컨테이너의 파일 기반 Bearer 수신도 확인했지만 공개 HTTPS 전달은 아직 검증하지 않았다.
 
 ## 왜 BRIEF인가
 
@@ -178,9 +179,10 @@ BRIEF가 소유하지 않는다.
 [현재 관심 항목 조건부 조회 계약](docs/PRD/0017_current-attention-item-etag/spec.md)과
 [BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)과
 [BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)과
-[BATON 이벤트 수신 인증 계약](docs/PRD/0020_baton-event-authentication/spec.md)을
+[BATON 이벤트 수신 인증 계약](docs/PRD/0020_baton-event-authentication/spec.md)과
+[스테이징 실행 계약](docs/PRD/0021_staging-runtime-boundary/spec.md)을
 따른다.
-이벤트 수신 외의 인증·인가, 브로커, 스케줄러와 운영 배포는 첫 MVP 범위가 아니다.
+이벤트 수신 외의 인증·인가, 브로커, 스케줄러와 공개 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 이벤트 v2 계약 팩
 
@@ -217,10 +219,12 @@ Bearer 인증까지 검증한 사전 버전이다. 실제 HTTPS 스테이징 호
 - [BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)
 - [BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)
 - [BATON 이벤트 수신 인증 계약](docs/PRD/0020_baton-event-authentication/spec.md)
+- [스테이징 실행 계약](docs/PRD/0021_staging-runtime-boundary/spec.md)
 - [이벤트 v2 계약 팩](contracts/README.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [BATON 이벤트 전용 Bearer 인증](docs/ADR/0003_baton-event-authentication/adr.md)
+- [스테이징 컨테이너 실행 경계](docs/ADR/0004_staging-container-runtime/adr.md)
 - [인수인계](HANDOFF.md)
 
 ## 기술 스택
@@ -239,10 +243,10 @@ ADR-0002에서 다음 기준을 채택했다.
 의존은 `bootstrap`과 어댑터에서 `application`, 다시 `domain` 쪽으로만 향한다. 두
 어댑터는 서로 의존하지 않고 안쪽 모듈은 바깥쪽 모듈을 참조하지 않는다.
 
-Java 25 호환 빌드와 기동은 검토 과정에서 확인했지만 MVP에 필요한 기능상 이점이나
-고정된 CI/실행 이미지 기준이 없어 Java 21을 채택했다. 특정 JDK 공급자, 실행
-컨테이너 이미지와 운영 배포 방식은 아직 채택하지 않았다. 현재 구현·검증 상태는
-`HANDOFF.md`에 기록한다.
+Java 25 호환 빌드와 기동은 검토 과정에서 확인했지만 MVP에 필요한 기능상 이점이 없어
+Java 21을 채택했다. 스테이징 컨테이너는 재현성을 위해 Eclipse Temurin 21.0.11+10
+JDK/JRE 이미지를 digest로 고정한다. 공개 HTTPS와 장기 운영 배포 방식은 아직 채택하지
+않았다. 현재 구현·검증 상태는 `HANDOFF.md`에 기록한다.
 
 ## 로컬 데이터베이스
 
@@ -278,6 +282,21 @@ PostgreSQL 18 공식 이미지의 데이터 디렉터리에 맞춰 이름 있는
 현재·직전 Bearer를 함께 허용한 BATON→BRIEF 실행 JAR 전달을 포함한다. 실제 HTTPS
 스테이징이나 운영 배포를 검증한 것은 아니다. 상세한 실행 증거와 남은 범위는
 `HANDOFF.md`에 기록한다.
+
+## 스테이징 실행
+
+`.env.staging.example`을 추적되지 않는 `.env.staging`으로 복사하고 데이터베이스
+비밀번호, 현재 Bearer와 직전 Bearer 파일의 실제 절대 경로를 설정한다. 평상시 직전 token
+파일은 비워 둔다.
+
+```shell
+docker compose --env-file .env.staging -f compose.staging.yml config --quiet
+docker compose --env-file .env.staging -f compose.staging.yml up --build -d --wait
+```
+
+PostgreSQL은 호스트 포트를 열지 않고 BRIEF HTTP는 기본 `127.0.0.1:8080`에만 바인딩한다.
+공개 HTTPS reverse proxy는 이 loopback origin 앞에 별도로 배치한다. 저장소의
+`compose.staging.yml`은 DNS, 인증서, 방화벽, 백업과 실제 BATON 공개 전달을 구성하지 않는다.
 
 ## 라이선스
 
