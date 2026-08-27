@@ -72,6 +72,11 @@ Bearer와 BRIEF의 새 token·직전 token 중첩 구간도 같은 실제 두 �
 검증했다. 역순 리비전 차단은 BATON outbox 영속성 테스트가 담당하며 HTTPS·스테이징
 활성화는 포함하지 않는다.
 
+BATON `7731654`·`7c5c4ac`·`7ab64ba`는 기존 프로덕션 Compose에 BRIEF HTTPS origin,
+명시적 재조정 주기와 소유자 전용 Bearer 파일의 Spring config tree 주입을 연결하고
+사전점검·운영 문서를 갱신했다. BRIEF 서비스의 스테이징 배포와 실제 공개 HTTPS 전달은
+여전히 검증하지 않았다.
+
 PRD-0020 인증 변경 뒤 BRIEF `./gradlew --no-daemon clean test :bootstrap:bootJar`, BATON
 `./gradlew --no-daemon clean build`와 다음 선택 실행 검증이 모두 성공했다.
 
@@ -174,7 +179,8 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   트랜잭션 연결을 검증했다. BATON V23의 lease·신호별 순서·재시도 전달 상태와 기본 비활성
   HTTP 송신기도 구현·검증했다. BATON `d30be0d`은 실제 두 실행 JAR과 두 데이터베이스에서
   원본 API 변경·초기 정합화·장애 재시도·동일 재전달·심각도·해소 수렴을 검증했다.
-  다음 진입점은 실제 HTTPS·스테이징 비밀 주입과 계약 팩 안정 버전 승격이다.
+  다음 진입점은 BRIEF 스테이징 배포, 실제 공개 HTTPS 전달 검증과 계약 팩 안정 버전
+  승격이다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -414,7 +420,8 @@ Compose 컨테이너·네트워크·이름 있는 볼륨을 모두 제거했다.
 - 로컬 MVP만 구현했다. 운영 준비와 배포 검증은 완료하지 않았다.
 - WATCH, RELAY, GO 생산자와의 종단 간 연동은 없다. BATON은 로컬 선택 실행 테스트에서
   실제 두 프로세스와 두 데이터베이스로 원본 API·초기 정합화→HTTP→BRIEF PostgreSQL
-  수렴, 전용 Bearer와 직전 token 중첩 교체를 검증했다. HTTPS·스테이징 활성화는 남아 있다.
+  수렴, 전용 Bearer와 직전 token 중첩 교체를 검증했다. BATON 프로덕션 설정 주입은
+  연결했지만 BRIEF 스테이징 배포와 공개 HTTPS 전달 검증은 남아 있다.
 - 브로커, 스케줄러와 이벤트 수신 외 API의 운영 인증·인가 계약은 없다.
 - 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관은 구현하지 않았다. 숫자 보존 기간,
   용량 상한, 재구축 SLO·잠금 제한 시간, 체크포인트와 운영 복구 목표도 미결정이다.
