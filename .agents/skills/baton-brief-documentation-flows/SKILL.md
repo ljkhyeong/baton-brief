@@ -63,7 +63,7 @@ description: BATON BRIEF 문서화 작업 절차. 제품 코드를 주로 변경
   Security 처리, `401`과 비밀 비노출, 현재·직전 token 한 건의 수동 교체, loopback 밖
   HTTPS origin, 조회·운영 권한 및 실제 BATON 원격 스테이징 전달 비목표를 기록한다.
 - PRD-0021에는 digest로 고정한 Java 21 실행 이미지, 비루트·읽기 전용 컨테이너, 내부
-  PostgreSQL, loopback HTTP, 파일 기반 Compose secrets와 공인 DNS·백업·운영 배포
+  PostgreSQL, loopback 호스트 게시, 파일 기반 Compose secrets와 공인 DNS·백업·운영 배포
   비목표를 기록한다.
 - PRD-0022에는 선택적인 Caddy profile, 이벤트 수신 단일 경로 허용, 자동 HTTPS,
   Authorization 로그 비노출과 로컬 내부 CA 검증·공인 인증서 미검증 경계를 기록한다.

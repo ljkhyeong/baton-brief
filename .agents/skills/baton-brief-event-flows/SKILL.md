@@ -41,15 +41,15 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
   건만 함께 허용하고 BATON 전환 뒤 직전 값을 제거한다.
 - PRD-0021을 BRIEF 스테이징 수신 실행 경계로 사용한다. 현재·직전 token은 저장소 밖
   파일에서 Compose secrets와 Spring config tree로 주입하고 인증 필수를 고정한다. 이
-  조립의 loopback HTTP 성공을 공인 HTTPS나 비밀 관리 제품 검증으로 확대하지 않는다.
+  조립의 loopback 호스트 게시 성공을 공인 HTTPS나 비밀 관리 제품 검증으로 확대하지 않는다.
 - PRD-0022를 스테이징 HTTPS 이벤트 수신 경계로 사용한다. Caddy는 정확한 수신 경로만
   전달하고 다른 경로를 거부하며 Bearer 판정은 Spring Security에 남긴다. 로컬 내부 CA
   검증을 공인 인증서나 실제 BATON 원격 전달로 확대하지 않는다.
 - `contracts/VERSION`과 `contracts/schemas/source-event.v2.schema.json`을 언어 중립 v2
-  요청 계약 팩의 기준으로 사용한다. 현재 RC 예시는 BRIEF 소비자와 BATON 실제
-  Java/Jackson serializer·송신기가 함께 사용하고 로컬 원본 API·초기 정합화·실제
-  전달과 전용 Bearer, BRIEF 로컬 Caddy HTTPS 수신도 검증했다. 실제 BATON 스테이징
-  호스트의 공인 HTTPS 생산자·소비자 경계를 확인하기 전에는 안정 버전으로 승격하지 않는다.
+  요청 계약 팩의 기준으로 사용한다. 현재 `2.0.0-rc.2`는 BRIEF 소비자 입력 계약의 근거이고,
+  BATON 실제 Java/Jackson serializer·송신기와 로컬 원본 API·초기 정합화·전달을 교차
+  검증한 버전은 `2.0.0-rc.1`까지다. 현재 버전의 생산자 재검증과 실제 BATON 스테이징
+  호스트의 공인 HTTPS 경계를 확인하기 전에는 안정 버전으로 승격하지 않는다.
 - PRD-0008을 현재 보존 기준으로 사용한다. `UNSUPPORTED`를 포함한 모든 최초 수신 기록과
   이벤트별 최초 충돌 한 건은 대체 계약을 채택·마이그레이션·검증하기 전까지
   `retain-all`로 보존한다. 현재 구현·검증 근거는 `HANDOFF.md`에서 확인한다.
@@ -120,6 +120,9 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
 - 도착 순서에 의존하지 않고 오래된 리비전과 순서가 뒤바뀐 리비전을 테스트한다.
 - 생산자 테스트 고정값을 소비자와 대조해 검증하고 BRIEF 실패가 BATON을 롤백할 수
   없음을 확인한다.
+- 지문 입력이나 인코딩을 바꾸면 테스트에서 같은 지문 계산을 복제하지 않고, 기존 고정
+  이벤트가 저장한 지문과 동일 재전달 결과를 사전 계산한 값에 대조한다. v1의 `null`
+  심각도와 이미 보존한 수신 기록의 호환성을 함께 확인한다.
 - 인증 경계를 바꾸면 누락·오류 Bearer의 `401`, 정상 Bearer의 기존 수신 결과와 BATON
   실제 `RestClient` 헤더를 검증한다. 수동 교체는 BRIEF가 새 값과 직전 값을 함께 허용한
   상태에서 BATON의 직전 값 전달이 계속 성공하는지 기존 교차 서비스 시나리오에서

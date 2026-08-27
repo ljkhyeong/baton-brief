@@ -40,9 +40,9 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
    컨테이너와 Caddy HTTPS 경계를 따른다. 현재 구현 범위는 `HANDOFF.md`에서 확인한다.
    ADR-0004·ADR-0005의 로컬 실행 근거를 브로커, 스케줄러, 외부 시스템 어댑터, 공인
    인증서, 장기 운영 배포 또는 다른 API 인증·인가로 확대하지 않는다.
-5. 로컬 PostgreSQL 18.4 의존 서비스에는 `compose.yml`을 사용한다. Spring Boot의 표준
-   데이터 원본 및 Flyway 속성/환경변수를 우선하고 프레임워크 설정에 프로젝트 전용 별칭을
-   추가하지 않는다.
+5. 로컬 PostgreSQL 18.4 의존 서비스에는 `compose.yml`을 사용하고 호스트 포트는
+   `127.0.0.1`에만 게시한다. Spring Boot의 표준 데이터 원본 및 Flyway 속성/환경변수를
+   우선하고 프레임워크 설정에 프로젝트 전용 별칭을 추가하지 않는다.
 6. 이후 장기 기술 스택, 아키텍처, 전송 또는 운영 선택은 ADR에 기록한다.
 7. 비즈니스 불변식을 어댑터와 독립적으로 유지하고, 시간 의존 동작에 `Clock`을 주입하며,
    시간대와 구간 의미를 명시한다.
@@ -97,8 +97,9 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   교체는 현재 token과 직전 token 한 건만 BRIEF에서 함께 허용하고 BATON 전환 뒤 직전
   값을 제거한다. token 목록·회전 작업·별도 저장소를 만들지 않는다.
 - PRD-0021의 스테이징 조립은 digest로 고정한 Java 21 이미지, 비루트·읽기 전용 실행,
-  내부 PostgreSQL, loopback HTTP와 파일 기반 Compose secrets를 유지한다. Spring Boot
-  `configtree:`를 사용하고 별도 비밀 로더와 커스텀 health를 추가하지 않는다.
+  내부 PostgreSQL, loopback 호스트 게시와 파일 기반 Compose secrets를 유지한다. 컨테이너
+  프로세스는 내부 `proxy` 네트워크의 Caddy 요청을 받도록 `0.0.0.0`에서 실행하고, Spring
+  Boot `configtree:`를 사용하며 별도 비밀 로더와 커스텀 health를 추가하지 않는다.
 - PRD-0022의 선택적인 Caddy profile은 이벤트 수신 한 경로만 외부에 허용하고 다른 경로를
   기본 거부한다. Caddy는 Bearer를 해석하지 않고 Authorization을 접근 로그에서 제거하며,
   애플리케이션에 TLS·인증서 코드를 추가하지 않는다. 내부 CA 검증을 공인 ACME나 BATON
