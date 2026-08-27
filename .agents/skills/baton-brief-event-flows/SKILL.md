@@ -28,14 +28,16 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
   규칙에 끼워 맞추지 않고 BRIEF 이벤트 v2의 호환성·지문·투영 의미를 먼저 채택한다.
 - BATON 원본 변경과 자동 회차 생성은 신호에 영향을 주는 경로만 같은 트랜잭션 재조정에
   연결한다. 생산자 outbox 송신은 lease와 신호별 리비전 순서를 지키고 같은 event record를
-  재사용한다. 이 구현 근거를 실제 프로세스 사이 종단 간 전달 완료로 확대하지 않는다.
+  재사용한다. 실제 두 실행 JAR의 로컬 outbox→HTTP→PostgreSQL 검증은 원본 변경·초기
+  정합화부터 outbox 생성까지 한 흐름이나 운영 인증·HTTPS 완료로 확대하지 않는다.
 - PRD-0019를 이벤트 v2 소비 기준으로 사용한다. `sourceSeverity`는 v2에 필수이며 최초
   수신 증거와 fingerprint에 보존한다. v1·기존 미지원 기록의 `null`은 그대로 두고 v1
   fingerprint 바이트열을 바꾸지 않는다.
 - `contracts/VERSION`과 `contracts/schemas/source-event.v2.schema.json`을 언어 중립 v2
   요청 계약 팩의 기준으로 사용한다. 현재 RC 예시는 BRIEF 소비자와 BATON 실제
-  Java/Jackson serializer·송신기가 함께 사용하지만, 실제 종단 간 전달 성공 근거로
-  확대하지 않는다.
+  Java/Jackson serializer·송신기가 함께 사용하고 로컬 outbox 이후의 실제 전달도
+  검증했다. 원본 변경·초기 정합화부터 시작하는 단일 교차 서비스 흐름과 운영 경계를
+  확인하기 전에는 안정 버전으로 승격하지 않는다.
 - PRD-0008을 현재 보존 기준으로 사용한다. `UNSUPPORTED`를 포함한 모든 최초 수신 기록과
   이벤트별 최초 충돌 한 건은 대체 계약을 채택·마이그레이션·검증하기 전까지
   `retain-all`로 보존한다. 현재 구현·검증 근거는 `HANDOFF.md`에서 확인한다.
@@ -109,6 +111,7 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
 - 계약 팩 예시는 별도 수신 시나리오를 만들지 않고 기존 v2 PostgreSQL 통합 흐름의 실제
   요청 본문으로 사용한다. Schema 검증은 예시 형식만 소유하고 멱등성·충돌·재구축 의미를
   중복 검증하지 않는다.
-- 실제 생산자 직렬화와 종단 간 전달을 확인하지 않았다면 소비자 고정값이나 기존 WATCH
-  outbox 패턴만으로 BATON→BRIEF 호환 완료를 주장하지 않는다.
+- 소비자 고정값이나 기존 WATCH outbox 패턴만으로 BATON→BRIEF 호환 완료를 주장하지
+  않는다. outbox 이후의 실제 전달만 확인했다면 원본 변경·초기 정합화부터 시작하는 전체
+  흐름과 운영 인증·HTTPS를 별도 미검증 범위로 남긴다.
 - 저장소가 실제로 제공하는 검증 명령만 실행한다.
