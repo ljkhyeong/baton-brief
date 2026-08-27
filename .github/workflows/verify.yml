@@ -25,10 +25,9 @@ jobs:
           cache: gradle
 
       - name: Gradle 검증
-        run: ./gradlew --no-daemon clean test :bootstrap:bootJar contractsZip
+        run: ./gradlew --no-daemon test :bootstrap:bootJar contractsZip
 
       - name: Compose 설정 검증
         run: |
           docker compose -f compose.yml config --quiet
-          docker compose --env-file .env.staging.example -f compose.staging.yml config --quiet
           docker compose --env-file .env.staging.example -f compose.staging.yml --profile https config --quiet

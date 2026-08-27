@@ -24,7 +24,6 @@
 		reverse_proxy brief:8080 {
 			header_up X-Forwarded-Host {$BRIEF_STAGING_HOST:brief.invalid}
 			header_up X-Forwarded-Port 443
-			header_up X-Forwarded-Proto https
 		}
 	}
 
