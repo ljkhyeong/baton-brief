@@ -53,6 +53,9 @@
   경로를 `404`로 종료한다. Bearer를 proxy에서 다시 구현하지 않고 접근 로그의
   Authorization 헤더만 제거한다. 내부 health와 권한 계약이 없는 조회·에디션·재구축 API를
   외부에 노출하지 않는다.
+- BRIEF는 외부 송신 경로가 없는 내부 `data`·`proxy` 네트워크에만 연결하고, Caddy만
+  `proxy`와 외부 송신용 `egress`에 연결한다. Caddy는 모든 Linux capability를 제거한 뒤
+  80·443 바인딩에 필요한 `NET_BIND_SERVICE`만 추가한다.
 - 수신 증거 조회는 최초 기록의 `processingOutcome`을 반환한다. `DUPLICATE`와
   `CONFLICT`로 이를 덮어쓰지 않고 충돌은 선택적인 최초 탐지 시각으로만 표현하며,
   fingerprint와 원문 payload를 응답에 노출하지 않는다.
@@ -184,7 +187,8 @@
   자체 동작을 다시 검증하지 않고 loopback 결과를 공인 HTTPS 완료로 확대하지 않는다.
 - Caddy 경계를 바꾸면 설정 유효성, 신뢰한 HTTPS의 무인증 `401`·정상 Bearer 수신, 이벤트
   외 경로 `404`와 Authorization 로그 비노출을 한 조립 시나리오에서 확인한다. 인증서 검증을
-  끄거나 이 결과를 실제 공인 인증서·BATON 원격 스테이징 전달로 기록하지 않는다.
+  끄거나 이 결과를 실제 공인 인증서·BATON 원격 스테이징 전달로 기록하지 않는다. 네트워크
+  또는 capability를 바꾸면 실제 컨테이너 연결과 `cap_drop`·`cap_add`도 함께 확인한다.
 
 ## Git
 

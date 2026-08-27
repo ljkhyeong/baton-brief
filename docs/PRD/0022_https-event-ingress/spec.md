@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-27
-- 구현 상태: 로컬 CA HTTPS 조립과 외부 경로 제한 검증 완료
+- 구현 상태: 로컬 CA HTTPS 조립, 외부 경로 제한과 컨테이너 네트워크 격리 검증 완료
 - 범위: 스테이징 Caddy가 공개 HTTPS에서 BRIEF 이벤트 수신 한 경로만 전달하는 경계
 
 ## 목적
@@ -14,7 +14,7 @@ PRD-0020은 BATON 전용 Bearer를, PRD-0021은 내부 HTTP 애플리케이션�
 ## 외부 노출 계약
 
 - Caddy가 외부에서 허용하는 요청은 정확히 `POST /api/v1/events` 하나다.
-- 허용한 요청은 `edge` 네트워크의 `brief:8080`으로 전달한다.
+- 허용한 요청은 외부 송신 경로가 없는 내부 `proxy` 네트워크의 `brief:8080`으로 전달한다.
 - 그 밖의 메서드와 경로는 Caddy에서 빈 본문의 `404`로 끝내며 BRIEF에 전달하지 않는다.
 - `/actuator/health`는 BRIEF 컨테이너 healthcheck에만 사용하고 외부 HTTPS에서 노출하지
   않는다.
@@ -34,6 +34,18 @@ PRD-0020은 BATON 전용 Bearer를, PRD-0021은 내부 HTTP 애플리케이션�
 - 인증서와 Caddy 설정 상태는 별도 이름 있는 볼륨에 보존한다.
 - BRIEF 애플리케이션 이미지에는 인증서, private key, TLS 서버와 자체 신뢰 저장소 코드를
   추가하지 않는다.
+
+## 네트워크와 실행 권한
+
+- PostgreSQL과 BRIEF는 외부 송신 경로가 없는 내부 `data` 네트워크를 공유한다.
+- BRIEF와 Caddy는 외부 송신 경로가 없는 내부 `proxy` 네트워크만 공유한다.
+- Caddy만 별도 `egress` 네트워크에 연결해 ACME와 외부 HTTPS 통신을 담당한다. BRIEF와
+  PostgreSQL은 `egress`에 연결하지 않는다.
+- Caddy는 Linux capability를 모두 제거한 뒤 80·443 포트 바인딩에 필요한
+  `NET_BIND_SERVICE`만 추가한다. 읽기 전용 루트 파일시스템과 `no-new-privileges`도
+  유지한다.
+- 현재 공식 Caddy 이미지는 root 사용자로 실행한다. 이름 있는 인증서 볼륨의 소유권
+  초기화 계약 없이 임의의 init 컨테이너나 별도 권한 변경 스크립트를 추가하지 않는다.
 
 로컬 검증에서는 `BRIEF_STAGING_HOST=localhost`에 Caddy 내부 CA를 사용했다. 생성한 루트
 인증서를 임시 파일로 복사해 `curl --cacert`로 신뢰했으며 인증서 검증을 끄는 `-k`는
@@ -72,7 +84,10 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
   `202 APPLIED` 결과를 유지한다.
 - 외부 `/actuator/health`를 포함한 이벤트 수신 외 경로는 `404`이며 BRIEF에 전달되지 않는다.
 - Caddy 접근 로그에는 Authorization 헤더와 token 원문이 없다.
-- Caddy 컨테이너는 읽기 전용 루트 파일시스템과 `no-new-privileges`를 사용한다.
+- BRIEF는 내부 `data`·`proxy`에만, Caddy는 내부 `proxy`와 외부 송신용 `egress`에만
+  연결된다. `data`와 `proxy`는 Docker 내부 네트워크다.
+- Caddy 컨테이너는 읽기 전용 루트 파일시스템과 `no-new-privileges`를 사용하고, 모든
+  capability를 제거한 뒤 `NET_BIND_SERVICE`만 보유한다.
 - 검증용 컨테이너·네트워크·볼륨, 내부 CA와 임시 비밀 파일은 검증 뒤 제거한다.
 
 ## 비목표
@@ -90,7 +105,10 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 BRIEF와 Caddy를 함께 기동했다. Caddy 내부 CA 루트 인증서를 `curl --cacert`로 신뢰한
 HTTPS 요청에서 무인증 이벤트 수신 `401`, 파일 기반 현재 Bearer와 계약 팩 v2 예시의
 `202 APPLIED`, 외부 `/actuator/health`의 `404`를 확인했다. 접근 로그에는 Authorization
-헤더가 없었고 Caddy의 읽기 전용 루트와 `no-new-privileges`도 확인했다.
+헤더가 없었다. 실제 Docker 연결 상태에서 `data`에는 PostgreSQL·BRIEF만, 내부 `proxy`에는
+BRIEF·Caddy만, 외부 송신 가능한 `egress`에는 Caddy만 연결됨을 확인했다. Caddy는 읽기
+전용 루트와 `no-new-privileges`를 유지하면서 `ALL` capability를 제거하고
+`NET_BIND_SERVICE`만 추가한 상태로 80·443을 정상 바인딩했다.
 
 검증 뒤 Compose 컨테이너·네트워크·이름 있는 볼륨, 내부 CA와 임시 비밀 파일을 제거했다.
 실제 공인 인증서와 BATON 원격 전달은 아직 검증하지 않았다.

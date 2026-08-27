@@ -90,6 +90,10 @@ Spring Security가 판정하고 Caddy 접근 로그에서는 제거한다. 로�
 `/actuator/health` `404`를 확인했다. 실제 공인 DNS·ACME 인증서와 BATON 원격 스테이징
 전달은 아직 검증하지 않았다.
 
+후속 네트워크 축소에서 `data`에는 PostgreSQL·BRIEF만, 내부 `proxy`에는 BRIEF·Caddy만,
+외부 송신 가능한 `egress`에는 Caddy만 연결했다. Caddy는 `ALL` capability를 제거하고
+`NET_BIND_SERVICE`만 추가한 읽기 전용 컨테이너로 같은 HTTPS 계약을 유지했다.
+
 PRD-0020 인증 변경 뒤 BRIEF `./gradlew --no-daemon clean test :bootstrap:bootJar`, BATON
 `./gradlew --no-daemon clean build`와 다음 선택 실행 검증이 모두 성공했다.
 
@@ -435,6 +439,10 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   Bearer의 계약 팩 v2 예시 `202 APPLIED`, 외부 `/actuator/health` `404` 확인
 - Caddy 접근 로그에 Authorization 헤더가 없고 컨테이너가 읽기 전용 루트와
   `no-new-privileges`를 사용하는지 확인
+- 실제 Docker 네트워크 검사: 내부 `data`에는 PostgreSQL·BRIEF, 내부 `proxy`에는
+  BRIEF·Caddy, 외부 송신 가능한 `egress`에는 Caddy만 연결됨을 확인
+- Caddy 컨테이너 검사: `cap_drop=ALL`, `cap_add=NET_BIND_SERVICE`, 읽기 전용 루트와
+  `no-new-privileges` 확인. 이 최소 권한으로 80·443 바인딩과 HTTPS 수신 성공
 - `./gradlew --no-daemon test :bootstrap:bootJar`: HTTPS 조립 변경 뒤 저장소 전체 테스트와
   실행 JAR 생성 성공
 
@@ -444,6 +452,10 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 BRIEF 실행 JAR과 두 데이터베이스에서 전용 Bearer를 포함한 원본 수렴도 확인했다. BRIEF
 로컬 Caddy HTTPS 수신 경계는 확인했지만 BATON 원격 스테이징 전달과 이벤트 수신 외 API의
 인증·인가는 검증 범위가 아니다.
+
+이번 네트워크·capability 축소는 Compose만 변경해 동일 이미지의 실제 기동과 HTTPS 요청으로
+검증했다. 애플리케이션 코드와 Gradle 입력은 바꾸지 않아 제품 테스트와 `bootJar`를 다시
+실행하지 않았다.
 
 검증 뒤 `baton-brief-smoke` 애플리케이션 프로세스와 스테이징 검증용 컨테이너를 정상
 종료하고, 이번 검증에서 만든 Compose 컨테이너·네트워크·이름 있는 PostgreSQL·Caddy

@@ -23,7 +23,11 @@ HTTPS origin을 요구한다. 애플리케이션에 TLS와 인증서 생명주�
 - 외부 전달 헤더를 신뢰하지 않고 Caddy가 HTTPS 기준 `X-Forwarded-*`를 다시 설정한다.
 - BRIEF 애플리케이션의 loopback 바인딩, PostgreSQL 내부 네트워크와 파일 기반 Compose
   secrets를 유지한다.
+- PostgreSQL·BRIEF의 `data`와 BRIEF·Caddy의 `proxy`를 외부 송신 경로가 없는 내부
+  네트워크로 분리한다. ACME와 외부 HTTPS에 필요한 `egress`에는 Caddy만 연결한다.
 - Caddy 루트 파일시스템은 읽기 전용으로 두고 인증서·설정 상태만 이름 있는 볼륨에 쓴다.
+- Caddy의 Linux capability는 모두 제거하고 80·443 바인딩에 필요한
+  `NET_BIND_SERVICE`만 추가한다. `no-new-privileges`도 유지한다.
 
 ## 결과
 
@@ -32,6 +36,8 @@ HTTPS origin을 요구한다. 애플리케이션에 TLS와 인증서 생명주�
 - 애플리케이션 이미지와 Kotlin 코드에 TLS 서버, 인증서 갱신과 신뢰 우회 코드를 추가하지
   않는다.
 - 공개 경로 허용 목록이 명시되어 권한 계약이 없는 내부 API의 우발적 노출을 막는다.
+- BRIEF 컨테이너가 외부 송신 네트워크에 참여하지 않아 애플리케이션 침해 시 외부 연결
+  경로를 줄인다.
 - Caddy 자동 HTTPS와 저장 볼륨으로 공인 인증서 발급·갱신 책임을 배포 경계에 둔다.
 - 기존 loopback 스테이징 실행은 profile을 활성화하지 않으면 그대로 유지된다.
 
@@ -41,6 +47,8 @@ HTTPS origin을 요구한다. 애플리케이션에 TLS와 인증서 생명주�
 - Caddy 데이터 볼륨의 백업·복구와 다중 인스턴스 인증서 조정은 아직 결정하지 않았다.
 - 로컬 내부 CA 검증만으로 공인 ACME 발급과 실제 BATON 원격 전달을 입증할 수 없다.
 - 이벤트 수신 외 API를 공개하려면 별도 권한·경로 계약과 Caddy 설정 변경이 필요하다.
+- 공식 Caddy 이미지는 현재 root 사용자로 실행한다. capability는 최소화했지만 비루트
+  전환에는 이름 있는 인증서 볼륨의 소유권 초기화·복구 계약이 먼저 필요하다.
 
 ## 대안
 

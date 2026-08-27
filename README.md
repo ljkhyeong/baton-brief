@@ -312,8 +312,11 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 ```
 
 Caddy는 외부에서 정확한 `POST /api/v1/events`만 전달하고 다른 경로는 `404`로 끝낸다.
-Bearer 판정은 계속 Spring Security가 담당한다. 저장소의 `compose.staging.yml`은 실제
-DNS·방화벽, 공인 인증서 발급 성공, 백업과 BATON 원격 전달까지 구성하거나 검증하지 않는다.
+Bearer 판정은 계속 Spring Security가 담당한다. BRIEF는 내부 `data`·`proxy` 네트워크에만
+연결되고 외부 송신 가능한 `egress`에는 Caddy만 연결된다. Caddy는 모든 capability를
+제거한 뒤 80·443 바인딩에 필요한 `NET_BIND_SERVICE`만 사용한다. 저장소의
+`compose.staging.yml`은 실제 DNS·방화벽, 공인 인증서 발급 성공, 백업과 BATON 원격
+전달까지 구성하거나 검증하지 않는다.
 
 ## 라이선스
 
