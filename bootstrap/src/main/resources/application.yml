@@ -6,11 +6,16 @@ spring:
     username: brief
     password: brief
   jackson:
+    deserialization:
+      accept-float-as-int: false
+      fail-on-unknown-properties: true
     mapper:
       allow-coercion-of-scalars: false
   mvc:
     problemdetails:
       enabled: true
+server:
+  address: 127.0.0.1
 brief:
   event-receiver:
     authentication-required: ${BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED:false}

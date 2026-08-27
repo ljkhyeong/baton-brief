@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: brief
       POSTGRES_PASSWORD: brief
     ports:
-      - "${BRIEF_DB_PORT:-5432}:5432"
+      - "127.0.0.1:${BRIEF_DB_PORT:-5432}:5432"
     volumes:
       - brief-postgres-data:/var/lib/postgresql
     healthcheck:
