@@ -2,7 +2,8 @@
 
 ## 시작 순서
 
-- 작업 전에 `HANDOFF.md`, `README.md`와 영향받는 PRD/ADR을 읽는다.
+- 작업 전에 `HANDOFF.md`, `README.md`와 영향받는 PRD/ADR을 읽는다. PRD/ADR은
+  `docs/README.md`의 문서 색인에서 찾는다.
 - 작업 성격에 맞는 프로젝트 로컬 스킬을 `.agents/skills/`에서 사용한다.
 - 문서와 코드가 다르면 실행 가능한 코드와 테스트를 확인하고 같은 변경에서 문서를
   바로잡는다.
