@@ -47,13 +47,14 @@ class JdbcBriefPersistenceAdapter(
         event: SourceEvent,
         fingerprint: String,
         receivedAt: Instant,
+        conflictDetectedAt: () -> Instant,
     ): IngestResult {
         lockExclusive("event:${event.eventId}")
         findReceiptFingerprint(event.eventId)?.let { existingFingerprint ->
             return if (existingFingerprint == fingerprint) {
                 IngestResult(event.eventId, IngestStatus.UNSUPPORTED)
             } else {
-                recordConflict(event.eventId, fingerprint, receivedAt)
+                recordConflict(event.eventId, fingerprint, conflictDetectedAt())
                 IngestResult(event.eventId, IngestStatus.CONFLICT)
             }
         }
@@ -67,6 +68,7 @@ class JdbcBriefPersistenceAdapter(
         event: SourceEvent,
         fingerprint: String,
         receivedAt: Instant,
+        conflictDetectedAt: () -> Instant,
         project: (AttentionItem?) -> ProjectionDecision,
     ): IngestResult {
         lockShared(PROJECTION_LOCK)
@@ -75,7 +77,7 @@ class JdbcBriefPersistenceAdapter(
             return if (existingFingerprint == fingerprint) {
                 IngestResult(event.eventId, IngestStatus.DUPLICATE)
             } else {
-                recordConflict(event.eventId, fingerprint, receivedAt)
+                recordConflict(event.eventId, fingerprint, conflictDetectedAt())
                 IngestResult(event.eventId, IngestStatus.CONFLICT)
             }
         }

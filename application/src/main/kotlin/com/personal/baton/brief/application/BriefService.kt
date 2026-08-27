@@ -23,13 +23,14 @@ class BriefService(
 ) : BriefUseCases {
     override fun ingest(event: SourceEvent): IngestResult {
         val normalizedEvent = event.copy(occurredAt = event.occurredAt.truncatedTo(ChronoUnit.MICROS))
-        val receivedAt = clock.instant().truncatedTo(ChronoUnit.MICROS)
+        val currentTimestamp = { clock.instant().truncatedTo(ChronoUnit.MICROS) }
+        val receivedAt = currentTimestamp()
         val fingerprint = fingerprint(normalizedEvent)
         if (!normalizedEvent.isSupported) {
-            return persistence.recordUnsupported(normalizedEvent, fingerprint, receivedAt)
+            return persistence.recordUnsupported(normalizedEvent, fingerprint, receivedAt, currentTimestamp)
         }
 
-        return persistence.processEvent(normalizedEvent, fingerprint, receivedAt) { current ->
+        return persistence.processEvent(normalizedEvent, fingerprint, receivedAt, currentTimestamp) { current ->
             AttentionProjector.project(normalizedEvent, current)
         }
     }

@@ -2,6 +2,7 @@ package com.personal.baton.brief
 
 import com.jayway.jsonpath.JsonPath
 import com.personal.baton.brief.application.BriefPersistencePort
+import com.personal.baton.brief.application.BriefService
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
@@ -10,7 +11,9 @@ import com.personal.baton.brief.domain.ProjectionDecision
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
+import java.time.Clock
 import java.time.Instant
+import java.time.OffsetDateTime
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CyclicBarrier
@@ -24,6 +27,7 @@ import org.hamcrest.Matchers.nullValue
 import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -187,7 +191,14 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000001"
         val seasonId = "20000000-0000-0000-0000-000000000001"
         val eventId = "30000000-0000-0000-0000-000000000001"
-        val first = eventJson(eventId, workspaceId, seasonId, "handoff:1", 1)
+        val first = eventJson(
+            eventId,
+            workspaceId,
+            seasonId,
+            "handoff:1",
+            1,
+            occurredAt = "2026-08-12t18:00:00.1+09:00",
+        )
 
         postEvent(first)
             .andExpect(status().isAccepted)
@@ -252,6 +263,7 @@ class BriefMvpIntegrationTest(
                 seasonId,
                 "handoff:1",
                 1,
+                occurredAt = "2026-08-12T09:00:00.123456789z",
             ),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("STALE"))
@@ -283,6 +295,13 @@ class BriefMvpIntegrationTest(
         postEvent(unsupported)
             .andExpect(status().isUnprocessableContent)
             .andExpect(jsonPath("$.status").value("UNSUPPORTED"))
+        assertThat(
+            jdbc.sql(
+                "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
+            ).param("eventId", UUID.fromString("30000000-0000-0000-0000-000000000004"))
+                .query(String::class.java)
+                .single(),
+        ).isEqualTo("ac86b6dc7a11b60105bd556485eb07f11d9d451c08e3d88f2b3de23b65b31ec9")
         mockMvc.perform(get("/api/v1/events/30000000-0000-0000-0000-000000000004/receipt"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.eventVersion").value(2))
@@ -509,6 +528,43 @@ class BriefMvpIntegrationTest(
         val missingReceiptPath = "/api/v1/events/30000000-0000-0000-0000-000000000099/receipt"
         mockMvc.perform(get(missingReceiptPath))
             .andExpect(status().isNotFound)
+
+        val receivedAt = Instant.parse("2026-08-12T09:00:01Z")
+        val conflictRequestAt = Instant.parse("2026-08-12T09:00:02Z")
+        val conflictDetectedAt = Instant.parse("2026-08-12T09:00:03Z")
+        val sequentialClock = Mockito.mock(Clock::class.java)
+        Mockito.`when`(sequentialClock.instant())
+            .thenReturn(receivedAt, conflictRequestAt, conflictDetectedAt)
+        val conflictEventId = UUID.fromString("30000000-0000-0000-0000-000000000098")
+        val conflictEvent = SourceEvent(
+            eventId = conflictEventId,
+            eventType = SourceEventType.HANDOFF_BLOCKED,
+            eventVersion = 1,
+            workspaceId = UUID.fromString(workspaceId),
+            seasonId = UUID.fromString(seasonId),
+            sourceReference = "handoff:conflict-time",
+            aggregateRevision = 1,
+            occurredAt = receivedAt,
+            state = SourceEventState.ACTIVE,
+        )
+        val service = BriefService(persistence, sequentialClock)
+        assertThat(service.ingest(conflictEvent).status).isEqualTo(IngestStatus.APPLIED)
+        assertThat(service.ingest(conflictEvent.copy(state = SourceEventState.RESOLVED)).status)
+            .isEqualTo(IngestStatus.CONFLICT)
+        assertThat(
+            jdbc.sql("SELECT received_at FROM source_event_receipt WHERE event_id = :eventId")
+                .param("eventId", conflictEventId)
+                .query(OffsetDateTime::class.java)
+                .single()
+                .toInstant(),
+        ).isEqualTo(receivedAt)
+        assertThat(
+            jdbc.sql("SELECT detected_at FROM source_event_conflict WHERE event_id = :eventId")
+                .param("eventId", conflictEventId)
+                .query(OffsetDateTime::class.java)
+                .single()
+                .toInstant(),
+        ).isEqualTo(conflictDetectedAt)
     }
 
     @Test
@@ -1057,6 +1113,34 @@ class BriefMvpIntegrationTest(
             .replace("\"occurredAt\": \"2026-08-12T09:00:00Z\"", "\"occurredAt\": 1786525200")
         postEvent(numericInstant).andExpect(status().isBadRequest)
 
+        val fractionalRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
+            .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 1.5")
+        postEvent(fractionalRevision).andExpect(status().isBadRequest)
+
+        val overflowingRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
+            .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 9223372036854775808")
+        postEvent(overflowingRevision).andExpect(status().isBadRequest)
+
+        val unknownField = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
+            .replace("\"state\": \"ACTIVE\"", "\"state\": \"ACTIVE\", \"unexpected\": true")
+        postEvent(unknownField).andExpect(status().isBadRequest)
+
+        listOf(
+            "2026-08-12T24:00:00Z",
+            "2026-08-12T23:59:60Z",
+        ).forEach { occurredAt ->
+            postEvent(
+                eventJson(
+                    eventId,
+                    workspaceId,
+                    seasonId,
+                    "invalid",
+                    1,
+                    occurredAt = occurredAt,
+                ),
+            ).andExpect(status().isBadRequest)
+        }
+
         postEvent(
             eventJson(
                 eventId = eventId,
@@ -1158,6 +1242,7 @@ class BriefMvpIntegrationTest(
                         event = supportedEvent,
                         fingerprint = "a".repeat(64),
                         receivedAt = receivedAt,
+                        conflictDetectedAt = { receivedAt },
                     ) { current ->
                         AttentionProjector.project(supportedEvent, current)
                     }

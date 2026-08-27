@@ -21,6 +21,10 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatterBuilder
+import java.time.format.ResolverStyle
+import java.time.temporal.ChronoField
+import java.util.Locale
 import java.util.UUID
 
 data class SourceEventRequest(
@@ -39,7 +43,9 @@ data class SourceEventRequest(
     val occurredAt: String,
     val state: SourceEventState,
 ) {
-    private val occurredAtInstant = runCatching { Instant.parse(occurredAt) }.getOrNull()
+    private val occurredAtInstant = runCatching {
+        Instant.from(OCCURRED_AT_FORMATTER.parse(occurredAt))
+    }.getOrNull()
 
     @get:AssertTrue(message = "occurredAt must be an ISO-8601 instant")
     val validOccurredAt: Boolean
@@ -61,6 +67,28 @@ data class SourceEventRequest(
         state = state,
         sourceSeverity = sourceSeverity,
     )
+
+    companion object {
+        private val OCCURRED_AT_FORMATTER = DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .appendValue(ChronoField.YEAR, 4)
+            .appendLiteral('-')
+            .appendValue(ChronoField.MONTH_OF_YEAR, 2)
+            .appendLiteral('-')
+            .appendValue(ChronoField.DAY_OF_MONTH, 2)
+            .appendLiteral('T')
+            .appendValue(ChronoField.HOUR_OF_DAY, 2)
+            .appendLiteral(':')
+            .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
+            .appendLiteral(':')
+            .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
+            .optionalStart()
+            .appendFraction(ChronoField.NANO_OF_SECOND, 1, 9, true)
+            .optionalEnd()
+            .appendOffset("+HH:MM", "Z")
+            .toFormatter(Locale.ROOT)
+            .withResolverStyle(ResolverStyle.STRICT)
+    }
 }
 
 data class EditionWeekRequest(

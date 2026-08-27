@@ -215,12 +215,14 @@ interface BriefPersistencePort {
         event: SourceEvent,
         fingerprint: String,
         receivedAt: Instant,
+        conflictDetectedAt: () -> Instant,
     ): IngestResult
 
     fun processEvent(
         event: SourceEvent,
         fingerprint: String,
         receivedAt: Instant,
+        conflictDetectedAt: () -> Instant,
         project: (AttentionItem?) -> ProjectionDecision,
     ): IngestResult
 
