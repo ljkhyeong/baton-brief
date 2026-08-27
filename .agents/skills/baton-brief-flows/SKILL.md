@@ -103,6 +103,10 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   기본 거부한다. Caddy는 Bearer를 해석하지 않고 Authorization을 접근 로그에서 제거하며,
   애플리케이션에 TLS·인증서 코드를 추가하지 않는다. 내부 CA 검증을 공인 ACME나 BATON
   원격 전달로 확대하지 않는다.
+- BRIEF는 외부 송신 경로가 없는 내부 `data`·`proxy`에만 연결하고 Caddy만 `proxy`와
+  외부 송신용 `egress`에 연결한다. Caddy는 capability를 모두 제거한 뒤
+  `NET_BIND_SERVICE`만 추가한다. 비루트 Caddy를 채택하기 전에는 이름 있는 인증서 볼륨의
+  소유권 계획 없이 init 컨테이너나 권한 변경 스크립트를 만들지 않는다.
 - 이벤트 v2 계약 팩은 `contracts/VERSION`을 단일 버전 기준으로 삼고 JSON Schema·예시와
   PRD-0019만 Gradle 표준 `Zip`으로 묶는다. 공유 JVM DTO, 계약 서비스, 별도 배포 플러그인과
   예시 전용 제품 시나리오를 추가하지 않는다.
@@ -146,4 +150,5 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   공인 HTTPS나 BATON 원격 스테이징 전달 완료로 기록하지 않는다.
 - Caddy 조립을 바꾸면 설정 유효성, 정상 인증서 검증을 사용한 무인증 `401`·정상 Bearer
   수신, 이벤트 외 경로 `404`, Authorization 로그 비노출과 임시 자원 정리를 한 번
-  확인한다. Spring Security와 제품 이벤트 시나리오를 별도 테스트로 반복하지 않는다.
+  확인한다. 네트워크나 capability를 바꾸면 실제 컨테이너 연결과 `cap_drop`·`cap_add`도
+  함께 확인한다. Spring Security와 제품 이벤트 시나리오를 별도 테스트로 반복하지 않는다.
