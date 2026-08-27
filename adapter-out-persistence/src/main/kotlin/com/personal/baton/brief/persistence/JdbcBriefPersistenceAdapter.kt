@@ -50,14 +50,12 @@ class JdbcBriefPersistenceAdapter(
         conflictDetectedAt: () -> Instant,
     ): IngestResult {
         lockExclusive("event:${event.eventId}")
-        findReceiptFingerprint(event.eventId)?.let { existingFingerprint ->
-            return if (existingFingerprint == fingerprint) {
-                IngestResult(event.eventId, IngestStatus.UNSUPPORTED)
-            } else {
-                recordConflict(event.eventId, fingerprint, conflictDetectedAt())
-                IngestResult(event.eventId, IngestStatus.CONFLICT)
-            }
-        }
+        findExistingEventResult(
+            event.eventId,
+            fingerprint,
+            IngestStatus.UNSUPPORTED,
+            conflictDetectedAt,
+        )?.let { return it }
 
         insertReceipt(event, fingerprint, IngestStatus.UNSUPPORTED, receivedAt)
         return IngestResult(event.eventId, IngestStatus.UNSUPPORTED)
@@ -73,14 +71,12 @@ class JdbcBriefPersistenceAdapter(
     ): IngestResult {
         lockShared(PROJECTION_LOCK)
         lockExclusive("event:${event.eventId}")
-        findReceiptFingerprint(event.eventId)?.let { existingFingerprint ->
-            return if (existingFingerprint == fingerprint) {
-                IngestResult(event.eventId, IngestStatus.DUPLICATE)
-            } else {
-                recordConflict(event.eventId, fingerprint, conflictDetectedAt())
-                IngestResult(event.eventId, IngestStatus.CONFLICT)
-            }
-        }
+        findExistingEventResult(
+            event.eventId,
+            fingerprint,
+            IngestStatus.DUPLICATE,
+            conflictDetectedAt,
+        )?.let { return it }
 
         lockExclusive(
             "attention:${event.workspaceId}:${event.seasonId}:${event.eventType.name}:${event.sourceReference}",
@@ -112,13 +108,7 @@ class JdbcBriefPersistenceAdapter(
 
     override fun findEventReceipt(eventId: UUID): SourceEventReceipt? = jdbc.sql(
         """
-        SELECT receipt.event_id, receipt.ingestion_sequence, receipt.event_type,
-               receipt.event_version, receipt.source_severity, receipt.workspace_id, receipt.season_id,
-               receipt.source_reference, receipt.aggregate_revision, receipt.occurred_at,
-               receipt.event_state, receipt.processing_outcome, receipt.received_at,
-               conflict.detected_at AS conflict_detected_at
-          FROM source_event_receipt receipt
-          LEFT JOIN source_event_conflict conflict ON conflict.event_id = receipt.event_id
+        $SOURCE_EVENT_RECEIPT_SELECT
          WHERE receipt.event_id = :eventId
         """.trimIndent(),
     ).param("eventId", eventId)
@@ -148,13 +138,7 @@ class JdbcBriefPersistenceAdapter(
 
         val fetched = jdbc.sql(
             """
-            SELECT receipt.event_id, receipt.ingestion_sequence, receipt.event_type,
-                   receipt.event_version, receipt.source_severity, receipt.workspace_id, receipt.season_id,
-                   receipt.source_reference, receipt.aggregate_revision, receipt.occurred_at,
-                   receipt.event_state, receipt.processing_outcome, receipt.received_at,
-                   conflict.detected_at AS conflict_detected_at
-              FROM source_event_receipt receipt
-              LEFT JOIN source_event_conflict conflict ON conflict.event_id = receipt.event_id
+            $SOURCE_EVENT_RECEIPT_SELECT
              WHERE receipt.workspace_id = :workspaceId
                AND receipt.season_id = :seasonId
                AND (
@@ -473,6 +457,21 @@ class JdbcBriefPersistenceAdapter(
         .query(String::class.java)
         .optional()
         .getOrNull()
+
+    private fun findExistingEventResult(
+        eventId: UUID,
+        fingerprint: String,
+        replayStatus: IngestStatus,
+        conflictDetectedAt: () -> Instant,
+    ): IngestResult? {
+        val existingFingerprint = findReceiptFingerprint(eventId) ?: return null
+        if (existingFingerprint == fingerprint) {
+            return IngestResult(eventId, replayStatus)
+        }
+
+        recordConflict(eventId, fingerprint, conflictDetectedAt())
+        return IngestResult(eventId, IngestStatus.CONFLICT)
+    }
 
     private fun insertReceipt(
         event: SourceEvent,
@@ -850,5 +849,14 @@ class JdbcBriefPersistenceAdapter(
 
     companion object {
         private const val PROJECTION_LOCK = "brief:projection"
+        private val SOURCE_EVENT_RECEIPT_SELECT = """
+            SELECT receipt.event_id, receipt.ingestion_sequence, receipt.event_type,
+                   receipt.event_version, receipt.source_severity, receipt.workspace_id, receipt.season_id,
+                   receipt.source_reference, receipt.aggregate_revision, receipt.occurred_at,
+                   receipt.event_state, receipt.processing_outcome, receipt.received_at,
+                   conflict.detected_at AS conflict_detected_at
+              FROM source_event_receipt receipt
+              LEFT JOIN source_event_conflict conflict ON conflict.event_id = receipt.event_id
+        """.trimIndent()
     }
 }
