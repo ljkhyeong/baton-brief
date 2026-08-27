@@ -29,10 +29,12 @@ BRIEF는 다음 표준 환경 설정을 사용한다.
 | 환경 변수 | 의미 | 기본값 |
 |---|---|---|
 | `BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED` | 이벤트 수신 Bearer 필수 여부 | `false` |
-| `BRIEF_EVENT_RECEIVER_BEARER_TOKEN` | 수신자가 비교할 전용 비밀 | 빈 값 |
+| `BRIEF_EVENT_RECEIVER_BEARER_TOKEN` | 수신자가 비교할 현재 전용 비밀 | 빈 값 |
+| `BRIEF_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN` | 수동 교체 중 함께 허용할 직전 비밀 | 빈 값 |
 
-인증이 필수이면 token은 32~200자의 URL-safe ASCII여야 하며, 조건을 만족하지 않으면
-애플리케이션 기동이 실패한다. 기본값은 기존 로컬 MVP 호환을 위해 비활성이다.
+인증이 필수이면 현재 token은 32~200자의 URL-safe ASCII여야 한다. 직전 token을 설정한
+경우에도 같은 형식을 요구하며 조건을 만족하지 않으면 애플리케이션 기동이 실패한다.
+기본값은 기존 로컬 MVP 호환을 위해 비활성이다.
 
 BATON은 `BATON_BRIEF_BEARER_TOKEN`이 설정된 경우 Spring `RestClient`의 표준 Bearer
 헤더 API로 같은 token을 전송한다. token은 설정 객체 문자열, 로그, 이벤트 본문, 수신
@@ -41,14 +43,24 @@ BATON은 `BATON_BRIEF_BEARER_TOKEN`이 설정된 경우 Spring `RestClient`의 �
 생산자와 소비자는 같은 환경에서 전용 값을 공유하되 저장소에 값을 커밋하지 않는다.
 WATCH·워크스페이스 운영 키와 다른 비밀을 사용한다.
 
+## 수동 교체 절차
+
+1. BRIEF의 현재 token을 새 값으로 바꾸고 직전 token에 기존 값을 넣어 먼저 배포한다.
+2. BATON의 `BATON_BRIEF_BEARER_TOKEN`을 새 값으로 바꾼다.
+3. BATON 전달이 새 값으로 성공한 뒤 BRIEF의 직전 token 설정을 제거한다.
+
+BRIEF는 현재 token과 선택적인 직전 token 한 건만 허용한다. BATON은 한 요청에 현재
+설정값 하나만 전송한다. 직전 token은 순차 배포를 위한 짧은 중첩 구간이며 장기 복수 키,
+생산자별 권한이나 token 저장소가 아니다.
+
 ## HTTPS 경계
 
 BATON은 loopback 이외의 BRIEF 기본 URL에 HTTPS origin만 허용하는 기존 검증을 유지한다.
 TLS 종단, 인증서 발급·회전, JDK 신뢰 저장소와 스테이징 주소는 배포 환경이 소유하며
 애플리케이션에 자체 인증서 검증기나 우회 가능한 trust-all client를 추가하지 않는다.
 
-이번 로컬 검증은 loopback HTTP 위에서 Bearer 계약을 확인했다. 실제 HTTPS 스테이징
-전달과 비밀 주입·회전은 아직 검증하지 않았다.
+이번 로컬 검증은 loopback HTTP 위에서 Bearer 계약과 현재·직전 token 중첩을 확인했다.
+실제 HTTPS 스테이징 전달과 비밀 관리 제품을 이용한 주입·회전은 아직 검증하지 않았다.
 
 ## 구현 원칙
 
@@ -63,6 +75,8 @@ TLS 종단, 인증서 발급·회전, JDK 신뢰 저장소와 스테이징 주�
 
 - 인증이 필수인 BRIEF는 Bearer가 없는 요청과 잘못된 요청을 `401`로 거부한다.
 - 같은 구성의 정상 Bearer는 기존 v1·v2 이벤트 수신 결과를 유지한다.
+- BRIEF가 새 token과 직전 token을 함께 허용하는 구간에 BATON의 직전 token 전달이
+  계속 성공한다.
 - BATON 실제 `RestClient`가 전용 Bearer를 보내며 `401`을 영구 실패로 분류한다.
 - 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL을 사용한 기존 원본 수렴 시나리오가
   Bearer 인증을 켠 상태에서도 성공한다.
@@ -72,7 +86,7 @@ TLS 종단, 인증서 발급·회전, JDK 신뢰 저장소와 스테이징 주�
 
 - BRIEF 조회·에디션·재구축 API의 사용자·운영자 권한 모델
 - OAuth2 authorization server, JWT, token introspection, mTLS와 복수 생산자 권한
-- token 발급·회전 자동화와 비밀 관리 제품 선택
+- token 발급·자동 회전과 비밀 관리 제품 선택
 - 공개 DNS, 인증서, 방화벽과 실제 HTTPS 스테이징 활성화
 - 계약 팩 `2.0.0-rc.1`의 안정 버전 승격
 
@@ -83,7 +97,8 @@ TLS 종단, 인증서 발급·회전, JDK 신뢰 저장소와 스테이징 주�
 - BATON 외부 어댑터 테스트에서 실제 JSON 요청에 Bearer 헤더가 포함되고 `401`이 영구
   실패로 분류됨을 확인했다.
 - 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4를 연결한 선택 실행 테스트가
-  인증을 켠 상태에서 원본 API·초기 정합화·재전달·심각도 변경·해소 수렴을 완료했다.
+  새 token과 직전 token을 함께 허용한 상태에서 BATON의 직전 token으로 원본 API·초기
+  정합화·재전달·심각도 변경·해소 수렴을 완료했다.
 
 ## 관련 문서
 

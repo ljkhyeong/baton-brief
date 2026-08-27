@@ -41,8 +41,9 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 트랜잭션 재조정에 연결했다. V23의 lease·신호별 리비전 순서·재시도 상태와 기본 비활성
 > HTTP 송신기도 구현·검증했다. 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL을 연결한
 > 선택 실행 테스트로 원본 API 변경, 초기 정합화, 장애 재시도, 동일 이벤트 재전달,
-> 심각도 변경과 해소 투영을 검증했다. PRD-0020의 전용 Bearer 인증도 같은 실제 두
-> 프로세스 흐름에서 검증했다. HTTPS·스테이징 활성화는 아직 없다.
+> 심각도 변경과 해소 투영을 검증했다. PRD-0020의 전용 Bearer 인증과 현재·직전 token을
+> 함께 허용하는 수동 교체 구간도 실제 두 프로세스 흐름에서 검증했다. HTTPS·스테이징
+> 활성화는 아직 없다.
 
 ## 왜 BRIEF인가
 
@@ -263,14 +264,20 @@ docker compose up -d --wait postgres
 `BRIEF_EVENT_RECEIVER_BEARER_TOKEN`을 함께 설정한다. 보호 범위는 `POST /api/v1/events`이며
 다른 API의 운영 권한을 의미하지 않는다.
 
+중단 없이 token을 바꿀 때는 BRIEF의 `BRIEF_EVENT_RECEIVER_BEARER_TOKEN`에 새 값을,
+`BRIEF_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN`에 기존 값을 먼저 배포한다. BATON의
+`BATON_BRIEF_BEARER_TOKEN`을 새 값으로 바꾼 뒤 직전 token 설정을 제거한다. 직전 token은
+교체 구간 한 번만 허용하며 비어 있으면 추가 token을 받지 않는다.
+
 PostgreSQL 18 공식 이미지의 데이터 디렉터리에 맞춰 이름 있는 볼륨은
 `/var/lib/postgresql`에 마운트한다.
 
 이 구성은 로컬 개발용이며 운영 배포 구성을 뜻하지 않는다.
 
 현재 검증은 MockMvc 기반 HTTP 통합 테스트, 패키지 JAR의 실제 로컬 HTTP 상태 확인과
-Bearer 인증을 켠 BATON→BRIEF 실행 JAR 전달을 포함한다. 실제 HTTPS 스테이징이나 운영
-배포를 검증한 것은 아니다. 상세한 실행 증거와 남은 범위는 `HANDOFF.md`에 기록한다.
+현재·직전 Bearer를 함께 허용한 BATON→BRIEF 실행 JAR 전달을 포함한다. 실제 HTTPS
+스테이징이나 운영 배포를 검증한 것은 아니다. 상세한 실행 증거와 남은 범위는
+`HANDOFF.md`에 기록한다.
 
 ## 라이선스
 
