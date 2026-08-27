@@ -44,6 +44,10 @@
 - 이벤트 v2의 언어 중립 요청 계약은 `contracts/VERSION`과 JSON Schema·예시를 기준으로
   관리한다. BRIEF 통합 시나리오는 같은 예시를 직접 수신하며 별도 고정 요청을 복제하지
   않는다. RC 계약 팩만으로 BATON 실제 serializer나 종단 간 전달 완료를 주장하지 않는다.
+- BATON 이벤트 수신 인증을 켜면 `POST /api/v1/events`만 전용 Bearer로 보호한다. Spring
+  Security의 표준 Bearer 처리와 stateless filter chain을 사용하고 직접 헤더 파서·세션·
+  사용자 계정·token 저장소를 만들지 않는다. 비밀은 설정·로그·응답·영속 데이터에
+  노출하지 않으며, loopback 밖의 BATON 기본 URL은 HTTPS origin만 허용한다.
 - 수신 증거 조회는 최초 기록의 `processingOutcome`을 반환한다. `DUPLICATE`와
   `CONFLICT`로 이를 덮어쓰지 않고 충돌은 선택적인 최초 탐지 시각으로만 표현하며,
   fingerprint와 원문 payload를 응답에 노출하지 않는다.
@@ -114,7 +118,8 @@
   PRD-0013의 현재 관심 항목 단건 조회, PRD-0014의 현재 활성 관심 항목 키셋 조회,
   PRD-0015의 현재 관심 항목 상태 필터 조회, PRD-0016의 현재 관심 항목 상태 전이 증거
   이력과 PRD-0017의 현재 관심 항목 조건부 조회, PRD-0018의 BATON 생산자 호환성
-  선행조건, PRD-0019의 BATON 연속성 신호 이벤트 v2 및 인증 없는 로컬 MVP 경계를 따른다.
+  선행조건, PRD-0019의 BATON 연속성 신호 이벤트 v2와 PRD-0020의 BATON 이벤트 수신
+  전용 Bearer 경계를 따른다.
   PRD-0008의 직접 동시성 검증 범위는 재구축과 지원 이벤트 수신이며, 에디션 생성·다른
   재구축은 같은 잠금 코드 경로의 근거를 대상 테스트 증거로 확대하지 않는다. 이를 운영
   인증·인가가 결정되거나 외부 공개가 허용된 것으로 확대 해석하지 않는다.

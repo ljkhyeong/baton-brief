@@ -12,8 +12,8 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
   그렇지 않으면 생산자 변경을 명시적인 선행 의존 작업으로 다룬다.
 - PRD-0002를 채택한 로컬 MVP 계약으로 사용한다. 내부 HTTP, v1 세 타입과 v2 다섯 타입,
   최상위 `sourceReference`/`state`, 의미론적 지문 결과와 집계 리비전 규칙을
-  따른다. 운영 인증, 브로커, 생산자 변경과 격리 해제 운영은 채택한 MVP 범위 밖으로
-  유지한다.
+  따른다. PRD-0020의 이벤트 수신 전용 Bearer 외 운영 인증, 브로커와 격리 해제 운영은
+  채택한 MVP 범위 밖으로 유지한다.
 - PRD-0007을 이벤트 식별자별 최초 수신 증거의 읽기 전용 조회 계약으로
   사용한다.
 - PRD-0011을 작업공간·시즌별 이상 수신 증거 이력의 읽기 전용 조회 계약으로 사용한다.
@@ -29,14 +29,18 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
 - BATON 원본 변경과 자동 회차 생성은 신호에 영향을 주는 경로만 같은 트랜잭션 재조정에
   연결한다. 생산자 outbox 송신은 lease와 신호별 리비전 순서를 지키고 같은 event record를
   재사용한다. 실제 두 실행 JAR의 로컬 검증은 원본 API 변경·초기 정합화·
-  outbox→HTTP→PostgreSQL 수렴을 포함한다. 이를 운영 인증·HTTPS·스테이징 완료로 확대하지 않는다.
+  outbox→HTTP→PostgreSQL 수렴을 포함한다. 이를 HTTPS·스테이징 완료로 확대하지 않는다.
 - PRD-0019를 이벤트 v2 소비 기준으로 사용한다. `sourceSeverity`는 v2에 필수이며 최초
   수신 증거와 fingerprint에 보존한다. v1·기존 미지원 기록의 `null`은 그대로 두고 v1
   fingerprint 바이트열을 바꾸지 않는다.
+- PRD-0020을 BATON 이벤트 수신 인증 기준으로 사용한다. 인증을 켠
+  `POST /api/v1/events`만 환경별 전용 Bearer로 보호하고 Spring Security의 표준 token
+  해석·stateless filter chain을 사용한다. token을 직접 파싱·저장·로그하거나 다른 조회·
+  운영 API의 권한으로 확대하지 않는다.
 - `contracts/VERSION`과 `contracts/schemas/source-event.v2.schema.json`을 언어 중립 v2
   요청 계약 팩의 기준으로 사용한다. 현재 RC 예시는 BRIEF 소비자와 BATON 실제
   Java/Jackson serializer·송신기가 함께 사용하고 로컬 원본 API·초기 정합화·실제
-  전달도 검증했다. 운영 인증·HTTPS·스테이징 경계를 확인하기 전에는 안정 버전으로
+  전달과 전용 Bearer도 검증했다. HTTPS·스테이징 경계를 확인하기 전에는 안정 버전으로
   승격하지 않는다.
 - PRD-0008을 현재 보존 기준으로 사용한다. `UNSUPPORTED`를 포함한 모든 최초 수신 기록과
   이벤트별 최초 충돌 한 건은 대체 계약을 채택·마이그레이션·검증하기 전까지
@@ -108,10 +112,13 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
 - 도착 순서에 의존하지 않고 오래된 리비전과 순서가 뒤바뀐 리비전을 테스트한다.
 - 생산자 테스트 고정값을 소비자와 대조해 검증하고 BRIEF 실패가 BATON을 롤백할 수
   없음을 확인한다.
+- 인증 경계를 바꾸면 누락·오류 Bearer의 `401`, 정상 Bearer의 기존 수신 결과와 BATON
+  실제 `RestClient` 헤더를 검증한다. 실제 두 실행 JAR 검증은 Bearer를 켜되 loopback
+  HTTP 결과를 HTTPS·비밀 회전·스테이징 완료로 확대하지 않는다.
 - 계약 팩 예시는 별도 수신 시나리오를 만들지 않고 기존 v2 PostgreSQL 통합 흐름의 실제
   요청 본문으로 사용한다. Schema 검증은 예시 형식만 소유하고 멱등성·충돌·재구축 의미를
   중복 검증하지 않는다.
 - 소비자 고정값이나 기존 WATCH outbox 패턴만으로 BATON→BRIEF 호환 완료를 주장하지
   않는다. outbox 이후의 실제 전달만 확인했다면 원본 변경·초기 정합화부터 시작하는 전체
-  흐름과 운영 인증·HTTPS를 별도 미검증 범위로 남긴다.
+  흐름과 적용할 인증·HTTPS를 별도 미검증 범위로 남긴다.
 - 저장소가 실제로 제공하는 검증 명령만 실행한다.

@@ -8,7 +8,7 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 ## 맥락을 확립한다
 
 - `AGENTS.md`, `HANDOFF.md`, `README.md`, 영향받는 PRD와 관련 ADR을 읽는다.
-- ADR-0002의 다섯 모듈과 PRD-0002부터 PRD-0019까지를 현재 작업 범위로 사용한다. 실제
+- ADR-0002의 다섯 모듈과 PRD-0002부터 PRD-0020까지를 현재 작업 범위로 사용한다. 실제
   구현 상태와 검증 근거는 `HANDOFF.md`에서 확인하고, 확인한 로컬 실행을 외부 연동·운영
   배포로 확대하지 않는다.
 - 이 보완 절차를 사용하기 전에 기존 규칙을 검색하고 가장 좁게 일치하는 BRIEF 스킬을
@@ -36,7 +36,7 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 3. `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap` 다섯
    모듈을 유지한다. 의존은 `bootstrap`/어댑터에서 `application`, 다시 `domain`으로
    향하게 한다. 어댑터끼리 의존하지 않고 내부 모듈은 외부 모듈에 의존하지 않는다.
-4. PRD-0002부터 PRD-0019까지 채택한 인증 없는 내부 로컬 MVP 계약을 따른다. 현재 구현
+4. PRD-0002부터 PRD-0020까지 채택한 내부 로컬 MVP와 이벤트 수신 전용 Bearer 계약을 따른다. 현재 구현
    범위는 `HANDOFF.md`에서 확인한다. 후속 결정이 채택하기 전에 JDK 공급자, 실행 컨테이너
    이미지, 브로커, 스케줄러, 생산자 변경, 외부 시스템 어댑터, 운영 배포 또는 운영
    인증·인가 계약을 가정하지 않는다.
@@ -91,6 +91,9 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 - PRD-0019의 v2는 기존 수신 경로와 모델을 확장하고 BATON `sourceSeverity`를 최초 수신
   증거·fingerprint·재구축에 보존한다. v1의 `null` 심각도를 지문에 새로 넣거나 버전별
   서비스·저장소·DTO를 복제하지 않는다.
+- PRD-0020의 이벤트 수신 인증에는 Spring Security의 표준 Bearer resolver와 stateless
+  filter chain을 사용한다. 직접 헤더 파서·세션·사용자 계정·token 저장소·오류 DTO를
+  만들지 않고, BATON은 Spring `RestClient`의 표준 Bearer 헤더 API를 사용한다.
 - 이벤트 v2 계약 팩은 `contracts/VERSION`을 단일 버전 기준으로 삼고 JSON Schema·예시와
   PRD-0019만 Gradle 표준 `Zip`으로 묶는다. 공유 JVM DTO, 계약 서비스, 별도 배포 플러그인과
   예시 전용 제품 시나리오를 추가하지 않는다.
