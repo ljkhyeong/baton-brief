@@ -50,6 +50,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer
     properties = [
         "brief.event-receiver.authentication-required=true",
         "brief.event-receiver.bearer-token=$EVENT_BEARER_TOKEN",
+        "brief.event-receiver.previous-bearer-token=$PREVIOUS_EVENT_BEARER_TOKEN",
     ],
 )
 @AutoConfigureMockMvc
@@ -1029,6 +1030,21 @@ class BriefMvpIntegrationTest(
                 .content(eventJson(eventId, workspaceId, seasonId, "unauthorized", 1)),
         ).andExpect(status().isUnauthorized)
 
+        mockMvc.perform(
+            post("/api/v1/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $PREVIOUS_EVENT_BEARER_TOKEN")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    eventJson(
+                        "30000000-0000-0000-0000-000000000011",
+                        workspaceId,
+                        seasonId,
+                        "rotation-overlap",
+                        1,
+                    ),
+                ),
+        ).andExpect(status().isAccepted)
+
         postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1, eventVersion = 0))
             .andExpect(status().isBadRequest)
             .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
@@ -1253,3 +1269,4 @@ class BriefMvpIntegrationTest(
 }
 
 private const val EVENT_BEARER_TOKEN = "brief-event-receiver-test-token-00000001"
+private const val PREVIOUS_EVENT_BEARER_TOKEN = "brief-event-receiver-test-token-previous-01"
