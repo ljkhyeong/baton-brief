@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-27
-- 구현 상태: 로컬 생산자·소비자 Bearer 인증과 스테이징 파일 기반 주입 구현 및 검증 완료
+- 구현 상태: 로컬 생산자·소비자 Bearer 인증, 스테이징 파일 주입과 Caddy HTTPS 경계 검증 완료
 - 범위: BATON이 BRIEF `POST /api/v1/events`를 호출할 때 사용하는 서비스 간 인증
 
 ## 목적
@@ -56,12 +56,14 @@ BRIEF는 현재 token과 선택적인 직전 token 한 건만 허용한다. BATO
 ## HTTPS 경계
 
 BATON은 loopback 이외의 BRIEF 기본 URL에 HTTPS origin만 허용하는 기존 검증을 유지한다.
-TLS 종단, 인증서 발급·회전, JDK 신뢰 저장소와 스테이징 주소는 배포 환경이 소유하며
-애플리케이션에 자체 인증서 검증기나 우회 가능한 trust-all client를 추가하지 않는다.
+PRD-0022의 선택적인 Caddy 앞단은 공개 HTTPS에서 `POST /api/v1/events`만 내부 HTTP
+애플리케이션으로 전달한다. TLS 종단과 인증서 상태는 배포 경계가 소유하며 애플리케이션에
+자체 인증서 검증기나 우회 가능한 trust-all client를 추가하지 않는다.
 
 PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secrets와 Spring config tree로
-주입하고 loopback HTTP에서 인증 필수 수신을 확인했다. 실제 HTTPS 스테이징 전달과 비밀
-관리 제품을 이용한 주입·회전은 아직 검증하지 않았다.
+주입한다. 로컬 Caddy 내부 CA를 명시적으로 신뢰한 HTTPS 수신은 검증했지만, 실제 공인 DNS·
+ACME 인증서와 BATON 스테이징 호스트의 원격 전달 및 비밀 관리 제품의 주입·회전은 아직
+검증하지 않았다.
 
 ## 구현 원칙
 
@@ -88,7 +90,7 @@ PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secret
 - BRIEF 조회·에디션·재구축 API의 사용자·운영자 권한 모델
 - OAuth2 authorization server, JWT, token introspection, mTLS와 복수 생산자 권한
 - token 발급·자동 회전과 비밀 관리 제품 선택
-- 공개 DNS, 인증서, 방화벽과 실제 HTTPS 스테이징 활성화
+- 실제 공인 DNS, 방화벽, ACME 인증서 발급과 BATON 원격 스테이징 전달
 - 계약 팩 `2.0.0-rc.1`의 안정 버전 승격
 
 ## 현재 검증
@@ -102,6 +104,9 @@ PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secret
   정합화·재전달·심각도 변경·해소 수렴을 완료했다.
 - 스테이징 컨테이너 조립에서 파일 기반 현재 token으로 기존 v2 계약 예시를 수신하고
   token 없는 요청이 `401`로 거부되는 것을 확인했다.
+- Caddy 내부 CA를 신뢰한 로컬 HTTPS에서 같은 무인증 `401`과 정상 Bearer
+  `202 APPLIED`를 확인했다. Caddy는 인증을 재구현하지 않고 Spring Security 결과를
+  전달했다.
 
 ## 관련 문서
 
@@ -109,3 +114,4 @@ PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secret
 - [BATON 연속성 신호 이벤트 v2](../0019_baton-continuity-event-v2/spec.md)
 - [서비스 간 이벤트 인증 결정](../../ADR/0003_baton-event-authentication/adr.md)
 - [스테이징 실행 계약](../0021_staging-runtime-boundary/spec.md)
+- [HTTPS 이벤트 수신 계약](../0022_https-event-ingress/spec.md)

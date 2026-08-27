@@ -3,7 +3,8 @@
 이 디렉터리는 PRD-0019의 BATON 연속성 신호 이벤트 v2 요청 계약을 언어 중립적인
 JSON Schema와 예시로 제공한다. BRIEF 소비자와 BATON 실제 serializer·outbox·송신기는
 같은 예시를 사용하며, 로컬 원본 API·초기 정합화부터 BRIEF PostgreSQL 수렴까지 검증했다.
-전용 Bearer는 로컬 실제 전달에서 검증했지만 HTTPS·스테이징 활성화가 완료됐다는 뜻은 아니다.
+전용 Bearer와 BRIEF 로컬 Caddy HTTPS 수신은 검증했지만 실제 BATON 원격 스테이징 전달이
+완료됐다는 뜻은 아니다.
 
 ## 포함 파일
 
@@ -14,8 +15,9 @@ JSON Schema와 예시로 제공한다. BRIEF 소비자와 BATON 실제 serialize
 스키마는 개별 필드 형식과 v2 열거형을 정의한다. 같은 `sourceReference`의 리비전 증가,
 `ACTIVE`·`RESOLVED` 생명주기, 멱등성·충돌·HTTP 결과와 재구축 의미는 PRD-0019가 기준이다.
 
-현재 버전 `2.0.0-rc.1`은 로컬 생산자·소비자와 Bearer 인증 호환성을 검증한 사전
-버전이다. HTTPS·스테이징 전달 경계를 검증하기 전에는 안정 버전으로 올리지 않는다.
+현재 버전 `2.0.0-rc.1`은 로컬 생산자·소비자, Bearer 인증과 BRIEF Caddy HTTPS 수신을
+검증한 사전 버전이다. 실제 BATON 스테이징 호스트의 공인 HTTPS 전달 경계를 검증하기
+전에는 안정 버전으로 올리지 않는다.
 
 ## 검증과 생성
 

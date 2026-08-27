@@ -75,8 +75,8 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
 - 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 실제 serializer는 고정한
   예시와 일치하고 송신기도 같은 record를 사용한다. 로컬 원본 API 변경·초기 정합화·
-  outbox→BRIEF 전달과 전용 Bearer는 검증했지만 HTTPS·스테이징 활성화가 남아 있으므로 현재
-  버전은 `2.0.0-rc.1`이다.
+  outbox→BRIEF 전달과 전용 Bearer, BRIEF 로컬 Caddy HTTPS 수신 경계는 검증했다. 실제
+  BATON 스테이징 호스트의 공인 HTTPS 전달이 남아 있으므로 현재 버전은 `2.0.0-rc.1`이다.
 - Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD를
   `baton-brief-contracts-2.0.0-rc.1.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
   배포 플러그인은 만들지 않는다.
@@ -148,8 +148,9 @@ serializer가 계약 팩 예시와 일치하는지 검증했고, 신호별 연�
 HTTP 요청·결과 분류를 구현·검증했다. BATON `d30be0d`에서는 실제 BATON·BRIEF 실행 JAR과
 MySQL 8.4·PostgreSQL 18.4를 연결해 원본 API 변경·초기 정합화·장애 재시도·동일 이벤트
 재전달·심각도 변경·해소 투영을 검증했다. 역순 리비전 차단은 BATON outbox 영속성 테스트가
-담당한다. PRD-0020의 전용 Bearer는 같은 실제 두 프로세스 흐름에서 검증했고,
-HTTPS·스테이징 활성화는 검증하지 않았다.
+담당한다. PRD-0020의 전용 Bearer는 같은 실제 두 프로세스 흐름에서 검증했고 BRIEF 로컬
+Caddy HTTPS 수신 경계도 별도로 확인했다. 실제 BATON 스테이징 호스트의 공인 HTTPS
+전달은 검증하지 않았다.
 
 ## 관련 문서
 

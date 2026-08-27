@@ -9,8 +9,10 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 사용하는 최소 상태 확인, 최초 이벤트 수신 증거의 읽기 전용 단건 조회까지 구현했다.
 > PostgreSQL 통합 테스트와 전체 테스트·실행 JAR 생성, Java 21/PostgreSQL 18.4 실행
 > 점검이 통과했다. PRD-0021의 비루트 실행 이미지, 내부 PostgreSQL과 파일 기반 비밀을
-> 사용하는 최소 스테이징 컨테이너 경계도 구현·검증했다. 공개 HTTPS와 운영 배포는
-> 아직 없다. PRD-0008의 수신 증거 `retain-all`과 동기 전역 원자적 재구축 경계는
+> 사용하는 최소 스테이징 컨테이너 경계도 구현·검증했다. PRD-0022의 선택적인 Caddy
+> 앞단은 로컬 CA를 신뢰한 HTTPS에서 이벤트 수신만 허용하고 다른 경로를 차단함을
+> 확인했다. 실제 공인 DNS·인증서와 운영 배포는 아직 없다. PRD-0008의 수신 증거
+> `retain-all`과 동기 전역 원자적 재구축 경계는
 > 강제 실패 롤백과 재구축·지원 이벤트 수신 잠금 동시성 대상 테스트, 변경 뒤 전체
 > 테스트·실행 JAR 생성으로 검증했다.
 > PRD-0009의 주간 범위 최신 불변 에디션 조회도 구현했고 PostgreSQL 통합 테스트와 전체
@@ -44,7 +46,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 선택 실행 테스트로 원본 API 변경, 초기 정합화, 장애 재시도, 동일 이벤트 재전달,
 > 심각도 변경과 해소 투영을 검증했다. PRD-0020의 전용 Bearer 인증과 현재·직전 token을
 > 함께 허용하는 수동 교체 구간도 실제 두 프로세스 흐름에서 검증했다. BRIEF 스테이징
-> 컨테이너의 파일 기반 Bearer 수신도 확인했지만 공개 HTTPS 전달은 아직 검증하지 않았다.
+> 컨테이너의 파일 기반 Bearer와 로컬 Caddy HTTPS 수신도 확인했지만 실제 BATON 원격
+> 스테이징 전달은 아직 검증하지 않았다.
 
 ## 왜 BRIEF인가
 
@@ -180,15 +183,17 @@ BRIEF가 소유하지 않는다.
 [BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)과
 [BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)과
 [BATON 이벤트 수신 인증 계약](docs/PRD/0020_baton-event-authentication/spec.md)과
-[스테이징 실행 계약](docs/PRD/0021_staging-runtime-boundary/spec.md)을
+[스테이징 실행 계약](docs/PRD/0021_staging-runtime-boundary/spec.md)과
+[HTTPS 이벤트 수신 계약](docs/PRD/0022_https-event-ingress/spec.md)을
 따른다.
 이벤트 수신 외의 인증·인가, 브로커, 스케줄러와 공개 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 이벤트 v2 계약 팩
 
 [이벤트 계약 팩](contracts/README.md)은 BATON 생산자가 사용할 v2 요청 JSON Schema와
-다섯 신호·심각도 변경·해소 예시를 제공한다. 현재 `2.0.0-rc.1`은 로컬 생산자·소비자와
-Bearer 인증까지 검증한 사전 버전이다. 실제 HTTPS 스테이징 호환 완료를 뜻하지 않는다.
+다섯 신호·심각도 변경·해소 예시를 제공한다. 현재 `2.0.0-rc.1`은 로컬 생산자·소비자,
+Bearer 인증과 BRIEF 로컬 Caddy HTTPS 수신까지 검증한 사전 버전이다. 실제 BATON 원격
+스테이징 호환 완료를 뜻하지 않는다.
 
 ```shell
 ./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefEventContractTest'
@@ -220,11 +225,13 @@ Bearer 인증까지 검증한 사전 버전이다. 실제 HTTPS 스테이징 호
 - [BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)
 - [BATON 이벤트 수신 인증 계약](docs/PRD/0020_baton-event-authentication/spec.md)
 - [스테이징 실행 계약](docs/PRD/0021_staging-runtime-boundary/spec.md)
+- [HTTPS 이벤트 수신 계약](docs/PRD/0022_https-event-ingress/spec.md)
 - [이벤트 v2 계약 팩](contracts/README.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
 - [BATON 이벤트 전용 Bearer 인증](docs/ADR/0003_baton-event-authentication/adr.md)
 - [스테이징 컨테이너 실행 경계](docs/ADR/0004_staging-container-runtime/adr.md)
+- [Caddy 이벤트 수신 HTTPS 앞단](docs/ADR/0005_caddy-event-ingress/adr.md)
 - [인수인계](HANDOFF.md)
 
 ## 기술 스택
@@ -245,8 +252,9 @@ ADR-0002에서 다음 기준을 채택했다.
 
 Java 25 호환 빌드와 기동은 검토 과정에서 확인했지만 MVP에 필요한 기능상 이점이 없어
 Java 21을 채택했다. 스테이징 컨테이너는 재현성을 위해 Eclipse Temurin 21.0.11+10
-JDK/JRE 이미지를 digest로 고정한다. 공개 HTTPS와 장기 운영 배포 방식은 아직 채택하지
-않았다. 현재 구현·검증 상태는 `HANDOFF.md`에 기록한다.
+JDK/JRE 이미지를 digest로 고정한다. 선택적인 이벤트 수신 HTTPS 앞단은 Caddy 2.11.4
+Alpine 이미지를 digest로 고정한다. 실제 공인 DNS·방화벽과 장기 운영 배포 방식은 아직
+채택하지 않았다. 현재 구현·검증 상태는 `HANDOFF.md`에 기록한다.
 
 ## 로컬 데이터베이스
 
@@ -278,10 +286,10 @@ PostgreSQL 18 공식 이미지의 데이터 디렉터리에 맞춰 이름 있는
 
 이 구성은 로컬 개발용이며 운영 배포 구성을 뜻하지 않는다.
 
-현재 검증은 MockMvc 기반 HTTP 통합 테스트, 패키지 JAR의 실제 로컬 HTTP 상태 확인과
-현재·직전 Bearer를 함께 허용한 BATON→BRIEF 실행 JAR 전달을 포함한다. 실제 HTTPS
-스테이징이나 운영 배포를 검증한 것은 아니다. 상세한 실행 증거와 남은 범위는
-`HANDOFF.md`에 기록한다.
+현재 검증은 MockMvc 기반 HTTP 통합 테스트, 패키지 JAR의 실제 로컬 HTTP 상태 확인,
+현재·직전 Bearer를 함께 허용한 BATON→BRIEF 실행 JAR 전달과 BRIEF 로컬 Caddy HTTPS
+수신을 포함한다. 실제 BATON 원격 스테이징이나 운영 배포를 검증한 것은 아니다. 상세한
+실행 증거와 남은 범위는 `HANDOFF.md`에 기록한다.
 
 ## 스테이징 실행
 
@@ -295,8 +303,17 @@ docker compose --env-file .env.staging -f compose.staging.yml up --build -d --wa
 ```
 
 PostgreSQL은 호스트 포트를 열지 않고 BRIEF HTTP는 기본 `127.0.0.1:8080`에만 바인딩한다.
-공개 HTTPS reverse proxy는 이 loopback origin 앞에 별도로 배치한다. 저장소의
-`compose.staging.yml`은 DNS, 인증서, 방화벽, 백업과 실제 BATON 공개 전달을 구성하지 않는다.
+공개 호스트가 준비된 환경에서는 `.env.staging`의 `BRIEF_STAGING_HOST`를 실제 DNS
+호스트로 바꾸고 Caddy profile을 명시적으로 활성화한다.
+
+```shell
+docker compose --env-file .env.staging -f compose.staging.yml --profile https config --quiet
+docker compose --env-file .env.staging -f compose.staging.yml --profile https up --build -d --wait
+```
+
+Caddy는 외부에서 정확한 `POST /api/v1/events`만 전달하고 다른 경로는 `404`로 끝낸다.
+Bearer 판정은 계속 Spring Security가 담당한다. 저장소의 `compose.staging.yml`은 실제
+DNS·방화벽, 공인 인증서 발급 성공, 백업과 BATON 원격 전달까지 구성하거나 검증하지 않는다.
 
 ## 라이선스
 

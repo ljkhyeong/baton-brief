@@ -70,18 +70,25 @@ MySQL 8.4·PostgreSQL 18.4를 함께 기동해 원본 API 변경·초기 정합�
 재현한 동일 이벤트 `200`, 심각도 변경과 `RESOLVED` 투영을 확인했다. PRD-0020의 전용
 Bearer와 BRIEF의 새 token·직전 token 중첩 구간도 같은 실제 두 프로세스 흐름에서
 검증했다. 역순 리비전 차단은 BATON outbox 영속성 테스트가 담당하며 HTTPS·스테이징
-활성화는 포함하지 않는다.
+활성화는 이 교차 서비스 실행에 포함하지 않는다. BRIEF 로컬 Caddy HTTPS 수신은 별도
+조립에서 확인했다.
 
 BATON `7731654`·`7c5c4ac`·`7ab64ba`는 기존 프로덕션 Compose에 BRIEF HTTPS origin,
 명시적 재조정 주기와 소유자 전용 Bearer 파일의 Spring config tree 주입을 연결하고
-사전점검·운영 문서를 갱신했다. BRIEF 서비스의 스테이징 배포와 실제 공개 HTTPS 전달은
-여전히 검증하지 않았다.
+사전점검·운영 문서를 갱신했다. BRIEF의 로컬 Caddy HTTPS 수신 경계는 검증했지만 BATON
+스테이징 호스트에서 실제 공개 주소로 보내는 전달은 여전히 검증하지 않았다.
 
 PRD-0021에서 digest로 고정한 Java 21 실행 이미지, 비루트·읽기 전용 BRIEF 컨테이너,
 호스트 포트를 열지 않는 PostgreSQL 18.4와 파일 기반 데이터베이스·현재·직전 Bearer
 secret을 조립했다. loopback HTTP에서 aggregate health `UP`, 무인증 수신 `401`과 계약 팩
-v2 예시의 정상 Bearer `APPLIED`를 확인했다. 공개 HTTPS와 BATON 스테이징 전달은 아직
-검증하지 않았다.
+v2 예시의 정상 Bearer `APPLIED`를 확인했다.
+
+PRD-0022에서 digest로 고정한 Caddy 2.11.4의 선택적인 `https` profile을 추가했다. 외부에는
+정확한 `POST /api/v1/events`만 전달하고 다른 경로는 `404`로 종료하며, Authorization은
+Spring Security가 판정하고 Caddy 접근 로그에서는 제거한다. 로컬 Caddy 내부 CA를
+`curl --cacert`로 신뢰한 HTTPS에서 무인증 `401`, 정상 Bearer `202 APPLIED`, 외부
+`/actuator/health` `404`를 확인했다. 실제 공인 DNS·ACME 인증서와 BATON 원격 스테이징
+전달은 아직 검증하지 않았다.
 
 PRD-0020 인증 변경 뒤 BRIEF `./gradlew --no-daemon clean test :bootstrap:bootJar`, BATON
 `./gradlew --no-daemon clean build`와 다음 선택 실행 검증이 모두 성공했다.
@@ -151,10 +158,12 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   `ruleVersion`은 조회 필터가 아니며 저장된 값을 응답에 포함한다.
 - PRD-0020에서 `POST /api/v1/events`의 선택적 전용 Bearer 인증, 현재·직전 token 한 건의
   수동 교체 구간과 loopback 밖 HTTPS origin 경계를 채택했다. 다른 조회·운영 API의 권한과
-  실제 HTTPS 스테이징은 아직 미결정이다.
+  실제 BATON 원격 스테이징 전달은 아직 미검증이다.
 - PRD-0021에서 외부 reverse proxy 앞의 loopback HTTP 스테이징 실행 이미지, 내부
-  PostgreSQL과 파일 기반 Compose secrets 경계를 채택했다. DNS·인증서·방화벽·백업과
-  실제 공개 HTTPS 전달은 포함하지 않는다.
+  PostgreSQL과 파일 기반 Compose secrets 경계를 채택했다. 공인 DNS·방화벽·백업과
+  실제 BATON 원격 전달은 포함하지 않는다.
+- PRD-0022에서 선택적인 Caddy HTTPS 앞단과 이벤트 수신 단일 경로 허용 목록을 채택했다.
+  로컬 내부 CA 검증은 완료했지만 공인 DNS·ACME 발급과 BATON 원격 전달은 포함하지 않는다.
 - PRD-0010에서 새 에디션 항목의 집계 리비전·리비전 공백 근거를 응답,
   `stateFingerprint`와 비교 `changed` 판정에 포함하는 계약을 채택했다. Flyway V3 이전
   항목은 정확한 근거가 없으므로 두 값을 `null`로 유지하고 `0`·`false`로 기존 데이터를
@@ -188,7 +197,8 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   트랜잭션 연결을 검증했다. BATON V23의 lease·신호별 순서·재시도 전달 상태와 기본 비활성
   HTTP 송신기도 구현·검증했다. BATON `d30be0d`은 실제 두 실행 JAR과 두 데이터베이스에서
   원본 API 변경·초기 정합화·장애 재시도·동일 재전달·심각도·해소 수렴을 검증했다.
-  다음 진입점은 실제 공개 HTTPS 전달 검증과 계약 팩 안정 버전 승격이다.
+  다음 진입점은 실제 BATON 스테이징 호스트의 공인 HTTPS 전달 검증과 계약 팩 안정 버전
+  승격이다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -418,27 +428,39 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - 스테이징 loopback HTTP 확인: aggregate health `UP`, Bearer 없는 계약 예시 `401`, 파일
   기반 현재 Bearer로 같은 v2 예시 `APPLIED`
 - 실행 컨테이너 검사: 사용자 `10001:10001`, 읽기 전용 루트 파일시스템 확인
+- `docker compose --env-file <임시 환경 파일> -f compose.staging.yml --profile https config --quiet`와
+  `caddy validate`: Compose 및 Caddy 설정 유효성 확인
+- 같은 `https` profile을 비기본 host port와 `BRIEF_STAGING_HOST=localhost`로 기동하고
+  Caddy 내부 CA 루트를 `curl --cacert`로 신뢰: 무인증 이벤트 `401`, 파일 기반 현재
+  Bearer의 계약 팩 v2 예시 `202 APPLIED`, 외부 `/actuator/health` `404` 확인
+- Caddy 접근 로그에 Authorization 헤더가 없고 컨테이너가 읽기 전용 루트와
+  `no-new-privileges`를 사용하는지 확인
+- `./gradlew --no-daemon test :bootstrap:bootJar`: HTTPS 조립 변경 뒤 저장소 전체 테스트와
+  실행 JAR 생성 성공
 
 실제 로컬 소켓을 통한 패키지 JAR의 Tomcat·Flyway·DataSource·aggregate health 결합은
 확인했다. 제품 HTTP 계약과 영속성 동작은 위 PostgreSQL Testcontainers·MockMvc 통합
 시나리오가 담당하므로 같은 제품 시나리오를 네트워크로 반복하지 않았다. 이후 실제 BATON·
-BRIEF 실행 JAR과 두 데이터베이스에서 전용 Bearer를 포함한 원본 수렴도 확인했다. HTTPS·
-스테이징과 이벤트 수신 외 API의 인증·인가는 검증 범위가 아니다.
+BRIEF 실행 JAR과 두 데이터베이스에서 전용 Bearer를 포함한 원본 수렴도 확인했다. BRIEF
+로컬 Caddy HTTPS 수신 경계는 확인했지만 BATON 원격 스테이징 전달과 이벤트 수신 외 API의
+인증·인가는 검증 범위가 아니다.
 
 검증 뒤 `baton-brief-smoke` 애플리케이션 프로세스와 스테이징 검증용 컨테이너를 정상
-종료하고, 이번 검증에서 만든 Compose 컨테이너·네트워크·이름 있는 볼륨과 임시 비밀을
-모두 제거했다.
+종료하고, 이번 검증에서 만든 Compose 컨테이너·네트워크·이름 있는 PostgreSQL·Caddy
+볼륨, 내부 CA와 임시 비밀을 모두 제거했다.
 
 ## 현재 제한
 
-- 로컬 MVP와 최소 스테이징 컨테이너 경계까지 구현했다. 공개 운영 준비는 완료하지 않았다.
+- 로컬 MVP, 최소 스테이징 컨테이너와 로컬 Caddy HTTPS 수신 경계까지 구현했다. 공개 운영
+  준비는 완료하지 않았다.
 - WATCH, RELAY, GO 생산자와의 종단 간 연동은 없다. BATON은 로컬 선택 실행 테스트에서
   실제 두 프로세스와 두 데이터베이스로 원본 API·초기 정합화→HTTP→BRIEF PostgreSQL
-  수렴, 전용 Bearer와 직전 token 중첩 교체를 검증했다. BATON 프로덕션 설정 주입은
-  연결했고 BRIEF 스테이징 컨테이너도 검증했지만 공개 HTTPS 전달 검증은 남아 있다.
+  수렴, 전용 Bearer와 직전 token 중첩 교체를 검증했다. BATON 프로덕션 설정 주입과 BRIEF
+  로컬 Caddy HTTPS 수신은 확인했지만 실제 두 스테이징 호스트 사이의 공인 HTTPS 전달
+  검증은 남아 있다.
 - 브로커, 스케줄러와 이벤트 수신 외 API의 운영 인증·인가 계약은 없다.
 - 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관은 구현하지 않았다. 숫자 보존 기간,
   용량 상한, 재구축 SLO·잠금 제한 시간, 체크포인트와 운영 복구 목표도 미결정이다.
-- 스테이징 컨테이너는 Eclipse Temurin 21.0.11+10으로 고정했다. 공개 TLS, 장기 운영 배포와
-  이미지 registry 구성은 없다.
+- 스테이징 컨테이너는 Eclipse Temurin 21.0.11+10, HTTPS 앞단은 Caddy 2.11.4로 고정했다.
+  실제 공인 DNS·ACME 인증서, 장기 운영 배포와 이미지 registry 구성은 없다.
 - GitHub Actions와 릴리스 정책은 아직 없다.
