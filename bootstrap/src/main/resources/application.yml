@@ -11,6 +11,10 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+brief:
+  event-receiver:
+    authentication-required: ${BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED:false}
+    bearer-token: ${BRIEF_EVENT_RECEIVER_BEARER_TOKEN:}
 management:
   endpoints:
     web:
