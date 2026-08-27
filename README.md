@@ -41,7 +41,8 @@ BATON BRIEF는 BATON 생태계에서 발생한 운영 사실을 설명 가능한
 > 트랜잭션 재조정에 연결했다. V23의 lease·신호별 리비전 순서·재시도 상태와 기본 비활성
 > HTTP 송신기도 구현·검증했다. 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL을 연결한
 > 선택 실행 테스트로 원본 API 변경, 초기 정합화, 장애 재시도, 동일 이벤트 재전달,
-> 심각도 변경과 해소 투영을 검증했다. 운영 인증·HTTPS·스테이징 활성화는 아직 없다.
+> 심각도 변경과 해소 투영을 검증했다. PRD-0020의 전용 Bearer 인증도 같은 실제 두
+> 프로세스 흐름에서 검증했다. HTTPS·스테이징 활성화는 아직 없다.
 
 ## 왜 BRIEF인가
 
@@ -111,7 +112,8 @@ BRIEF가 소유하지 않는다.
 
 ## 채택한 로컬 계약
 
-- 인증 없는 내부 HTTP로 이벤트 v1·v2를 수신한다.
+- 내부 HTTP로 이벤트 v1·v2를 수신하며, 운영 연동에서는 PRD-0020의 전용 Bearer를
+  선택적으로 필수화한다.
 - v1 세 타입은 기존 규칙을 유지하고, v2의 BATON 다섯 연속성 신호는 원본
   `CRITICAL`·`WARNING`을 보존해 `HIGH`·`MEDIUM`으로 일대일 표시한다.
 - 이벤트 지문과 집계 리비전으로 `DUPLICATE`, `CONFLICT`, `STALE`과 리비전 공백을 구분한다.
@@ -174,15 +176,16 @@ BRIEF가 소유하지 않는다.
 [현재 관심 항목 상태 전이 증거 이력 계약](docs/PRD/0016_attention-item-transitions/spec.md)과
 [현재 관심 항목 조건부 조회 계약](docs/PRD/0017_current-attention-item-etag/spec.md)과
 [BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)과
-[BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)을
+[BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)과
+[BATON 이벤트 수신 인증 계약](docs/PRD/0020_baton-event-authentication/spec.md)을
 따른다.
-인증·인가, 브로커, 스케줄러, 생산자 변경과 운영 배포는 첫 MVP 범위가 아니다.
+이벤트 수신 외의 인증·인가, 브로커, 스케줄러와 운영 배포는 첫 MVP 범위가 아니다.
 
 ## 이벤트 v2 계약 팩
 
 [이벤트 계약 팩](contracts/README.md)은 BATON 생산자가 사용할 v2 요청 JSON Schema와
-다섯 신호·심각도 변경·해소 예시를 제공한다. 현재 `2.0.0-rc.1`은 BRIEF 소비자만 검증한
-사전 버전이며 BATON 생산자 호환 완료를 뜻하지 않는다.
+다섯 신호·심각도 변경·해소 예시를 제공한다. 현재 `2.0.0-rc.1`은 로컬 생산자·소비자와
+Bearer 인증까지 검증한 사전 버전이다. 실제 HTTPS 스테이징 호환 완료를 뜻하지 않는다.
 
 ```shell
 ./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefEventContractTest'
@@ -212,9 +215,11 @@ BRIEF가 소유하지 않는다.
 - [현재 관심 항목 조건부 조회 계약](docs/PRD/0017_current-attention-item-etag/spec.md)
 - [BATON 생산자 호환성 선행조건](docs/PRD/0018_baton-producer-compatibility/spec.md)
 - [BATON 연속성 신호 이벤트 v2 소비 계약](docs/PRD/0019_baton-continuity-event-v2/spec.md)
+- [BATON 이벤트 수신 인증 계약](docs/PRD/0020_baton-event-authentication/spec.md)
 - [이벤트 v2 계약 팩](contracts/README.md)
 - [마이크로서비스 경계](docs/ADR/0001_microservice-boundary/adr.md)
 - [기술 스택과 모듈 경계](docs/ADR/0002_technology-stack/adr.md)
+- [BATON 이벤트 전용 Bearer 인증](docs/ADR/0003_baton-event-authentication/adr.md)
 - [인수인계](HANDOFF.md)
 
 ## 기술 스택
@@ -253,14 +258,19 @@ docker compose up -d --wait postgres
 `SPRING_FLYWAY_ENABLED`로 덮어쓴다. `BRIEF_DB_PORT`는 Compose가 호스트에 공개할 PostgreSQL
 포트만 바꾸며, 바꾼 경우 데이터 원본 URL도 같은 포트로 지정해야 한다.
 
+이벤트 수신 인증은 로컬에서 기본 비활성이다. 활성화하려면
+`BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED=true`와 32~200자의 URL-safe ASCII
+`BRIEF_EVENT_RECEIVER_BEARER_TOKEN`을 함께 설정한다. 보호 범위는 `POST /api/v1/events`이며
+다른 API의 운영 권한을 의미하지 않는다.
+
 PostgreSQL 18 공식 이미지의 데이터 디렉터리에 맞춰 이름 있는 볼륨은
 `/var/lib/postgresql`에 마운트한다.
 
 이 구성은 로컬 개발용이며 운영 배포 구성을 뜻하지 않는다.
 
-현재 검증은 MockMvc 기반 HTTP 통합 테스트와 패키지 JAR의 실제 로컬 HTTP 상태 확인을
-포함한다. 실제 BATON 생산자 연동이나 운영 배포를 검증한 것은 아니다. 상세한 실행 증거와
-남은 범위는 `HANDOFF.md`에 기록한다.
+현재 검증은 MockMvc 기반 HTTP 통합 테스트, 패키지 JAR의 실제 로컬 HTTP 상태 확인과
+Bearer 인증을 켠 BATON→BRIEF 실행 JAR 전달을 포함한다. 실제 HTTPS 스테이징이나 운영
+배포를 검증한 것은 아니다. 상세한 실행 증거와 남은 범위는 `HANDOFF.md`에 기록한다.
 
 ## 라이선스
 

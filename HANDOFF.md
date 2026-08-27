@@ -67,8 +67,21 @@ PRD-0019에서 기존 v1을 보존하면서 BATON 다섯 신호와 필수 `sourc
 구현·검증했다. BATON `d30be0d`의 선택 실행 테스트는 실제 BATON·BRIEF 실행 JAR과
 MySQL 8.4·PostgreSQL 18.4를 함께 기동해 원본 API 변경·초기 정합화·BRIEF 수신·현재
 투영까지 연결했다. BRIEF 미기동 네트워크 실패의 재시도, 최초 `202`, 응답 유실 상태를
-재현한 동일 이벤트 `200`, 심각도 변경과 `RESOLVED` 투영을 확인했다. 역순 리비전 차단은 BATON
-outbox 영속성 테스트가 담당하며 운영 인증·HTTPS·스테이징 활성화는 포함하지 않는다.
+재현한 동일 이벤트 `200`, 심각도 변경과 `RESOLVED` 투영을 확인했다. PRD-0020의 전용
+Bearer도 같은 실제 두 프로세스 흐름에서 검증했다. 역순 리비전 차단은 BATON outbox
+영속성 테스트가 담당하며 HTTPS·스테이징 활성화는 포함하지 않는다.
+
+PRD-0020 인증 변경 뒤 BRIEF `./gradlew --no-daemon clean test :bootstrap:bootJar`, BATON
+`./gradlew --no-daemon clean build`와 다음 선택 실행 검증이 모두 성공했다.
+
+```bash
+./gradlew --no-daemon :application:briefCrossServiceTest \
+  -PbriefBootJar=/absolute/path/to/baton-brief.jar
+```
+
+선택 실행 검증은 BRIEF 이벤트 수신 인증을 필수화하고 BATON `RestClient`에 같은 전용
+Bearer를 주입한 실제 두 실행 JAR과 MySQL 8.4·PostgreSQL 18.4를 사용했다. loopback HTTP
+검증이므로 TLS 인증서·신뢰 저장소·스테이징 주소와 비밀 회전은 입증하지 않는다.
 
 이후 `contracts/VERSION`의 `2.0.0-rc.1`, Draft 2020-12 JSON Schema와 생산 의미가 반영된
 예시를 추가했다. 기존 v2 통합 시나리오가 이 예시를 직접 요청 본문으로 사용하며 Gradle
@@ -105,7 +118,7 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   있도록 wrapper는 9.2.1을 유지한다.
 - 모듈은 `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap`
   다섯 개이며 의존은 어댑터에서 `application`, 다시 `domain` 쪽으로만 향한다.
-- PRD-0002에서 인증 없는 내부 HTTP API, 이벤트 v1 봉투와 결과, 규칙 v1 투영,
+- PRD-0002에서 내부 HTTP API, 이벤트 v1 봉투와 결과, 규칙 v1 투영,
   리비전 공백/오래된 리비전 처리, 재구축과 불변 주간 에디션 계약을 채택했다.
 - PRD-0003에서 작업공간·시즌별 에디션 요약을 `generation` 배타 키셋으로 조회하는 내부
   HTTP 계약을 채택했다.
@@ -123,6 +136,8 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 - PRD-0009에서 작업공간·시즌·`weekStart`·`zoneId`가 정확히 같은 범위의 최대
   `generation` 에디션을 저장된 불변 스냅샷으로 반환하는 별도 조회 계약을 채택했다.
   `ruleVersion`은 조회 필터가 아니며 저장된 값을 응답에 포함한다.
+- PRD-0020에서 `POST /api/v1/events`의 선택적 전용 Bearer 인증과 loopback 밖 HTTPS origin
+  경계를 채택했다. 다른 조회·운영 API의 권한과 실제 HTTPS 스테이징은 아직 미결정이다.
 - PRD-0010에서 새 에디션 항목의 집계 리비전·리비전 공백 근거를 응답,
   `stateFingerprint`와 비교 `changed` 판정에 포함하는 계약을 채택했다. Flyway V3 이전
   항목은 정확한 근거가 없으므로 두 값을 `null`로 유지하고 `0`·`false`로 기존 데이터를
@@ -156,7 +171,7 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
   트랜잭션 연결을 검증했다. BATON V23의 lease·신호별 순서·재시도 전달 상태와 기본 비활성
   HTTP 송신기도 구현·검증했다. BATON `d30be0d`은 실제 두 실행 JAR과 두 데이터베이스에서
   원본 API 변경·초기 정합화·장애 재시도·동일 재전달·심각도·해소 수렴을 검증했다.
-  다음 진입점은 운영 인증·HTTPS·스테이징 활성화와 계약 팩 안정 버전 승격이다.
+  다음 진입점은 실제 HTTPS·스테이징 활성화와 계약 팩 안정 버전 승격이다.
 - 로컬 PostgreSQL 18.4 `compose.yml`을 추가했다. 애플리케이션 기본값은 이 데이터베이스에
   연결하고 Flyway를 활성화하며, 다른 환경은 Spring Boot 표준 데이터 원본/Flyway
   환경변수로 덮어쓴다.
@@ -384,8 +399,9 @@ Flyway V5에서 제거했다. 최초 수신 증거의 `source_event_receipt.rece
 
 실제 로컬 소켓을 통한 패키지 JAR의 Tomcat·Flyway·DataSource·aggregate health 결합은
 확인했다. 제품 HTTP 계약과 영속성 동작은 위 PostgreSQL Testcontainers·MockMvc 통합
-시나리오가 담당하므로 같은 제품 시나리오를 네트워크로 반복하지 않았다. BATON 생산자와의
-외부 종단 간 연동, 인증·인가와 운영 배포는 검증 범위가 아니다.
+시나리오가 담당하므로 같은 제품 시나리오를 네트워크로 반복하지 않았다. 이후 실제 BATON·
+BRIEF 실행 JAR과 두 데이터베이스에서 전용 Bearer를 포함한 원본 수렴도 확인했다. HTTPS·
+스테이징과 이벤트 수신 외 API의 인증·인가는 검증 범위가 아니다.
 
 검증 뒤 `baton-brief-smoke` 애플리케이션 프로세스를 정상 종료하고, 이번 검증에서 만든
 Compose 컨테이너·네트워크·이름 있는 볼륨을 모두 제거했다.
@@ -395,8 +411,8 @@ Compose 컨테이너·네트워크·이름 있는 볼륨을 모두 제거했다.
 - 로컬 MVP만 구현했다. 운영 준비와 배포 검증은 완료하지 않았다.
 - WATCH, RELAY, GO 생산자와의 종단 간 연동은 없다. BATON은 로컬 선택 실행 테스트에서
   실제 두 프로세스와 두 데이터베이스로 원본 API·초기 정합화→HTTP→BRIEF PostgreSQL
-  수렴을 검증했다. 운영 인증·HTTPS·스테이징 활성화는 남아 있다.
-- 브로커, 스케줄러, 외부 시스템 연동 어댑터와 운영 인증·인가 계약은 없다.
+  수렴과 전용 Bearer를 검증했다. HTTPS·스테이징 활성화는 남아 있다.
+- 브로커, 스케줄러와 이벤트 수신 외 API의 운영 인증·인가 계약은 없다.
 - 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관은 구현하지 않았다. 숫자 보존 기간,
   용량 상한, 재구축 SLO·잠금 제한 시간, 체크포인트와 운영 복구 목표도 미결정이다.
 - 특정 JDK 공급자, 실행 컨테이너 이미지와 운영 배포 구성은 없다.

@@ -71,8 +71,9 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest` | PRD-0009의 정확한 주간 범위 최신 에디션 조회 |
 | `GET` | `/api/v1/editions/{id}` | 불변 에디션 단건 조회 |
 
-로컬 MVP의 엔드포인트는 인증 없는 내부 API다. 호출자가 전달한 작업공간·시즌에
-대한 권한을 BRIEF가 자체 판정하지 않는다.
+로컬 MVP의 엔드포인트는 기본적으로 인증 없는 내부 API다. PRD-0020에 따라
+`POST /api/v1/events`만 전용 Bearer를 선택적으로 필수화할 수 있다. 호출자가 전달한
+작업공간·시즌의 사용자·운영자 권한은 BRIEF가 자체 판정하지 않는다.
 
 ## 이벤트 v1·v2
 
