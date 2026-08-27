@@ -1,0 +1,94 @@
+name: baton-brief-staging
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${BRIEF_STAGING_DB_NAME:-baton_brief}"
+      POSTGRES_USER: "${BRIEF_STAGING_DB_USERNAME:-brief}"
+      POSTGRES_PASSWORD_FILE: /run/secrets/brief-database-password
+    secrets:
+      - source: brief_database_password
+        target: brief-database-password
+    volumes:
+      - brief-staging-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - data
+    logging: *default-logging
+
+  brief:
+    image: "${BRIEF_STAGING_IMAGE:-baton-brief:staging}"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    environment:
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${BRIEF_STAGING_DB_NAME:-baton_brief}"
+      SPRING_DATASOURCE_USERNAME: "${BRIEF_STAGING_DB_USERNAME:-brief}"
+      BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED: "true"
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 30s
+      TZ: UTC
+    secrets:
+      - source: brief_database_password
+        target: spring.datasource.password
+      - source: brief_event_receiver_bearer_token
+        target: brief.event-receiver.bearer-token
+      - source: brief_event_receiver_previous_bearer_token
+        target: brief.event-receiver.previous-bearer-token
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${BRIEF_STAGING_HTTP_BIND:-127.0.0.1}:${BRIEF_STAGING_HTTP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - data
+      - edge
+    logging: *default-logging
+
+networks:
+  data:
+    internal: true
+  edge:
+
+volumes:
+  brief-staging-postgres-data:
+
+secrets:
+  brief_database_password:
+    file: "${BRIEF_STAGING_DATABASE_PASSWORD_FILE:?BRIEF_STAGING_DATABASE_PASSWORD_FILE is required}"
+  brief_event_receiver_bearer_token:
+    file: "${BRIEF_STAGING_EVENT_RECEIVER_BEARER_TOKEN_FILE:?BRIEF_STAGING_EVENT_RECEIVER_BEARER_TOKEN_FILE is required}"
+  brief_event_receiver_previous_bearer_token:
+    file: "${BRIEF_STAGING_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN_FILE:?BRIEF_STAGING_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN_FILE is required}"
