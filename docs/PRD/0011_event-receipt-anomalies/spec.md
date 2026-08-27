@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-20
-- 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 작업공간·시즌별 과거 이상 수신 증거의 읽기 전용 키셋 조회
 
 ## 목적
@@ -135,27 +134,3 @@ fingerprint, 원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 �
   나타나며, 커서를 스냅샷 토큰으로 해석하지 않는다.
 - 응답은 PRD-0007의 안전한 필드만 포함하고 fingerprint와 원문 payload를 노출하지 않는다.
 - 조회 전후에 수신 기록, 충돌 증거, 투영과 에디션 저장 상태가 바뀌지 않는다.
-
-## 현재 구현과 검증
-
-기존 `SourceEventReceipt` 항목 표현과 `source_event_receipt`·`source_event_conflict`를
-재사용해 로컬 조회를 구현했다. 별도 수신 증거 항목 DTO, Flyway 마이그레이션과 인덱스를
-추가하지 않았다.
-
-기존 `ingestion distinguishes duplicate conflict unsupported stale and gap` PostgreSQL 통합
-시나리오를 확장해 다음을 확인했다. 새 테스트 메서드는 추가하지 않았다.
-
-- `APPLIED` 최초 수신과 같은 이벤트의 `DUPLICATE` 직후에는 목록이 비어 있다.
-- 후속 충돌 뒤에는 최초 `processingOutcome`이 `APPLIED`인 기록도
-  `conflictDetectedAt`과 함께 포함된다.
-- 첫 페이지가 수신 순서 `4`, `3`의 `UNSUPPORTED`, `APPLIED_WITH_GAP`을 반환하고,
-  배타 커서 `beforeIngestionSequence=3`인 다음 페이지가 순서 `2`, `1`의 `STALE`,
-  충돌이 있는 `APPLIED`를 반환한다.
-- 다른 시즌과 다른 작업공간 범위는 `200 OK`의 빈 목록을 반환한다.
-
-`./gradlew --no-daemon clean test :bootstrap:bootJar`가 성공해 전체 테스트와 실행 JAR
-생성을 확인했다.
-
-첫 페이지와 다음 페이지 요청 사이에 새 충돌이 추가되는 별도 동시·중간 페이지 시나리오는
-직접 실행하지 않았다. 요청 간 스냅샷을 보장하지 않고 최신 상태를 첫 페이지부터 다시
-조회하는 의미는 이 계약의 명시적 한계다.

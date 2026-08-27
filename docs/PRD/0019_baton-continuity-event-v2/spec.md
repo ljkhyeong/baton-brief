@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: BRIEF `2.0.0-rc.2` 소비자·계약 팩 로컬 검증 완료, BATON 생산자·로컬 종단 간 교차 검증은 `2.0.0-rc.1`까지 완료
 - 범위: 기존 내부 이벤트 수신 경로에서 BATON의 권위 있는 다섯 연속성 신호를 v1과 함께 수용하는 계약
 
 ## 목적
@@ -74,9 +73,8 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
 - 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. 현재 `2.0.0-rc.2`는 BRIEF 소비자의
-  입력 계약 엄격화까지 반영한다. BATON 실제 serializer와 같은 record를 사용하는 송신기의
-  교차 검증은 `2.0.0-rc.1`까지 완료했다. `2.0.0-rc.2` 생산자 재검증과 실제 BATON
-  스테이징 호스트의 공인 HTTPS 전달은 남아 있다.
+  입력 계약 엄격화까지 반영한다. BATON 생산자는 같은 버전을 고정해 실제 serializer와
+  송신 경계를 검증해야 한다.
 - Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD를
   `baton-brief-contracts-2.0.0-rc.2.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
   배포 플러그인은 만들지 않는다.

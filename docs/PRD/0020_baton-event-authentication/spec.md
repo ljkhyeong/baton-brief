@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-27
-- 구현 상태: 로컬 생산자·소비자 Bearer 인증, 스테이징 파일 주입과 Caddy HTTPS 경계 검증 완료
 - 범위: BATON이 BRIEF `POST /api/v1/events`를 호출할 때 사용하는 서비스 간 인증
 
 ## 목적
@@ -61,9 +60,8 @@ PRD-0022의 선택적인 Caddy 앞단은 공개 HTTPS에서 `POST /api/v1/events
 자체 인증서 검증기나 우회 가능한 trust-all client를 추가하지 않는다.
 
 PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secrets와 Spring config tree로
-주입한다. 로컬 Caddy 내부 CA를 명시적으로 신뢰한 HTTPS 수신은 검증했지만, 실제 공인 DNS·
-ACME 인증서와 BATON 스테이징 호스트의 원격 전달 및 비밀 관리 제품의 주입·회전은 아직
-검증하지 않았다.
+주입한다. 공인 DNS·ACME 인증서, 원격 전달과 비밀 관리 제품의 검증 범위는 `HANDOFF.md`를
+따른다.
 
 ## 구현 원칙
 

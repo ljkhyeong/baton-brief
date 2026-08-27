@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 작업공간·시즌별 현재 `ACTIVE` 관심 항목의 복합 정체성 키셋 조회
 
 > PRD-0015는 이 경로의 기본 `ACTIVE` 의미를 유지하면서 선택적인 `status=RESOLVED` 조회를
@@ -106,21 +105,3 @@ PRD-0013은 정체성을 이미 아는 호출자가 현재 관심 항목 한 건
 - 불변 에디션 미리보기와 현재 투영에서 에디션을 즉석 조합하는 조회
 - 새 인덱스·마이그레이션, 캐시 검증자와 변경 알림
 - 인증·인가, 외부 공개 API와 운영 배포
-
-## 현재 구현과 검증
-
-`AttentionItemCursor`가 두 커서 값을 애플리케이션 경계에서 하나로 묶고, PostgreSQL은
-복합 기본 키의 `(event_type, source_reference)` 행 값 비교와 `limit + 1`로 페이지를
-조회한다. 웹 응답은 기존 `AttentionItemResponse`를 재사용한다.
-
-기존 `ingestion distinguishes duplicate conflict unsupported stale and gap` PostgreSQL
-통합 시나리오를 확장해 다음을 확인했다.
-
-- 재구축 뒤 세 종류의 `ACTIVE` 항목을 정체성 순서로 조회한다.
-- 첫 페이지의 `DECISION_FOLLOW_UP_OVERDUE`, `HANDOFF_BLOCKED` 뒤 커서로 다음 페이지의
-  `ROUTINE_MISSED`를 중복 없이 조회한다.
-- 다른 작업공간은 빈 페이지이고 반쪽 커서는 `400`이다.
-- `HANDOFF_BLOCKED`가 `RESOLVED`로 갱신되면 후속 활성 목록에서 제외된다.
-
-대상 PostgreSQL 통합 테스트와 `./gradlew --no-daemon clean test :bootstrap:bootJar`가
-성공해 저장소 전체 테스트와 실행 JAR 생성을 확인했다.

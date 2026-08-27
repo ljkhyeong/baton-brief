@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 현재 관심 항목 단건 응답의 `ETag`와 `If-None-Match` 조건부 조회
 
 ## 목적
@@ -76,17 +75,3 @@ Spring MVC가 `ResponseEntity`의 `ETag`를 사용해 표준 조건부 요청을
 - 직접 헤더 파서, 응답 본문 해시, 캐시 저장소와 무효화 작업
 - 현재 항목 수정 명령, 과거 전체 투영 스냅샷과 목록 스냅샷 토큰
 - 인증·인가, 외부 공개 API와 운영 배포
-
-## 현재 구현과 검증
-
-웹 어댑터는 현재 `AttentionItem`의 `ruleVersion`과 `lastRevision`에 API v1 표현 버전을
-결합한 검증자를 `ResponseEntity.eTag(...)`로 설정한다. 직접 헤더 파서, 별도 응답 DTO,
-본문 해시, 캐시 저장소와 마이그레이션은 추가하지 않았다.
-
-기존 `ingestion distinguishes duplicate conflict unsupported stale and gap` PostgreSQL 통합
-시나리오를 확장해 리비전 `3 ACTIVE` 현재 항목의 검증자를 같은 조회에 보내면 `304`이고,
-리비전 `4 RESOLVED` 적용 뒤 이전 검증자를 보내면 `200`, 새 본문과 다른 검증자를
-반환함을 확인했다. 새 테스트 메서드는 추가하지 않았다.
-
-대상 PostgreSQL 통합 테스트와 `./gradlew --no-daemon clean test :bootstrap:bootJar`가
-성공해 저장소 전체 테스트와 실행 JAR 생성을 확인했다.

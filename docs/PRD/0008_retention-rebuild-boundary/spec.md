@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-19
-- 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 로컬 MVP의 수신 증거 보존 기준과 동기 전역 투영 재구축의 실패·동시성 경계
 
 ## 목적
@@ -130,21 +129,3 @@ PRD-0011의 이상 수신 증거 이력 조회와 불변 에디션의 `sourceCur
 - 재구축과 지원 이벤트 수신의 동시 실행이 전역 잠금 경계에서 직렬화되어 일관된
   결과만 공개한다.
 - 임의의 TTL, 용량 상한, 제한 시간이나 SLO를 코드·설정·문서에 만들지 않는다.
-
-## 현재 구현과 검증
-
-현재 영속성 구현은 트랜잭션 advisory lock, 수신 순서 기반 비미지원 기록 재생과 같은
-트랜잭션의 현재 투영 교체를 사용한다. 수신 기록은 `JdbcClient`/JDBC 표준 스트림으로
-순서대로 처리해 `retain-all` 입력 전체를 목록으로 중복 적재하지 않는다.
-
-- 기존 `edition is idempotent immutable generated and reproducible after rebuild` PostgreSQL
-  통합 시나리오를 확장해 재구축 중 데이터베이스 제약 위반을 강제로 발생시켰다. 예외 뒤
-  관심 항목 수가 이전 값으로 복원되고 기존 에디션이 재사용되어 원자적 롤백과 부분 결과
-  비노출을 확인했다.
-- 기존 `serializes concurrent duplicate ingestion edition generation and rebuild`
-  PostgreSQL 통합 시나리오를 확장해 배타 재구축이 진행되는 동안 지원 이벤트 수신의
-  투영 단계가 대기하고, 재구축 종료 뒤 두 작업이 순서대로 성공함을 확인했다.
-- 에디션 생성과 다른 재구축도 구현에서 같은 전역 배타 잠금 경로를 사용한다. 다만 위
-  대상 테스트가 두 별도 동시 실행 시나리오까지 직접 증명한 것으로 확대하지 않는다.
-- `./gradlew --no-daemon clean test :bootstrap:bootJar`가 성공했고 실행 JAR 생성을
-  확인했다.

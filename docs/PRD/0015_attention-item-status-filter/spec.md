@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 기존 현재 관심 항목 키셋 목록의 `ACTIVE`·`RESOLVED` 상태 선택
 
 ## 목적
@@ -85,18 +84,3 @@ PRD-0014의 질의 매개변수에 다음 필드를 추가한다.
 
 PRD-0016은 같은 복합 정체성에 실제 적용된 상태 전이 증거를 별도 이력 경로로 제공한다.
 현재 상태별 목록의 정렬·커서와 과거 전이의 집계 리비전 커서를 합치지 않는다.
-
-## 현재 구현과 검증
-
-`CurrentAttentionItemPageRequest.status`는 도메인의 `SourceEventState`를 직접 사용하고 기본값을
-`ACTIVE`로 둔다. 기존 application·persistence 조회 포트는 상태를 받아 같은 PostgreSQL
-키셋 쿼리의 `item_status`에 바인딩한다.
-
-기존 `ingestion distinguishes duplicate conflict unsupported stale and gap` PostgreSQL 통합
-시나리오를 확장해 `HANDOFF_BLOCKED` 정체성이 `RESOLVED`로 갱신된 뒤 기본 활성 목록에서는
-제외되고 `status=RESOLVED` 목록에서 현재 해소 상태로 반환되는 것을 확인했다. 상태별
-페이지네이션은 같은 쿼리와 응답 경로이므로 기존 키셋 순서·다음 페이지 검증을 반복하지
-않았다.
-
-대상 PostgreSQL 통합 테스트와 `./gradlew --no-daemon clean test :bootstrap:bootJar`가
-성공해 저장소 전체 테스트와 실행 JAR 생성을 확인했다.

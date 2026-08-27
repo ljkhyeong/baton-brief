@@ -14,10 +14,6 @@ Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.4 기반의 로컬 MVP를 구현
 - BATON 전용 Bearer와 파일 기반 비밀을 사용하는 스테이징 컨테이너
 - 이벤트 수신 한 경로만 허용하는 선택적 Caddy HTTPS 앞단
 
-PostgreSQL 통합 테스트, 전체 테스트와 실행 JAR 생성, 로컬 BATON→BRIEF 실행 JAR 전달을
-확인했다. 로컬 Caddy 내부 CA를 사용한 HTTPS 경계도 검증했지만 공인 DNS·ACME 인증서와
-실제 두 스테이징 호스트 사이의 원격 전달, 장기 운영 배포는 아직 검증하지 않았다.
-
 현재 검증 근거와 남은 작업은 [HANDOFF.md](HANDOFF.md), 제품·구조 문서의 전체 지도는
 [문서 색인](docs/README.md)을 기준으로 확인한다.
 
@@ -94,8 +90,8 @@ BRIEF가 소유하지 않는다.
 
 [이벤트 계약 팩](contracts/README.md)은 BATON 생산자가 사용할 v2 요청 JSON Schema와
 다섯 연속성 신호의 예시를 제공한다. 현재 버전 `2.0.0-rc.2`는 BRIEF 소비자 입력 계약을
-엄격하게 한 사전 버전이다. BATON 실제 serializer의 교차 검증 근거는 `2.0.0-rc.1`까지이며,
-원격 스테이징 호환 완료를 뜻하지 않는다.
+엄격하게 한 사전 버전이다. 생산자 호환성의 현재 검증 범위는 [계약 팩 안내](contracts/README.md)와
+[HANDOFF.md](HANDOFF.md)를 따른다.
 
 ```shell
 ./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefEventContractTest'

@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-21
-- 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 전체 불변 에디션 응답의 `ETag`와 `If-None-Match` 조건부 조회
 
 ## 목적
@@ -83,20 +82,3 @@ Spring MVC가 `ResponseEntity`의 `ETag`를 사용해 표준 조건부 요청을
 - 에디션 이력·비교나 이벤트 수신 증거의 조건부 조회
 - 캐시 무효화 작업, 백그라운드 갱신과 외부 캐시 제품
 - 인증·인가, 외부 공개 API와 운영 배포
-
-## 현재 구현과 검증
-
-생성·전역 최신·주간 최신·단건 에디션 응답을 Spring `ResponseEntity`로 반환하고 API v1
-표현과 `editionId`로 만든 `ETag`를 설정했다. Spring MVC의 표준 조건부 요청 처리를
-사용하므로 직접 `If-None-Match`를 파싱하거나 `304` 응답을 조립하지 않는다.
-
-기존 `edition is idempotent immutable generated and reproducible after rebuild` PostgreSQL
-통합 시나리오를 확장해 다음을 확인했다.
-
-- 생성 응답의 `ETag`로 재구축 뒤 불변 단건 에디션을 조건부 조회하면 `304`다.
-- 전역 최신 세대가 `4`에서 `5`로 이동한 뒤 이전 검증자를 보내면 `200`과 세대 `5`를
-  반환한다.
-- 주간 최신 응답의 검증자를 같은 범위에 다시 보내면 `304`다.
-
-대상 PostgreSQL 통합 테스트와 `./gradlew --no-daemon clean test :bootstrap:bootJar`가
-성공해 저장소 전체 테스트와 실행 JAR 생성을 확인했다.

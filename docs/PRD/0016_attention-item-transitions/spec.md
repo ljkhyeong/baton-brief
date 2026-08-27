@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 복합 정체성별 실제 적용 상태 전이의 집계 리비전 키셋 조회
 
 ## 목적
@@ -98,18 +97,3 @@ PRD-0004의 표준 `ProblemDetail`로 거부한다.
 - 상태 전이 변경·삭제, 재처리와 격리 해제
 - offset, 전체 개수, 기간 검색과 새 인덱스·마이그레이션
 - 인증·인가, 외부 공개 API와 운영 배포
-
-## 현재 구현과 검증
-
-application 읽기 모델은 전이 필드와 다음 리비전 커서만 가진다. 영속성은
-`processing_outcome IN ('APPLIED', 'APPLIED_WITH_GAP')` 조건과 배타 리비전 커서를 한
-`JdbcClient` 조회에 적용한다. 웹은 application 결과를 그대로 반환하며 별도 전달 DTO를
-만들지 않는다.
-
-기존 `ingestion distinguishes duplicate conflict unsupported stale and gap` PostgreSQL 통합
-시나리오를 확장해 리비전 `4 RESOLVED`, `3 ACTIVE`·공백 탐지, 다음 페이지의 `1 ACTIVE`
-순서와 마지막 커서를 확인했다. 같은 리비전의 `STALE` 기록은 전이에서 제외되고 다른
-작업공간은 빈 이력을 반환한다. 새 테스트 메서드와 마이그레이션은 추가하지 않았다.
-
-대상 PostgreSQL 통합 테스트와 `./gradlew --no-daemon clean test :bootstrap:bootJar`가
-성공해 저장소 전체 테스트와 실행 JAR 생성을 확인했다.

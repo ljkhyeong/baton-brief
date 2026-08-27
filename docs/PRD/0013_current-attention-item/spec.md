@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-21
-- 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 작업공간·시즌·이벤트 종류·원본 참조로 식별하는 현재 투영 단건 조회
 
 ## 목적
@@ -102,19 +101,3 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목만 복�
 
 PRD-0016은 이 단건 현재 상태와 구분되는 실제 적용 상태 전이 증거 이력을 별도 읽기 경로로
 추가한다. 규칙 버전별 과거 현재 항목 전체 스냅샷을 제공하는 계약은 아니다.
-
-## 현재 구현과 검증
-
-기존 이벤트 적용이 사용하던 복합 기본 키 단건 조회를 `BriefPersistencePort`와
-`BriefUseCases`에 노출하고, 웹 어댑터는 기존 `AttentionItemResponse`를 반환한다. 별도
-조회 모델, DTO, SQL 도우미와 마이그레이션은 추가하지 않았다.
-
-기존 `ingestion distinguishes duplicate conflict unsupported stale and gap` PostgreSQL
-통합 시나리오를 확장해 다음을 확인했다.
-
-- 리비전 공백을 포함한 현재 `ACTIVE` 항목을 재구축 뒤 리비전 `3`과 함께 조회한다.
-- 후속 리비전 `4`의 `RESOLVED` 이벤트를 적용하면 같은 조회가 해소 상태를 반환한다.
-- 다른 작업공간 범위는 `404`, 빈 `sourceReference`는 `400`이다.
-
-대상 PostgreSQL 통합 테스트와 `./gradlew --no-daemon clean test :bootstrap:bootJar`가
-성공해 저장소 전체 테스트와 실행 JAR 생성을 확인했다.

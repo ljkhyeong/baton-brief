@@ -38,7 +38,7 @@ serializer와 다시 검증해야 한다.
 ### 저장소 전체
 
 ```shell
-./gradlew --no-daemon clean test :bootstrap:bootJar contractsZip
+./gradlew --no-daemon test :bootstrap:bootJar contractsZip
 ```
 
 성공했다. 다섯 모듈의 전체 테스트, PostgreSQL Testcontainers 빈 데이터베이스 V1~V7
@@ -83,9 +83,9 @@ serializer와 다시 검증해야 한다.
 ### 자동 검증 구성
 
 `.github/workflows/verify.yml`은 pull request와 `main` push에서 Java 21을 사용해 Gradle
-wrapper의 `clean test :bootstrap:bootJar contractsZip`과 로컬·스테이징·HTTPS profile의
-Compose 구문을 검증하도록 구성했다. 최초 GitHub Actions 원격 실행 결과는 아직 확인하지
-않았다.
+wrapper의 `test :bootstrap:bootJar contractsZip`과 로컬·HTTPS profile의 Compose 구문을
+검증하도록 구성했다. `https` profile 검증에는 profile이 없는 BRIEF·PostgreSQL 서비스도
+함께 포함된다. 최초 GitHub Actions 원격 실행 결과는 아직 확인하지 않았다.
 
 ## 미검증·미결정 범위
 
