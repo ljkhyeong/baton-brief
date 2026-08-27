@@ -21,6 +21,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.hamcrest.Matchers.contains
 import org.hamcrest.Matchers.nullValue
+import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
@@ -37,6 +38,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.junit.jupiter.Container
@@ -44,7 +46,12 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
 
 @Testcontainers
-@SpringBootTest
+@SpringBootTest(
+    properties = [
+        "brief.event-receiver.authentication-required=true",
+        "brief.event-receiver.bearer-token=$EVENT_BEARER_TOKEN",
+    ],
+)
 @AutoConfigureMockMvc
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 class BriefMvpIntegrationTest(
@@ -1006,6 +1013,22 @@ class BriefMvpIntegrationTest(
         val seasonId = "20000000-0000-0000-0000-000000000003"
         val eventId = "30000000-0000-0000-0000-000000000010"
 
+        mockMvc.perform(
+            post("/api/v1/events")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(eventJson(eventId, workspaceId, seasonId, "unauthorized", 1)),
+        ).andExpect(status().isUnauthorized)
+            .andExpect(
+                header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")),
+            )
+
+        mockMvc.perform(
+            post("/api/v1/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer wrong-token-000000000000000000000")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(eventJson(eventId, workspaceId, seasonId, "unauthorized", 1)),
+        ).andExpect(status().isUnauthorized)
+
         postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1, eventVersion = 0))
             .andExpect(status().isBadRequest)
             .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
@@ -1167,6 +1190,7 @@ class BriefMvpIntegrationTest(
 
     private fun postEvent(json: String) = mockMvc.perform(
         post("/api/v1/events")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $EVENT_BEARER_TOKEN")
             .contentType(MediaType.APPLICATION_JSON)
             .content(json),
     )
@@ -1227,3 +1251,5 @@ class BriefMvpIntegrationTest(
         val postgres = PostgreSQLContainer("postgres:18.4-alpine")
     }
 }
+
+private const val EVENT_BEARER_TOKEN = "brief-event-receiver-test-token-00000001"
