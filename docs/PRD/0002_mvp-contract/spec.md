@@ -90,9 +90,13 @@ HTTP 계약 검증과 비웹 실행 점검을 실제 배포 환경의 네트워�
 | `workspaceId` | UUID | 불투명 원본 참조 범위 |
 | `seasonId` | UUID | 불투명 원본 참조 범위 |
 | `sourceReference` | 문자열 | 비어 있지 않은 불투명 식별자, 최대 128자 |
-| `aggregateRevision` | 정수 | 양수 |
-| `occurredAt` | JSON 문자열의 ISO-8601 시점 | 원본이 사실을 관측한 시각 |
+| `aggregateRevision` | 정수 | `1`부터 `9223372036854775807`까지 |
+| `occurredAt` | JSON 문자열의 ISO-8601 시점 | 초가 필수인 offset 시각, 소수초는 1~9자리 |
 | `state` | 열거형 | `ACTIVE` 또는 `RESOLVED` |
+
+정수 필드는 소수를 정수로 바꾸지 않고, 계약에 없는 JSON 필드는 무시하지 않는다.
+`occurredAt`의 `24:00:00`과 윤초는 실제 다른 시각으로 정규화하지 않고 `400 Bad Request`로
+거부한다.
 
 v1에서 지원하는 `eventType`은 다음과 같다.
 
@@ -153,7 +157,8 @@ HTTP 상태와 응답 본문은 다음과 같다.
 지원하지 않는 이벤트의 완전히 같은 재생은 `DUPLICATE`로 바꾸지 않고 저장된 `UNSUPPORTED` 결과를
 그대로 반환한다. 같은 `eventId`로 지문이 다른 이벤트가 오면 최초 수신 기록의 지원
 여부와 관계없이 `CONFLICT`다. 격리 증거는 이벤트별 최초 충돌의 지문과
-탐지 시각 한 건만 보존해 크기를 제한한다.
+탐지 시각 한 건만 보존해 크기를 제한한다. 최초 수신 기록의 `receivedAt`은 요청을 받은
+시각이고, `conflictDetectedAt`은 기존 지문과 다르다고 판정한 시각이다.
 
 ### 리비전과 간격
 

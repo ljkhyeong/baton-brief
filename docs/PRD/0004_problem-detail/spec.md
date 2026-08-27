@@ -21,7 +21,8 @@
 
 - Bean Validation 요청 본문 실패
 - 요청 매개변수의 `@Positive`, `@Min`, `@Max` 검증 실패
-- JSON, enum과 타입 역직렬화 실패
+- JSON, enum과 타입 역직렬화 실패. 소수를 정수로 바꾸지 않는다.
+- 대상 요청 DTO에 선언하지 않은 JSON 필드
 - UUID·숫자 경로 또는 요청 매개변수 변환 실패
 - 필수 요청 매개변수 누락
 - 명시적인 `ResponseStatusException` 기반 `404 Not Found`
@@ -65,7 +66,9 @@ Spring Boot 표준 속성 `spring.mvc.problemdetails.enabled=true`를 사용한�
 
 ## 호환성과 비목표
 
-- 기존 오류 HTTP 상태는 바꾸지 않고 오류 표현만 표준화하는 호환 가능한 변경이다.
+- 기존 요청 오류의 HTTP 상태는 바꾸지 않고 오류 표현만 표준화한다.
+- 계약에 없는 JSON 필드를 보내던 요청은 더 이상 해당 필드를 조용히 무시하지 않고
+  `400 Bad Request`로 거부한다. `/api/v1`의 명시적 입력 계약을 엄격하게 적용하는 변경이다.
 - 애플리케이션별 오류 코드 체계, 필드별 오류 배열과 다국어 메시지를 정의하지 않는다.
 - 데이터베이스 장애의 `503` 분류, 재구축 중복 실행 오류와 운영 인증·인가는 포함하지
   않는다.
@@ -74,6 +77,7 @@ Spring Boot 표준 속성 `spring.mvc.problemdetails.enabled=true`를 사용한�
 
 - 대표적인 Bean Validation `400`과 없는 에디션 `404`가
   `application/problem+json`으로 응답한다.
+- 대표 요청에서 정수가 아닌 숫자와 선언하지 않은 JSON 필드를 `400`으로 거부한다.
 - 응답에 `title`, `status`, `detail`, `instance`가 있고 상태와 요청 경로가 일치한다.
   `type`은 별도 문제 유형이 있을 때만 포함하며, 생략된 경우 `about:blank`로 해석한다.
 - 기존 이벤트 도메인 결과와 성공 응답 본문은 바뀌지 않는다.

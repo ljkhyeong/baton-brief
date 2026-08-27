@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 구현 상태: 로컬 소비자·계약 팩·BATON 실제 직렬화·생산자 신호 스트림·불변 outbox·설정형 시간 재조정·원본 변경 자동 연결·HTTP 송신과 로컬 원본 API·초기 정합화→BRIEF 종단 간 검증 완료
+- 구현 상태: BRIEF `2.0.0-rc.2` 소비자·계약 팩 로컬 검증 완료, BATON 생산자·로컬 종단 간 교차 검증은 `2.0.0-rc.1`까지 완료
 - 범위: 기존 내부 이벤트 수신 경로에서 BATON의 권위 있는 다섯 연속성 신호를 v1과 함께 수용하는 계약
 
 ## 목적
@@ -73,12 +73,12 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
   제공한다.
 - `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
-- 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 실제 serializer는 고정한
-  예시와 일치하고 송신기도 같은 record를 사용한다. 로컬 원본 API 변경·초기 정합화·
-  outbox→BRIEF 전달과 전용 Bearer, BRIEF 로컬 Caddy HTTPS 수신 경계는 검증했다. 실제
-  BATON 스테이징 호스트의 공인 HTTPS 전달이 남아 있으므로 현재 버전은 `2.0.0-rc.1`이다.
+- 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. 현재 `2.0.0-rc.2`는 BRIEF 소비자의
+  입력 계약 엄격화까지 반영한다. BATON 실제 serializer와 같은 record를 사용하는 송신기의
+  교차 검증은 `2.0.0-rc.1`까지 완료했다. `2.0.0-rc.2` 생산자 재검증과 실제 BATON
+  스테이징 호스트의 공인 HTTPS 전달은 남아 있다.
 - Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD를
-  `baton-brief-contracts-2.0.0-rc.1.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
+  `baton-brief-contracts-2.0.0-rc.2.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
   배포 플러그인은 만들지 않는다.
 - BRIEF의 기존 v2 PostgreSQL 통합 시나리오는 계약 예시를 직접 요청 본문으로 사용한다.
   예시를 위한 별도 제품 시나리오를 복제하지 않는다.
@@ -121,36 +121,6 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - v1 타입 삭제·이름 변경 또는 기존 에디션 재작성
 - BRIEF가 BATON 신호 종류·심각도를 다시 판정하는 규칙
 - 운영 인증·인가, 브로커, 재시도 시간과 배포 설정
-
-## 현재 검증
-
-- 대상 PostgreSQL 통합 테스트에서 대표 V2 시점 데이터를 V3~V7로 순차 업그레이드해 기존
-  v2 미지원 행의 `sourceSeverity=null`, 현재 투영·불변 에디션 항목 보존을 확인했다.
-- 같은 통합 테스트 클래스의 v2 시나리오에서 다섯 타입, 두 원본 심각도, 심각도만 다른
-  동일 `eventId` 충돌, 같은 정체성의 심각도 변경과 `ACTIVE → RESOLVED`, 최초 수신 증거와
-  재구축 뒤 동일 현재 투영을 확인했다.
-- 기존 v1 수신 시나리오가 동일 재전달·충돌·stale·gap과 과거 v2 `UNSUPPORTED` 재전달을
-  유지하고, HTTP 계약 시나리오가 v2 필수 심각도 누락을 `400`으로 거부함을 확인했다.
-- `BriefEventContractTest`에서 모든 v2 예시를 Draft 2020-12 JSON Schema로 검증했고, 기존
-  v2 PostgreSQL 통합 시나리오가 같은 예시를 직접 수신해 다섯 타입·심각도·해소·재구축을
-  확인했다.
-- `./gradlew --no-daemon contractsZip`으로
-  `build/distributions/baton-brief-contracts-2.0.0-rc.1.zip`을 생성하고 `contracts/**`와
-  이 PRD가 포함된 것을 확인했다.
-- `./gradlew --no-daemon clean test :bootstrap:bootJar`가 성공해 빈 PostgreSQL의 V1~V7
-  적용, 전체 테스트와 실행 JAR 생성을 확인했다.
-
-BATON `codex/brief-producer-contract-20260822` 작업 브랜치에서 실제 Java/Jackson
-serializer가 계약 팩 예시와 일치하는지 검증했고, 신호별 연속 리비전·불변 outbox와 설정형
-시간 재조정을 구현했다. `75da34b`·`17919a7`에서는 신호에 영향을 주는 원본 변경과 자동
-회차 생성을 같은 트랜잭션 재조정에 연결하고 원본·outbox 원자적 롤백과 전체 빌드를
-확인했다. `1763367`·`7fa5890`에서는 V23 전달 상태·lease·신호별 순서와 같은 event record의
-HTTP 요청·결과 분류를 구현·검증했다. BATON `d30be0d`에서는 실제 BATON·BRIEF 실행 JAR과
-MySQL 8.4·PostgreSQL 18.4를 연결해 원본 API 변경·초기 정합화·장애 재시도·동일 이벤트
-재전달·심각도 변경·해소 투영을 검증했다. 역순 리비전 차단은 BATON outbox 영속성 테스트가
-담당한다. PRD-0020의 전용 Bearer는 같은 실제 두 프로세스 흐름에서 검증했고 BRIEF 로컬
-Caddy HTTPS 수신 경계도 별도로 확인했다. 실제 BATON 스테이징 호스트의 공인 HTTPS
-전달은 검증하지 않았다.
 
 ## 관련 문서
 

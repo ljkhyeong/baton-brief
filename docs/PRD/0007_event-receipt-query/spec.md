@@ -5,8 +5,6 @@
 - 구현 상태: 로컬 구현 및 검증 완료
 - 범위: 이벤트 식별자별 최초 수신 기록의 읽기 전용 단건 조회
 
-대상 PostgreSQL 18.4 통합 테스트와 저장소 전체 `clean test`, 실행 JAR 생성이 성공했다.
-
 ## 목적
 
 PRD-0002는 이벤트를 수신한 요청에서 처리 결과를 반환하지만, 호출자가 응답을 받지 못했거나
@@ -118,13 +116,3 @@ PRD-0011이 별도로 소유한다.
 - 없는 이벤트는 `404 ProblemDetail`로 응답한다.
 - 응답에 두 fingerprint, 원문 payload, SQL과 예외 상세가 없다.
 - 조회 전후에 수신 기록, 충돌 증거, 투영과 에디션 저장 상태가 바뀌지 않는다.
-
-## 현재 검증
-
-- `./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.ingestion distinguishes duplicate conflict unsupported stale and gap'`:
-  성공. PostgreSQL 18.4 Testcontainers에서 최초 수신 결과, 동일 재전달과 충돌 뒤 불변성,
-  fingerprint 비노출, 재구축 뒤 동일 응답, `UNSUPPORTED`와 미존재 `404 ProblemDetail`을
-  확인했다.
-- `./gradlew --no-daemon clean test :bootstrap:bootJar`: 성공. 기존 통합 테스트 메서드를
-  확장했으므로 PostgreSQL 통합 시나리오는 6개를 유지하며 전체 테스트와
-  `bootstrap-0.1.0-SNAPSHOT.jar` 생성을 확인했다.

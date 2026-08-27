@@ -91,22 +91,7 @@ ACME 인증서와 BATON 스테이징 호스트의 원격 전달 및 비밀 관�
 - OAuth2 authorization server, JWT, token introspection, mTLS와 복수 생산자 권한
 - token 발급·자동 회전과 비밀 관리 제품 선택
 - 실제 공인 DNS, 방화벽, ACME 인증서 발급과 BATON 원격 스테이징 전달
-- 계약 팩 `2.0.0-rc.1`의 안정 버전 승격
-
-## 현재 검증
-
-- BRIEF PostgreSQL 통합 시나리오에서 Bearer 누락·오류를 `401`로 거부하고 정상 Bearer로
-  기존 HTTP 계약을 처리했다.
-- BATON 외부 어댑터 테스트에서 실제 JSON 요청에 Bearer 헤더가 포함되고 `401`이 영구
-  실패로 분류됨을 확인했다.
-- 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4를 연결한 선택 실행 테스트가
-  새 token과 직전 token을 함께 허용한 상태에서 BATON의 직전 token으로 원본 API·초기
-  정합화·재전달·심각도 변경·해소 수렴을 완료했다.
-- 스테이징 컨테이너 조립에서 파일 기반 현재 token으로 기존 v2 계약 예시를 수신하고
-  token 없는 요청이 `401`로 거부되는 것을 확인했다.
-- Caddy 내부 CA를 신뢰한 로컬 HTTPS에서 같은 무인증 `401`과 정상 Bearer
-  `202 APPLIED`를 확인했다. Caddy는 인증을 재구현하지 않고 Spring Security 결과를
-  전달했다.
+- 계약 팩 `2.0.0-rc.2`의 생산자 재검증과 안정 버전 승격
 
 ## 관련 문서
 

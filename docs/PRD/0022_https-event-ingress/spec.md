@@ -18,7 +18,7 @@ PRD-0020은 BATON 전용 Bearer를, PRD-0021은 내부 HTTP 애플리케이션�
 - 그 밖의 메서드와 경로는 Caddy에서 빈 본문의 `404`로 끝내며 BRIEF에 전달하지 않는다.
 - `/actuator/health`는 BRIEF 컨테이너 healthcheck에만 사용하고 외부 HTTPS에서 노출하지
   않는다.
-- BRIEF HTTP 포트의 기본 `127.0.0.1` 바인딩은 유지한다. 다른 호스트는 Caddy HTTPS를
+- BRIEF HTTP 포트의 기본 `127.0.0.1` 호스트 게시는 유지한다. 다른 호스트는 Caddy HTTPS를
   거치며 PostgreSQL은 계속 호스트 포트를 열지 않는다.
 
 이 계약은 이벤트 수신 외 API의 인증·인가를 결정한 것이 아니다. 운영자·사용자 조회를
@@ -74,8 +74,8 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https co
 docker compose --env-file .env.staging -f compose.staging.yml --profile https up --build -d --wait
 ```
 
-기본 profile은 기존 loopback HTTP 스테이징 조립을 유지한다. 공개 호스트를 준비하지 않은
-개발 환경에서 `https` profile을 자동 활성화하지 않는다.
+기본 profile은 기존 loopback 호스트 게시 스테이징 조립을 유지한다. 공개 호스트를 준비하지
+않은 개발 환경에서 `https` profile을 자동 활성화하지 않는다.
 
 ## 수용 기준
 
@@ -98,20 +98,6 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 - WAF, CDN, rate limiting, mTLS와 OAuth2/JWT
 - Caddy 데이터 볼륨의 백업·복구와 다중 인스턴스 고가용성
 - token 자동 발급·회전과 비밀 관리 제품 선택
-
-## 현재 검증
-
-로컬 Docker에서 `BRIEF_STAGING_HOST=localhost`와 비기본 host port로 PostgreSQL 18.4,
-BRIEF와 Caddy를 함께 기동했다. Caddy 내부 CA 루트 인증서를 `curl --cacert`로 신뢰한
-HTTPS 요청에서 무인증 이벤트 수신 `401`, 파일 기반 현재 Bearer와 계약 팩 v2 예시의
-`202 APPLIED`, 외부 `/actuator/health`의 `404`를 확인했다. 접근 로그에는 Authorization
-헤더가 없었다. 실제 Docker 연결 상태에서 `data`에는 PostgreSQL·BRIEF만, 내부 `proxy`에는
-BRIEF·Caddy만, 외부 송신 가능한 `egress`에는 Caddy만 연결됨을 확인했다. Caddy는 읽기
-전용 루트와 `no-new-privileges`를 유지하면서 `ALL` capability를 제거하고
-`NET_BIND_SERVICE`만 추가한 상태로 80·443을 정상 바인딩했다.
-
-검증 뒤 Compose 컨테이너·네트워크·이름 있는 볼륨, 내부 CA와 임시 비밀 파일을 제거했다.
-실제 공인 인증서와 BATON 원격 전달은 아직 검증하지 않았다.
 
 ## 관련 문서
 

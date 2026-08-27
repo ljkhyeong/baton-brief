@@ -20,12 +20,12 @@ HTTP origin까지만 제공하고 PRD-0022의 명시적인 profile로 이벤트 
 - `compose.staging.yml`의 기본 조립은 `brief`와 `postgres` 두 서비스를 제공한다.
 - PostgreSQL 18.4는 내부 `data` 네트워크와 이름 있는 볼륨만 사용하며 호스트 포트를
   열지 않는다.
-- BRIEF는 `data`와 `edge` 네트워크에 참여하되 HTTP 포트를 기본
-  `127.0.0.1:8080`에만 게시한다.
+- BRIEF 프로세스는 컨테이너 내부의 `0.0.0.0:8080`에서 요청을 받고 `data`와 `proxy`
+  내부 네트워크에만 참여한다. 호스트에는 기본 `127.0.0.1:8080`으로만 게시한다.
 - 기존 Spring Boot aggregate health인 `/actuator/health`가 애플리케이션과 필수
   데이터베이스 상태를 확인한다.
-- 선택적인 `https` profile은 Caddy를 `edge` 네트워크에 연결하며 외부에는 PRD-0022의
-  이벤트 수신 한 경로만 제공한다.
+- 선택적인 `https` profile은 Caddy만 `proxy`와 외부 송신용 `egress` 네트워크에 연결하며
+  외부에는 PRD-0022의 이벤트 수신 한 경로만 제공한다.
 
 ## 설정과 비밀
 
@@ -84,18 +84,6 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 - PostgreSQL 백업·복구, 고가용성, 보존 기간과 용량 SLO
 - Kubernetes, 관리형 데이터베이스, 이미지 registry와 CI 배포
 - token 자동 발급·회전과 비밀 관리 제품 선택
-
-## 현재 검증
-
-로컬 Docker에서 스테이징 이미지를 빌드하고 PostgreSQL과 함께 기동했다.
-`/actuator/health`의 `UP`, 무인증 이벤트 요청의 `401`, 계약 팩의 기존 v2 예시를 파일 기반
-현재 Bearer로 수신한 `APPLIED`를 확인했다. 실행 컨테이너의 사용자 `10001:10001`과 읽기
-전용 루트 파일시스템도 확인했으며 검증용 컨테이너·네트워크·볼륨과 임시 비밀 파일을
-제거했다.
-
-PRD-0022의 `https` profile에서는 로컬 Caddy 내부 CA를 신뢰한 HTTPS 수신과 이벤트 외
-경로 차단도 확인했다. 이는 공인 인증서와 실제 BATON 원격 스테이징 전달 완료를 뜻하지
-않는다.
 
 ## 관련 문서
 

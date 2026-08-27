@@ -93,15 +93,16 @@ BRIEF가 소유하지 않는다.
 ## 이벤트 v2 계약 팩
 
 [이벤트 계약 팩](contracts/README.md)은 BATON 생산자가 사용할 v2 요청 JSON Schema와
-다섯 연속성 신호의 예시를 제공한다. 현재 버전 `2.0.0-rc.1`은 로컬 생산자·소비자와 실제
-직렬화까지 검증한 사전 버전이며 원격 스테이징 호환 완료를 뜻하지 않는다.
+다섯 연속성 신호의 예시를 제공한다. 현재 버전 `2.0.0-rc.2`는 BRIEF 소비자 입력 계약을
+엄격하게 한 사전 버전이다. BATON 실제 serializer의 교차 검증 근거는 `2.0.0-rc.1`까지이며,
+원격 스테이징 호환 완료를 뜻하지 않는다.
 
 ```shell
 ./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefEventContractTest'
 ./gradlew --no-daemon contractsZip
 ```
 
-생성 파일은 `build/distributions/baton-brief-contracts-2.0.0-rc.1.zip`이다.
+생성 파일은 `build/distributions/baton-brief-contracts-2.0.0-rc.2.zip`이다.
 
 ## 기술 스택
 
@@ -124,8 +125,10 @@ docker compose up -d --wait postgres
 ./gradlew :bootstrap:bootRun
 ```
 
-기본 데이터 원본은 `jdbc:postgresql://localhost:5432/baton_brief`이고 사용자와 비밀번호는
-`brief`다. 다른 환경에서는 Spring Boot 표준 환경변수
+애플리케이션은 기본 `127.0.0.1:8080`에서 요청을 받고 `compose.yml`은 PostgreSQL 포트를
+호스트의 `127.0.0.1`에만 게시한다. 기본 데이터 원본은
+`jdbc:postgresql://localhost:5432/baton_brief`이고 사용자와 비밀번호는 `brief`다. 다른
+환경에서는 Spring Boot 표준 환경변수
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`와
 `SPRING_FLYWAY_ENABLED`로 덮어쓴다.
 
