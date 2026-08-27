@@ -77,6 +77,32 @@ services:
       - edge
     logging: *default-logging
 
+  https:
+    profiles: [https]
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    restart: unless-stopped
+    environment:
+      BRIEF_STAGING_HOST: "${BRIEF_STAGING_HOST:-brief.invalid}"
+    depends_on:
+      brief:
+        condition: service_healthy
+    ports:
+      - "${BRIEF_STAGING_HTTP_PUBLISH:-80:80}"
+      - "${BRIEF_STAGING_HTTPS_TCP_PUBLISH:-443:443}"
+      - "${BRIEF_STAGING_HTTPS_UDP_PUBLISH:-443:443/udp}"
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - brief-staging-caddy-data:/data
+      - brief-staging-caddy-config:/config
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - edge
+    logging: *default-logging
+
 networks:
   data:
     internal: true
@@ -84,6 +110,8 @@ networks:
 
 volumes:
   brief-staging-postgres-data:
+  brief-staging-caddy-data:
+  brief-staging-caddy-config:
 
 secrets:
   brief_database_password:
