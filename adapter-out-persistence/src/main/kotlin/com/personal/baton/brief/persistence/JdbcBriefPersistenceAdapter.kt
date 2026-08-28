@@ -34,6 +34,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.jvm.optionals.getOrNull
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -41,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional
 @Repository
 class JdbcBriefPersistenceAdapter(
     private val jdbc: JdbcClient,
+    private val namedJdbc: NamedParameterJdbcOperations,
 ) : BriefPersistencePort {
     @Transactional
     override fun recordUnsupported(
@@ -674,18 +676,17 @@ class JdbcBriefPersistenceAdapter(
     }
 
     private fun insertEditionItems(edition: BriefEdition) {
-        edition.items.forEachIndexed { position, item ->
-            jdbc.sql(
-                """
-                INSERT INTO brief_edition_item (
-                    edition_id, position, source_reference, reason_code, severity,
-                    item_status, observed_at, rule_version, aggregate_revision, revision_gap
-                ) VALUES (
-                    :editionId, :position, :sourceReference, :reasonCode, :severity,
-                    :itemStatus, :observedAt, :ruleVersion, :aggregateRevision, :revisionGap
-                )
-                """.trimIndent(),
-            ).params(
+        namedJdbc.batchUpdate(
+            """
+            INSERT INTO brief_edition_item (
+                edition_id, position, source_reference, reason_code, severity,
+                item_status, observed_at, rule_version, aggregate_revision, revision_gap
+            ) VALUES (
+                :editionId, :position, :sourceReference, :reasonCode, :severity,
+                :itemStatus, :observedAt, :ruleVersion, :aggregateRevision, :revisionGap
+            )
+            """.trimIndent(),
+            edition.items.mapIndexed { position, item ->
                 mapOf(
                     "editionId" to edition.editionId,
                     "position" to position,
@@ -697,9 +698,9 @@ class JdbcBriefPersistenceAdapter(
                     "ruleVersion" to item.ruleVersion,
                     "aggregateRevision" to item.aggregateRevision,
                     "revisionGap" to item.revisionGap,
-                ),
-            ).update()
-        }
+                )
+            }.toTypedArray(),
+        )
     }
 
     private fun findEditionRow(
