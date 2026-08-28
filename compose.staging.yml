@@ -63,7 +63,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "${BRIEF_STAGING_HTTP_BIND:-127.0.0.1}:${BRIEF_STAGING_HTTP_PORT:-8080}:8080"
+      - "127.0.0.1:${BRIEF_STAGING_HTTP_PORT:-8080}:8080"
     stop_grace_period: 40s
     security_opt:
       - no-new-privileges:true
