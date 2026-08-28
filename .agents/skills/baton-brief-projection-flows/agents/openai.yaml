@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF 투영 흐름"
+  short_description: "결정적인 관심 항목 투영 관리"
+  default_prompt: "$baton-brief-projection-flows를 사용해 BRIEF 관심 항목 투영과 재구축 동작을 변경해 주세요."

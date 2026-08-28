@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: baton-brief
+  datasource:
+    url: jdbc:postgresql://localhost:5432/baton_brief
+    username: brief
+    password: brief
+  jackson:
+    deserialization:
+      accept-float-as-int: false
+      fail-on-unknown-properties: true
+    mapper:
+      allow-coercion-of-scalars: false
+  mvc:
+    problemdetails:
+      enabled: true
+server:
+  address: 127.0.0.1
+brief:
+  event-receiver:
+    authentication-required: ${BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED:false}
+    bearer-token: ${BRIEF_EVENT_RECEIVER_BEARER_TOKEN:}
+    previous-bearer-token: ${BRIEF_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN:}
+management:
+  endpoints:
+    web:
+      discovery:
+        enabled: false
+  endpoint:
+    health:
+      probes:
+        enabled: false

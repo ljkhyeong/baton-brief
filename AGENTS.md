@@ -1,48 +1,214 @@
-# BATON BRIEF Agent Guide
+# BATON BRIEF 에이전트 지침
 
 ## 시작 순서
 
-- 작업 전에 `HANDOFF.md`, `README.md`와 영향받는 PRD/ADR을 읽는다.
+- 작업 전에 `HANDOFF.md`, `README.md`와 영향받는 PRD/ADR을 읽는다. PRD/ADR은
+  `docs/README.md`의 문서 색인에서 찾는다.
+- 작업 성격에 맞는 프로젝트 로컬 스킬을 `.agents/skills/`에서 사용한다.
 - 문서와 코드가 다르면 실행 가능한 코드와 테스트를 확인하고 같은 변경에서 문서를
   바로잡는다.
-- 구현되지 않은 기능, route, event와 배포 방식을 완료된 것처럼 기록하지 않는다.
+- 구현되지 않은 기능, 경로, 이벤트와 배포 방식을 완료된 것처럼 기록하지 않는다.
+
+## 문서 언어
+
+- 새로 작성하거나 수정하는 저장소 문서의 제목·본문·상태·설명은 한글을 기본으로 한다.
+- 코드 식별자, API 경로, HTTP 메서드·상태, 파일명, 명령어, 제품명과 라이브러리·프로토콜의
+  공식 명칭은 정확성을 위해 원문 표기를 유지한다.
+- 영문 문서를 발견하면 같은 작업에서 한글화하되, 계약에 사용되는 enum·필드명·상태 코드는
+  번역하거나 바꾸지 않는다.
 
 ## 서비스 경계
 
-- BATON은 조직 운영 원본과 최종 권한, continuity signal의 권위 있는 판정을 소유한다.
-- WATCH는 URL 점검과 health 원본을 소유한다. WATCH 데이터베이스를 직접 읽지 않는다.
-- RELAY는 구독과 provider 전달 생명주기를 소유한다. BRIEF에서 메일이나 메시지를 직접
+- BATON은 조직 운영 원본과 최종 권한, 연속성 신호의 권위 있는 판정을 소유한다.
+- WATCH는 URL 점검과 상태 원본을 소유한다. WATCH 데이터베이스를 직접 읽지 않는다.
+- RELAY는 구독과 제공자 전달 생명주기를 소유한다. BRIEF에서 메일이나 메시지를 직접
   보내지 않는다.
-- GO는 링크 코드의 만료·폐기·redirect를 소유한다. BRIEF에서 링크 생명주기를 복제하지
+- GO는 링크 코드의 만료·폐기·리디렉션을 소유한다. BRIEF에서 링크 생명주기를 복제하지
   않는다.
-- BRIEF는 멱등 inbox, 관심 항목 projection, 생성 cursor와 immutable edition만 소유한다.
+- BRIEF는 멱등 수신함과 제한된 최초 충돌 증거, 관심 항목 투영, 생성 커서와 불변
+  에디션만 소유한다.
+- BATON UI의 사용자는 BATON 백엔드를 통해 BRIEF 결과를 조회한다. BATON이 사용자 인증과
+  작업공간·시즌 권한을 판정하고 BRIEF는 사용자 계정·세션·멤버십을 복제하지 않는다.
+- BATON은 권위 있는 작업공간·시즌·시간대와 실행 시점을 정해 기존 BRIEF 에디션 생성 명령을
+  호출한다. BRIEF에 대상 registry나 자체 scheduler를 만들지 않는다.
 
 ## 구현 원칙
 
-- source 서비스의 transaction과 외부 호출을 결합하지 않는다. after-commit event와
-  at-least-once delivery를 전제로 한다.
-- event identity와 version을 검증하고 exact replay는 멱등하게 처리한다. 같은 identity의
-  다른 payload는 충돌로 다룬다.
-- 도착 순서를 source truth로 해석하지 않는다. 계약에 있는 aggregate revision과
-  watermark를 사용한다.
-- edition은 immutable이다. 기존 edition을 덮어쓰지 않는다.
+- 원본 서비스의 트랜잭션과 외부 호출을 결합하지 않는다. 커밋 후 이벤트와 최소 한 번
+  전달을 전제로 한다.
+- BATON 생산자 연동은 PRD-0018의 권위 있는 신호 의미, 안정적인 정체성·`ACTIVE`·
+  `RESOLVED` 생명주기, 외부 집계 리비전, 시간 경계 재조정, 전용 transactional outbox와
+  실제 직렬화·종단 간 검증을 갖춘 뒤에만 완료로 판단한다. 현재 조회 신호를 이름만
+  변환하거나 JPA `@Version`을 외부 리비전으로 사용하지 않는다.
+- 이벤트 식별자와 버전을 검증하고 동일 재생은 멱등하게 처리한다. 같은 식별자의 다른
+  페이로드는 충돌로 다룬다.
+- 이벤트 v1 세 타입은 기존 타입 기반 `HIGH`·`MEDIUM` 규칙을 유지한다. 이벤트 v2는
+  BATON의 다섯 연속성 신호와 필수 `CRITICAL`·`WARNING`을 원본 수신 증거에 보존하고 각각
+  `HIGH`·`MEDIUM`으로 일대일 표시한다. v1·기존 미지원 기록의 `sourceSeverity`는 `null`을
+  유지하며 v1 fingerprint 입력을 바꾸지 않는다.
+- 이벤트 v2의 언어 중립 요청 계약은 `contracts/VERSION`과 JSON Schema·예시를 기준으로
+  관리한다. BRIEF 통합 시나리오는 같은 예시를 직접 수신하며 별도 고정 요청을 복제하지
+  않는다. RC 계약 팩만으로 BATON 실제 serializer나 종단 간 전달 완료를 주장하지 않는다.
+- BATON 이벤트 수신 인증을 켜면 `POST /api/v1/events`만 전용 Bearer로 보호한다. Spring
+  Security의 표준 Bearer 처리와 stateless filter chain을 사용하고 직접 헤더 파서·세션·
+  사용자 계정·token 저장소를 만들지 않는다. 비밀은 설정·로그·응답·영속 데이터에
+  노출하지 않는다. 교체 중에는 현재 token과 직전 token 한 건만 함께 허용하고 BATON
+  전환 뒤 직전 값을 제거한다. loopback 밖의 BATON 기본 URL은 HTTPS origin만 허용한다.
+- 스테이징 Caddy HTTPS 앞단은 정확한 `POST /api/v1/events`만 BRIEF로 전달하고 다른 모든
+  경로를 `404`로 종료한다. Bearer를 proxy에서 다시 구현하지 않고 접근 로그의
+  Authorization 헤더만 제거한다. 내부 health와 권한 계약이 없는 조회·에디션·재구축 API를
+  외부에 노출하지 않는다.
+- BATON 백엔드의 조회·에디션 생성은 이벤트 수신 Bearer를 재사용하지 않는 별도 서비스
+  인증과 비공개 네트워크 경로가 준비된 뒤 구현한다. 현재 Caddy 공개 허용 목록에 이 경로를
+  추가하지 않는다.
+- BRIEF는 외부 송신 경로가 없는 내부 `data`·`proxy` 네트워크에만 연결하고, Caddy만
+  `proxy`와 외부 송신용 `egress`에 연결한다. Caddy는 모든 Linux capability를 제거한 뒤
+  80·443 바인딩에 필요한 `NET_BIND_SERVICE`만 추가한다.
+- 수신 증거 조회는 최초 기록의 `processingOutcome`을 반환한다. `DUPLICATE`와
+  `CONFLICT`로 이를 덮어쓰지 않고 충돌은 선택적인 최초 탐지 시각으로만 표현하며,
+  fingerprint와 원문 payload를 응답에 노출하지 않는다.
+- 이상 수신 증거 이력은 작업공간·시즌 범위의 `APPLIED_WITH_GAP`, `STALE`,
+  `UNSUPPORTED` 또는 최초 충돌이 있는 기록만 반환한다. 충돌이 있는 `APPLIED`는 포함하고
+  `DUPLICATE`를 저장 결과로 만들지 않는다. `ingestionSequence` 배타 커서는 요청 간
+  스냅샷이 아니므로 최신 상태는 첫 페이지부터 다시 조회하게 한다.
+- 대체 보존 계약을 채택·마이그레이션·검증하기 전에는 `UNSUPPORTED`를 포함한 모든 수신
+  기록과 이벤트별 최초 충돌 한 건을 삭제·압축하지 않는다. 숫자 TTL, 용량 상한이나
+  보존 SLO를 임의로 만들지 않는다.
+- 동기 전역 재구축은 `UNSUPPORTED`를 제외한 수신 기록을 `ingestion_sequence` 순서로
+  재생한다. 지원 이벤트 수신·에디션 생성과 같은 PostgreSQL 트랜잭션 advisory lock
+  경계에서 직렬화하고, 현재 투영 전체 교체를 한 트랜잭션으로 수행해 실패 시 이전
+  투영으로 롤백한다.
+- 도착 순서를 원본 판단 기준으로 해석하지 않는다. 계약에 있는 집계 리비전과 워터마크를
+  사용한다.
+- 현재 관심 항목 단건 조회는 `(workspaceId, seasonId, eventType, sourceReference)` 복합
+  정체성을 그대로 사용하고 `ACTIVE`와 `RESOLVED`를 모두 현재 상태로 반환한다. 이를
+  불변 에디션·과거 상태 이력이나 목록 계약으로 확대하지 않는다.
+- 현재 관심 항목 단건 응답은 API 표현 버전·`ruleVersion`·마지막 적용 집계 리비전에
+  결합한 불투명 `ETag`를 제공한다. `If-None-Match`는 Spring MVC 표준 처리를 사용하고
+  직접 헤더 파서·`304` 분기·본문 해시·캐시 저장소를 만들지 않는다.
+- 현재 관심 항목 목록은 `ACTIVE`를 기본값으로 하고 `RESOLVED`를 선택할 수 있다.
+  `eventType`·`sourceReference` 복합 정체성 오름차순과 배타 키셋을 상태별로 재사용한다.
+  커서를 스냅샷으로 해석하지 않으며 심각도 우선의 불변 에디션 선정 순서를 복제하지 않는다.
+- 관심 항목 상태 전이 증거는 같은 복합 정체성의 `APPLIED`·`APPLIED_WITH_GAP` 최초 수신
+  기록만 원본 `aggregateRevision` 내림차순으로 반환한다. `detectedRevisionGap`은 해당
+  전이에서 새로 발견한 공백이며 현재 항목의 누적 `revisionGap`으로 바꾸지 않는다.
+- 에디션은 불변이다. 기존 에디션을 덮어쓰지 않는다.
+- 새 에디션 항목은 `aggregateRevision`과 `revisionGap`을 함께 고정하고 응답,
+  `stateFingerprint`와 비교 `changed` 판정에 포함한다. Flyway V3 이전 항목은 정확한
+  근거가 없으므로 두 값을 `null`로 유지하며 `0`·`false`로 기존 데이터를 채우거나 현재
+  투영에서 추정하지 않는다. 이 변경만으로 투영·에디션 `ruleVersion`을 올리지 않는다.
+- 작업공간·시즌 전역 최신과 정확한 작업공간·시즌·`weekStart`·`zoneId` 범위의 주간 최신을
+  서로 다른 포인터로 다룬다. 두 조회 모두 저장된 불변 에디션을 반환하고 현재 투영을
+  다시 조합하지 않는다. 주간 최신은 `ruleVersion`으로 필터링하지 않고 선택한 에디션의
+  저장된 값을 응답에 포함한다.
+- 생성·전역 최신·주간 최신·단건의 전체 불변 에디션 응답은 선택된 에디션을 나타내는
+  불투명 `ETag`를 제공한다. 적용 대상 `GET`의 `If-None-Match`는 Spring MVC의
+  `ResponseEntity` 표준 처리를 사용하고, 직접 헤더 파서·`304` 분기·본문 해시나 캐시
+  저장소를 만들지 않는다.
 - 시간 의존 코드는 시스템 현재 시간을 직접 읽지 않고 `Clock`을 주입한다.
 - 첫 MVP의 선정 규칙은 결정적이고 설명 가능해야 한다. AI 생성 결과를 권위 있는 판정으로
   사용하지 않는다.
-- 다른 서비스의 entity, migration, credential과 데이터베이스를 공유하지 않는다.
-- PII, secret, 원문 URL과 unbounded identifier를 로그나 metric label에 넣지 않는다.
+- 다른 서비스의 엔티티, 마이그레이션, 자격 증명과 데이터베이스를 공유하지 않는다.
+- 개인 식별 정보(PII), 비밀 값, 원문 URL과 길이가 제한되지 않은 식별자를 로그나 메트릭
+  레이블에 넣지 않는다.
+
+## 채택한 기술과 모듈 경계
+
+- ADR-0002를 기술 스택의 기준 문서로 사용한다. Kotlin/JVM 2.3.21, Java 21
+  도구 체인·JVM 21 바이트코드 대상·JDK 21 실행 환경, Spring Boot/BOM 4.1.0, Gradle wrapper
+  9.2.1과 Kotlin DSL, PostgreSQL 18.4를 임의로 바꾸지 않는다.
+- 영속성은 Spring JDBC `JdbcClient`와 Flyway로 구현하며 JPA를 추가하지 않는다.
+- 테스트 의존성은 실제 테스트가 있는 모듈에만 둔다. PostgreSQL 통합 테스트가
+  생기기 전에는 Testcontainers를 미리 추가하지 않는다.
+- JSON Schema 검증기는 계약 테스트가 있는 `bootstrap`의 테스트 의존성으로만 둔다.
+  계약 팩은 별도 플러그인·공유 DTO JAR 없이 Gradle 표준 `contractsZip` 작업으로 생성한다.
+- 모듈은 `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`,
+  `bootstrap` 다섯 개로 유지한다.
+- 의존은 `bootstrap`/어댑터 -> `application` -> `domain`으로만 향하게 한다. 두 어댑터가
+  서로 의존하거나 안쪽 모듈이 어댑터/`bootstrap`을 참조하게 하지 않는다.
+- PRD-0002의 이벤트·투영·에디션 경로, PRD-0003의 에디션 이력 경로, PRD-0004의 표준
+  요청 오류 표현, PRD-0005의 에디션 비교 경로와 PRD-0006의 최소 상태 확인 경계,
+  PRD-0007의 이벤트 수신 증거 조회, PRD-0008의 수신 증거 보존·투영 재구축 운영 경계와
+  PRD-0009의 주간 범위 최신 불변 에디션 조회, PRD-0010의 불변 에디션 리비전 근거와
+  PRD-0011의 이상 이벤트 수신 증거 이력 조회, PRD-0012의 불변 에디션 조건부 조회 및
+  PRD-0013의 현재 관심 항목 단건 조회, PRD-0014의 현재 활성 관심 항목 키셋 조회,
+  PRD-0015의 현재 관심 항목 상태 필터 조회, PRD-0016의 현재 관심 항목 상태 전이 증거
+  이력과 PRD-0017의 현재 관심 항목 조건부 조회, PRD-0018의 BATON 생산자 호환성
+  선행조건, PRD-0019의 BATON 연속성 신호 이벤트 v2와 PRD-0020의 BATON 이벤트 수신
+  전용 Bearer 경계, PRD-0021의 스테이징 컨테이너 실행 경계와 PRD-0022의 Caddy HTTPS
+  이벤트 수신 경계, PRD-0023의 BATON 백엔드 경유 조회와 PRD-0024의 BATON 주도 에디션
+  생성 경계를 따른다.
+  PRD-0008의 직접 동시성 검증 범위는 재구축과 지원 이벤트 수신이며, 에디션 생성·다른
+  재구축은 같은 잠금 코드 경로의 근거를 대상 테스트 증거로 확대하지 않는다. 이를 운영
+  인증·인가가 결정되거나 외부 공개가 허용된 것으로 확대 해석하지 않는다.
+- 최소 상태 확인은 Spring Boot Actuator의 표준 aggregate health와 자동 구성된 DB
+  contributor를 사용한다. 커스텀 controller, DTO, `HealthIndicator`와 확인 SQL을 만들지
+  않는다. 스테이징 Docker healthcheck는 이 aggregate endpoint를 사용한다. Spring Boot
+  4.1의 health probes 기본값은 `true`이므로 오케스트레이터 계약 전에는 표준 속성으로
+  비활성 상태를 유지한다.
+- 스테이징 이미지는 ADR-0004의 digest로 고정한 Java 21 JDK/JRE, UID/GID `10001`, 읽기
+  전용 루트와 `/tmp` tmpfs를 유지한다. PostgreSQL과 Bearer 비밀은 파일 기반 Compose
+  secrets와 Spring config tree로 주입하고 일반 환경 변수·별도 비밀 로더를 만들지 않는다.
+- 스테이징 BRIEF HTTP는 기본 loopback 바인딩을 유지한다. 공인 DNS·방화벽, 백업·복구,
+  registry와 실제 운영 배포를 구현되거나 검증된 것으로 가정하지 않는다.
+- 스테이징 BRIEF의 호스트 게시 주소는 Compose에서 `127.0.0.1`로 고정한다. 환경 변수로
+  외부 주소를 허용해 Caddy 허용 목록을 우회하지 않는다.
+- 선택적인 `https` profile은 digest로 고정한 Caddy와 자동 HTTPS를 사용한다. 실제
+  `BRIEF_STAGING_HOST`가 준비된 환경에서만 활성화하고 기본 `brief.invalid`를 운영 주소로
+  사용하지 않는다. 로컬 내부 CA 결과를 공인 DNS·ACME 발급이나 BATON 원격 전달 완료로
+  확대하지 않는다.
+- BATON 주도 에디션 생성의 소유권은 채택했지만 BATON 실행 기록·client, 서비스 인증과
+  종단 간 호출은 아직 구현된 것으로 가정하지 않는다. 브로커와 그 밖의 외부 시스템 연동
+  어댑터도 결정된 것으로 가정하지 않는다.
+- 로컬 PostgreSQL은 `compose.yml`을 사용한다. 애플리케이션 설정에는 Spring Boot 표준
+  데이터 원본/Flyway 속성을 사용하고 별도 환경변수 별칭을 만들지 않는다.
+
+## 단순화와 검증 책임
+
+- 구현 전에 같은 동작과 호출 지점을 `rg`로 찾고, 같은 이유로 생긴 중복을 함께 정리한다.
+- 직접 도우미나 설정 클래스를 만들기 전에 Kotlin 표준 API와 관용 표현을 먼저 사용한다.
+  Kotlin에 대응 기능이 없으면 Java 21 JDK API를 사용하고, 이어서 Spring Boot와 현재
+  의존성이 제공하는 API·자동 구성·표준 속성을 사용한다.
+- HTTP 표현은 입력 DTO, 도메인 불변식은 도메인, 저장 무결성은 데이터베이스처럼 한 소유
+  경계에서 한 번 검증한다. 서로 다른 신뢰 경계와 실패 시점을 지키는 검증은 중복으로
+  보지 않는다.
+- 한 번 쓰는 식을 이름만 바꾸는 도우미, 현재 변형이 하나뿐인 전략·팩터리, 전달만 하는
+  래퍼를 만들지 않는다. 실제 책임·실패 경계·안정적인 중복이 있을 때만 추출한다.
+- 커버리지 수치나 테스트 개수를 위해 단순 매핑, getter, 프레임워크 자체 동작을 다시
+  검증하지 않는다. 멱등성, 충돌, 리비전, 재구축, 시간 경계, 불변 에디션과 동시성처럼
+  회귀 비용이 큰 계약 증거를 우선한다.
+- 변경한 계층을 덮는 가장 작은 검증부터 실행하고, 같은 산출물을 증명하는 명령을 반복하지
+  않는다. 계층 횡단 변경의 전체 테스트·실행 JAR 검증은 최종 상태에서 한 번 수행한다.
 
 ## 문서와 검증
 
 - 제품 동작은 `docs/PRD/`, 장기 구조 결정은 `docs/ADR/`에 기록한다.
-- 계약 변경에는 producer/consumer compatibility와 replay 검증을 포함한다.
-- projection 변경에는 duplicate, out-of-order, rebuild와 fixed-clock 테스트를 포함한다.
-- 사용 가능한 실행 명령이 생기기 전에는 존재하지 않는 build나 test 명령을 문서화하지
-  않는다.
+- 계약 변경에는 생산자/소비자 호환성과 재생 검증을 포함한다.
+- 투영 변경에는 중복, 순서가 뒤바뀐 전달, 재구축과 고정 시각 테스트를 포함한다.
+- 재구축 실패·동시성 경계를 바꾸면 중간 강제 실패의 원자적 롤백과 지원 이벤트 수신
+  사이의 잠금 직렬화를 PostgreSQL 통합 테스트로 입증한다. 에디션 생성이나 다른
+  재구축과의 동시 실행은 실제로 검증한 범위만 보고한다.
+- 기존 열 제거, 기본 키 전환이나 호환 `null` 열 추가처럼 데이터가 있는 스키마를 바꾸는
+  Flyway 변경은 대표 이전 버전 행을 둔 PostgreSQL 업그레이드 시나리오로 검증한다. 빈
+  데이터베이스의 전체 마이그레이션 성공만으로 기존 데이터 호환성을 주장하지 않는다.
+- 저장소 전체 기준 검증으로 `./gradlew test`와 `./gradlew :bootstrap:bootJar`를 실행한다.
+  실행하지 못한 명령이나 확인하지 않은 실행 환경 동작은 성공으로 기록하지 않는다.
+- 이벤트 계약을 바꾸면 JSON Schema·예시 검증과 `contractsZip` 생성을 확인하고, BATON
+  실제 serializer가 검증되지 않았다면 계약 버전을 RC로 유지한다.
+- 스테이징 조립을 바꾸면 Compose 구문, 이미지 빌드, 비루트·읽기 전용 실행, DB aggregate
+  health와 파일 기반 Bearer 한 건을 확인한다. 제품 API 전체 시나리오나 Spring Security
+  자체 동작을 다시 검증하지 않고 loopback 결과를 공인 HTTPS 완료로 확대하지 않는다.
+- Caddy 경계를 바꾸면 설정 유효성, 신뢰한 HTTPS의 무인증 `401`·정상 Bearer 수신, 이벤트
+  외 경로 `404`와 Authorization 로그 비노출을 한 조립 시나리오에서 확인한다. 인증서 검증을
+  끄거나 이 결과를 실제 공인 인증서·BATON 원격 스테이징 전달로 기록하지 않는다. 네트워크
+  또는 capability를 바꾸면 실제 컨테이너 연결과 `cap_drop`·`cap_add`도 함께 확인한다.
 
 ## Git
 
 - 커밋 제목은 `종류: 한글 요약` 형식을 사용한다.
 - 종류는 `기능`, `수정`, `문서`, `테스트`, `설정`, `리팩터` 중에서 고른다.
-- 기능 작업 브랜치는 기본적으로 `codex/` prefix를 사용한다.
+- 기능 작업 브랜치는 기본적으로 `codex/` 접두사를 사용한다.
+- 완료한 변경은 주된 목적에 따라 `설정`, `기능`, `수정`, `리팩터`, `테스트`, `문서`로
+  나누어 명시적인 경로만 스테이징하고 각각 커밋한다. 서로 무관한 분류를 한 커밋에 섞지
+  않는다.
 - 관련 검증이 성공한 변경만 커밋하고, 실행하지 못한 검증은 최종 보고에 명시한다.

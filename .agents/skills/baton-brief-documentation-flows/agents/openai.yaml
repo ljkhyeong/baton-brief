@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF 문서화 흐름"
+  short_description: "BRIEF 문서를 실제 상태에 맞게 관리"
+  default_prompt: "$baton-brief-documentation-flows를 사용해 BATON BRIEF 문서를 실제 구현과 검증 상태에 맞게 갱신해 주세요."

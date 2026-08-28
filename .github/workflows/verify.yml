@@ -1,0 +1,46 @@
+name: 저장소 검증
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 빌드와 설정 검증
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Java 21 설정
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Gradle 설정과 wrapper 검증
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+
+      - name: Gradle 검증
+        run: ./gradlew --no-daemon test :bootstrap:bootJar contractsZip
+
+      - name: Compose 설정 검증
+        run: |
+          docker compose -f compose.yml config --quiet
+          docker compose --env-file .env.staging.example -f compose.staging.yml --profile https config --quiet
+
+      - name: 스테이징 이미지 빌드
+        run: docker build --tag baton-brief:ci .
+
+      - name: Caddy 설정 검증
+        run: >-
+          docker run --rm --network none
+          --env BRIEF_STAGING_HOST=brief.invalid
+          --volume "${{ github.workspace }}/ops/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+          caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

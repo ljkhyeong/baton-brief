@@ -1,0 +1,11 @@
+.git
+.gradle
+.idea
+**/build
+.env
+.env.*
+!.env.staging.example
+*.key
+*.pem
+*.p12
+*.pfx

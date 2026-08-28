@@ -1,0 +1,37 @@
+{
+	admin off
+}
+
+{$BRIEF_STAGING_HOST:brief.invalid} {
+	log {
+		format filter {
+			request>headers>Authorization delete
+			request>headers>Proxy-Authorization delete
+		}
+	}
+
+	header -Server
+
+	@eventIngestion {
+		method POST
+		path /api/v1/events
+	}
+	handle @eventIngestion {
+		header Cache-Control "no-store"
+		request_header -Forwarded
+		request_header -X-Forwarded-*
+		request_header -Proxy-Authorization
+		reverse_proxy brief:8080 {
+			header_up X-Forwarded-Host {$BRIEF_STAGING_HOST:brief.invalid}
+			header_up X-Forwarded-Port 443
+		}
+	}
+
+	handle {
+		respond "" 404
+	}
+
+	handle_errors {
+		respond "" {err.status_code}
+	}
+}

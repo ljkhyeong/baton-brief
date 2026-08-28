@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF 에디션 흐름"
+  short_description: "결정적인 불변 BRIEF 에디션 관리"
+  default_prompt: "$baton-brief-edition-flows를 사용해 결정적이고 불변인 BRIEF 에디션 변경을 구현해 주세요."
