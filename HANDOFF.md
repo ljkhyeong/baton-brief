@@ -106,7 +106,7 @@ serializer와 다시 검증해야 한다.
 외부 Action은 전체 commit SHA로 고정했고 `gradle/actions/setup-gradle`이 Gradle 실행 전에
 wrapper JAR을 검증하고 캐시를 구성한다. 이어 `test :bootstrap:bootJar contractsZip`, 로컬·
 HTTPS profile의 Compose 구문, 실제 Dockerfile 빌드와 고정 Caddy 이미지의 설정 유효성을
-검증한다. 최초 GitHub Actions 원격 실행 결과는 아직 확인하지 않았다.
+검증한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이 검증 구성이 통과했다.
 
 ## 미검증·미결정 범위
 
@@ -117,7 +117,7 @@ HTTPS profile의 Compose 구문, 실제 Dockerfile 빌드와 고정 Caddy 이미
 - 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관과 숫자 보존 기간
 - 재구축 SLO·잠금 제한 시간, 체크포인트, 백업·복구와 RPO·RTO
 - Caddy 인증서 볼륨 소유권을 포함한 비루트 전환과 다중 인스턴스 고가용성
-- GitHub Actions 최초 원격 실행, 이미지 registry와 릴리스 정책
+- 이미지 registry와 릴리스 정책
 - Gradle dependency verification metadata의 신뢰 가능한 최초 checksum 검토와
   플랫폼 간 유지 절차. 현재 wrapper 배포본 checksum과 최소 CI를 우선하고, 실제 작업
   의존성에서 생성된 대규모 metadata는 검토 없이 추가하지 않는다.
