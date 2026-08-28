@@ -1106,6 +1106,18 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.detail").isNotEmpty)
             .andExpect(jsonPath("$.instance").value("/api/v1/events"))
 
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000012",
+                workspaceId,
+                seasonId,
+                "future-version",
+                1,
+                eventVersion = 3,
+            ),
+        ).andExpect(status().isUnprocessableContent)
+            .andExpect(jsonPath("$.status").value("UNSUPPORTED"))
+
         val numericInstant = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
             .replace("\"occurredAt\": \"2026-08-12T09:00:00Z\"", "\"occurredAt\": 1786525200")
         postEvent(numericInstant).andExpect(status().isBadRequest)
