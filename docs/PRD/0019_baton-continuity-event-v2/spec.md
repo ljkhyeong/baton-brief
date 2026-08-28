@@ -21,12 +21,12 @@ BRIEF 이벤트 v1의 세 타입과 일치하지 않으므로 이름 변환으�
 |---|---|---|
 | `1` | `HANDOFF_BLOCKED`, `ROUTINE_MISSED`, `DECISION_FOLLOW_UP_OVERDUE` | 반드시 생략 또는 `null` |
 | `2` | `ROLE_UNASSIGNED`, `ROLE_SUCCESSOR_MISSING`, `ROLE_PREPARATION_INCOMPLETE`, `ROUTINE_REPEATEDLY_OVERDUE`, `HANDOFF_INCOMPLETE` | `CRITICAL` 또는 `WARNING` 필수 |
-| 그 밖의 양수 | 알려진 열거형만 JSON으로 해석 | `UNSUPPORTED`로 최초 수신 증거를 보존하고 투영하지 않음 |
+| 그 밖의 32비트 양수 | 알려진 열거형만 JSON으로 해석 | `UNSUPPORTED`로 최초 수신 증거를 보존하고 투영하지 않음 |
 
 v2 지원 전 이미 `UNSUPPORTED`로 보존할 수 있었던 `eventVersion=2`·v1 타입·심각도 없음
 조합은 동일 재전달 호환성을 위해 계속 `422 UNSUPPORTED`로 기록하되 투영하지 않는다.
-그 밖의 지원 버전·타입·심각도 불일치는 `400 Bad Request`다. 알 수 없는 열거형, 양수가
-아닌 버전과 기존 봉투 형식 오류도 기존처럼 수신 기록을 만들지 않는다.
+그 밖의 지원 버전·타입·심각도 불일치는 `400 Bad Request`다. 알 수 없는 열거형, 32비트
+양의 정수 범위를 벗어난 버전과 기존 봉투 형식 오류도 수신 기록을 만들지 않는다.
 
 `sourceSeverity`는 BATON의 원본 판정을 뜻하며 payload fingerprint, 최초 수신 증거와
 재구축 입력에 포함한다. v1 기록과 지원하지 않는 기존 기록은 `null`을 유지한다.

@@ -20,7 +20,7 @@
 
 | 문서 | 상태 | 내용 |
 | --- | --- | --- |
-| [PRD-0001 제품 기준](PRD/0001_product-baseline/spec.md) | 초안 | 서비스 경계, 핵심 개념과 첫 MVP 범위 |
+| [PRD-0001 제품 기준](PRD/0001_product-baseline/spec.md) | 채택됨 | 서비스 경계, 핵심 개념과 첫 MVP 범위 |
 | [PRD-0002 MVP 계약](PRD/0002_mvp-contract/spec.md) | 채택됨 | 이벤트 수신, 규칙 v1 투영, 재구축과 주간 에디션 |
 | [PRD-0004 표준 요청 오류](PRD/0004_problem-detail/spec.md) | 채택됨 | RFC 9457 `ProblemDetail` 적용 범위와 비노출 경계 |
 | [PRD-0006 최소 상태 확인](PRD/0006_minimum-health/spec.md) | 채택됨 | Spring Boot aggregate health와 DB contributor |
@@ -63,6 +63,13 @@
 | [PRD-0021 스테이징 실행](PRD/0021_staging-runtime-boundary/spec.md) | 채택됨 | 비루트 BRIEF, 내부 PostgreSQL과 파일 기반 비밀 |
 | [PRD-0022 HTTPS 이벤트 수신](PRD/0022_https-event-ingress/spec.md) | 채택됨 | Caddy 단일 허용 경로, 네트워크 격리와 로컬 CA 검증 |
 
+## BATON 애플리케이션 연결
+
+| 문서 | 상태 | 내용 |
+| --- | --- | --- |
+| [PRD-0023 BATON 백엔드 경유 조회](PRD/0023_baton-mediated-brief-query/spec.md) | 채택됨 | BATON 사용자 권한 판정 뒤 허용한 BRIEF 내부 조회 중계 |
+| [PRD-0024 BATON 주도 에디션 생성](PRD/0024_baton-driven-edition-generation/spec.md) | 채택됨 | BATON 대상·시점 결정과 기존 BRIEF 멱등 생성 명령 호출 |
+
 ## 아키텍처 결정
 
 | 문서 | 상태 | 결정 |
@@ -72,6 +79,7 @@
 | [ADR-0003 이벤트 Bearer](ADR/0003_baton-event-authentication/adr.md) | 채택됨 | Spring Security 표준 Bearer와 수동 교체 구간 |
 | [ADR-0004 스테이징 컨테이너](ADR/0004_staging-container-runtime/adr.md) | 채택됨 | 비루트·읽기 전용 실행 이미지와 내부 데이터베이스 |
 | [ADR-0005 Caddy HTTPS 앞단](ADR/0005_caddy-event-ingress/adr.md) | 채택됨 | 자동 HTTPS, 공개 경로 허용 목록과 최소 capability |
+| [ADR-0006 BATON·BRIEF 애플리케이션 경계](ADR/0006_baton-brief-application-boundary/adr.md) | 채택됨 | BATON의 사용자 권한·생성 실행과 BRIEF 내부 읽기 모델 책임 |
 
 ## 다른 기준 자료
 

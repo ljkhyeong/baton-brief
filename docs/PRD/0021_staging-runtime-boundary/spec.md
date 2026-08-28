@@ -33,7 +33,7 @@ HTTP origin까지만 제공하고 PRD-0022의 명시적인 profile로 이벤트 
 - `BRIEF_STAGING_DATABASE_PASSWORD_FILE`
 - `BRIEF_STAGING_EVENT_RECEIVER_BEARER_TOKEN_FILE`
 - `BRIEF_STAGING_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN_FILE`
-- 데이터베이스 이름·사용자, 이미지 이름과 loopback 바인딩 포트
+- 데이터베이스 이름·사용자, 이미지 이름과 loopback 게시 포트
 - `https` profile에서 사용할 공개 호스트 이름과 HTTP/HTTPS 포트 매핑
 
 실제 비밀 파일은 저장소 밖에 두고 Git에 추가하지 않는다. Compose는 세 파일을
@@ -62,8 +62,8 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https co
 docker compose --env-file .env.staging -f compose.staging.yml --profile https up --build -d --wait
 ```
 
-`BRIEF_STAGING_HTTP_BIND`를 외부 인터페이스로 바꾸는 것은 Caddy 우회 경로를 만들 수
-있으므로 기본 loopback 값을 유지한다.
+BRIEF의 호스트 게시 주소는 Compose에서 `127.0.0.1`로 고정한다. 공개할 주소를 환경 변수로
+받지 않으며 외부 접근은 PRD-0022의 Caddy 허용 경로를 통해서만 제공한다.
 
 ## 수용 기준
 

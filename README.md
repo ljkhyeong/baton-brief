@@ -23,12 +23,16 @@ Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.4 기반의 로컬 MVP를 구현
 BATON 도메인 이벤트 ──> BRIEF 수신 기록 ──> AttentionItem 현재 투영
                                                 │
                                                 └─> 불변 BriefEdition
-                                                           │
-                                                           └─> BATON UI
+
+설계한 다음 연결(미구현):
+BATON UI ──> BATON 백엔드 권한 판정 ──> BRIEF 내부 조회
+BATON 백엔드 대상·시점 결정 ──────────> BRIEF 에디션 생성 명령
 ```
 
 BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운영 사실과 최종 판정은 원본
-서비스가 소유하고 BRIEF는 커밋 후 전달된 이벤트만 소비한다.
+서비스가 소유하고 BRIEF는 커밋 후 전달된 이벤트만 소비한다. 사용자 조회와 에디션 생성
+실행의 다음 경계는 [PRD-0023](docs/PRD/0023_baton-mediated-brief-query/spec.md)과
+[PRD-0024](docs/PRD/0024_baton-driven-edition-generation/spec.md)를 따른다.
 
 ## 기능 지도
 
@@ -150,7 +154,8 @@ docker compose --env-file .env.staging -f compose.staging.yml up --build -d --wa
 ```
 
 기본 조립은 PostgreSQL의 호스트 포트를 열지 않고 BRIEF HTTP를 `127.0.0.1:8080`에만
-바인딩한다. 공개 호스트가 준비된 환경에서만 Caddy profile을 명시적으로 활성화한다.
+바인딩한다. 호스트 주소는 Compose에서 고정되며 포트만 바꿀 수 있다. 공개 호스트가 준비된
+환경에서만 Caddy profile을 명시적으로 활성화한다.
 
 ```shell
 docker compose --env-file .env.staging -f compose.staging.yml --profile https config --quiet

@@ -8,7 +8,8 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 ## 맥락을 확립한다
 
 - `AGENTS.md`, `HANDOFF.md`, `README.md`, 영향받는 PRD와 관련 ADR을 읽는다.
-- ADR-0002의 다섯 모듈과 PRD-0002부터 PRD-0022까지를 현재 작업 범위로 사용한다. 실제
+- ADR-0002·ADR-0006의 서비스·모듈 경계와 PRD-0002부터 PRD-0024까지를 현재 작업 범위로
+  사용한다. 실제
   구현 상태와 검증 근거는 `HANDOFF.md`에서 확인하고, 확인한 로컬 실행을 외부 연동·운영
   배포로 확대하지 않는다.
 - 이 보완 절차를 사용하기 전에 기존 규칙을 검색하고 가장 좁게 일치하는 BRIEF 스킬을
@@ -21,6 +22,8 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   링크 수명주기를 소유하게 한다.
 - BRIEF는 자체 멱등 수신함, `AttentionItem` 투영, 로컬 `sourceCursor`,
   작업공간/시즌별 `generation`, 재구축 근거와 불변 `BriefEdition`만 소유한다.
+- BATON 백엔드가 사용자 인증·멤버십 권한과 에디션 생성 대상·시점을 소유하게 한다.
+  BRIEF에 사용자 계정·세션·대상 registry와 자체 scheduler를 추가하지 않는다.
 - 커밋된 원본 이벤트를 소비한다. BRIEF 가용성을 BATON 원본 트랜잭션과
   결합하지 않는다.
 - 다른 서비스의 엔티티, 마이그레이션, 자격 증명 또는 데이터베이스를 공유하지 않는다.
@@ -36,7 +39,7 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 3. `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap` 다섯
    모듈을 유지한다. 의존은 `bootstrap`/어댑터에서 `application`, 다시 `domain`으로
    향하게 한다. 어댑터끼리 의존하지 않고 내부 모듈은 외부 모듈에 의존하지 않는다.
-4. PRD-0002부터 PRD-0022까지 채택한 로컬 MVP, 이벤트 수신 전용 Bearer, 최소 스테이징
+4. PRD-0002부터 PRD-0024까지 채택한 로컬 MVP, 이벤트 수신 전용 Bearer, 최소 스테이징
    컨테이너와 Caddy HTTPS 경계를 따른다. 현재 구현 범위는 `HANDOFF.md`에서 확인한다.
    ADR-0004·ADR-0005의 로컬 실행 근거를 브로커, 스케줄러, 외부 시스템 어댑터, 공인
    인증서, 장기 운영 배포 또는 다른 API 인증·인가로 확대하지 않는다.
@@ -104,6 +107,11 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   기본 거부한다. Caddy는 Bearer를 해석하지 않고 Authorization을 접근 로그에서 제거하며,
   애플리케이션에 TLS·인증서 코드를 추가하지 않는다. 내부 CA 검증을 공인 ACME나 BATON
   원격 전달로 확대하지 않는다.
+- PRD-0023의 사용자 조회는 BATON 백엔드가 권한을 판정한 뒤 비공개 서비스 경로로만
+  중계한다. 이벤트 수신 Bearer를 재사용하거나 BRIEF에 사용자 인증·멤버십·CORS를 만들지
+  않는다.
+- PRD-0024의 에디션 생성은 BATON이 대상·시간대·실행 기록을 소유하고 기존 BRIEF 멱등 명령을
+  호출한다. BRIEF에 scheduler·대상 registry·새 멱등 키를 추가하지 않는다.
 - BRIEF는 외부 송신 경로가 없는 내부 `data`·`proxy`에만 연결하고 Caddy만 `proxy`와
   외부 송신용 `egress`에 연결한다. Caddy는 capability를 모두 제거한 뒤
   `NET_BIND_SERVICE`만 추가한다. 비루트 Caddy를 채택하기 전에는 이름 있는 인증서 볼륨의

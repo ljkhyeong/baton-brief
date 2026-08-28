@@ -1,4 +1,4 @@
 interface:
-  display_name: "BATON BRIEF Flows"
-  short_description: "Guide cross-cutting BRIEF service changes"
-  default_prompt: "Use $baton-brief-flows to implement a scoped cross-cutting BATON BRIEF change."
+  display_name: "BATON BRIEF 공통 흐름"
+  short_description: "계층을 가로지르는 BRIEF 변경 절차"
+  default_prompt: "$baton-brief-flows를 사용해 범위가 명확한 BATON BRIEF 변경을 구현해 주세요."

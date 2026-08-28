@@ -2,23 +2,25 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 범위: BATON이 BRIEF 이벤트 v1 생산자가 되기 전에 해결할 의미·식별자·전송 계약
+- 범위: BATON 이벤트 v2의 의미·식별자·전송 호환성과 안정 버전 승격 게이트
 
 ## 목적
 
-BRIEF는 PRD-0002의 이벤트 v1을 멱등하게 수신하고 투영·재구축할 수 있지만, 소비자 계약이
-존재한다는 사실만으로 BATON이 같은 의미의 이벤트를 생산할 수 있는 것은 아니다.
+BRIEF는 PRD-0002의 이벤트 v1·v2를 멱등하게 수신하고 투영·재구축할 수 있지만, 소비자
+계약이 존재한다는 사실만으로 BATON이 같은 의미의 이벤트를 생산한다고 볼 수는 없다.
 
 현재 BATON의 연속성 신호와 BRIEF 이벤트 v1을 직접 이름으로 연결하거나 테스트 고정값만
 공유하면, 조회 시점에 계산되는 신호를 영속 상태 전이처럼 오해하고 내부 동시성 버전을 원본
 집계 리비전처럼 사용할 위험이 있다. 생산자 구현 전에 불일치를 명시하고, 의미 정합화와
 내구성 있는 전달의 완료 조건을 고정한다.
 
-## 현재 확인한 불일치
+## 도입 전에 확인한 불일치
 
-2026-08-22의 BATON `ccfbc46`과 현재 BRIEF 구현을 읽기 전용으로 대조했다.
+2026-08-22의 BATON `ccfbc46`과 당시 BRIEF 구현을 읽기 전용으로 대조한 결과다. 이후
+PRD-0019의 이벤트 v2와 BATON 생산자 구현으로 아래 차이를 해소했지만, 왜 v1 이름 변환을
+채택하지 않았는지 보존하는 기준으로 남긴다.
 
-| 관심사 | 현재 BATON | BRIEF 이벤트 v1 요구 | 결론 |
+| 관심사 | 당시 BATON | BRIEF 이벤트 v1 요구 | 결론 |
 |---|---|---|---|
 | 신호 종류 | `ROLE_UNASSIGNED`, `ROLE_SUCCESSOR_MISSING`, `ROLE_PREPARATION_INCOMPLETE`, `ROUTINE_REPEATEDLY_OVERDUE`, `HANDOFF_INCOMPLETE` | `HANDOFF_BLOCKED`, `ROUTINE_MISSED`, `DECISION_FOLLOW_UP_OVERDUE` | 이름과 의미가 일치하지 않는다. |
 | 심각도 | `CRITICAL`, `WARNING` | 규칙 v1이 `HIGH`, `MEDIUM`으로 결정 | 단순 enum 변환을 권위 판정처럼 사용하면 안 된다. |
@@ -103,8 +105,8 @@ BATON은 `PRD-0006: BATON–BRIEF 연속성 신호 생산 계약`에서 다음 �
   `1`부터 연속 증가한다.
 - 원본 변경과 시간 경계 재조정은 같은 신호 계산·저장 경계를 사용하고, 동일 상태에서는
   새 리비전과 outbox를 만들지 않는다.
-- BRIEF 전용 불변 outbox와 커밋 뒤 최소 한 번 전달을 사용하되, 이벤트 v2 소비 계약과 실제
-  직렬화 아티팩트가 준비되기 전에는 생산자 구현을 시작하지 않는다.
+- BRIEF 전용 불변 outbox와 커밋 뒤 최소 한 번 전달을 사용한다. 현재 생산자 구현은 이벤트
+  v2 소비 계약을 선행한 이 경계를 따른다.
 
 BRIEF는 `contracts/VERSION`의 `2.0.0-rc.2`를 기준으로 이벤트 v2 JSON Schema와 예시를
 제공하고, 같은 예시를 소비자 통합 시나리오에서 검증한다. 이 파일은 소비자 소유 계약
@@ -116,8 +118,17 @@ BRIEF는 `contracts/VERSION`의 `2.0.0-rc.2`를 기준으로 이벤트 v2 JSON S
   변경하지 않는다.
 - BATON 의미 정합화 결과가 v1과 손실 없이 맞지 않으면 BRIEF가 임의 매핑을 수용하지 않고
   새 이벤트 버전의 생산자·소비자 호환 계약을 먼저 채택한다.
-- 생산자 구현 전에는 BRIEF에 BATON 전용 client, broker adapter, 인증 예외, 추측 enum,
-  임시 source reference 변환과 고정 fixture를 추가하지 않는다.
+- BRIEF에는 생산 방향을 뒤집는 BATON client, broker adapter, 인증 예외, 추측 enum,
+  임시 source reference 변환과 생산자 의미가 없는 고정 fixture를 추가하지 않는다.
+
+## 현재 적용 상태
+
+- BATON은 다섯 연속성 신호의 영속 정체성·리비전·상태 전이, 시간 재조정과 BRIEF 전용
+  outbox·HTTP 전달을 구현했다.
+- 로컬 실행 JAR과 MySQL·PostgreSQL을 함께 사용한 교차 검증 근거는 계약 팩
+  `2.0.0-rc.1`까지다.
+- 현재 소비자 계약 `2.0.0-rc.2`는 BATON 실제 serializer 재검증과 공인 HTTPS 원격 전달이
+  남아 있으므로 안정 버전으로 승격하지 않는다.
 
 ## 수용 기준
 
@@ -126,8 +137,8 @@ BRIEF는 `contracts/VERSION`의 `2.0.0-rc.2`를 기준으로 이벤트 v2 JSON S
 - 날짜 경계와 초기 상태를 다루는 재조정이 동일 상태에서 멱등하다.
 - 원본 변경과 같은 트랜잭션의 전용 outbox, 커밋 뒤 최소 한 번 전달과 결과 분류가 있다.
 - 실제 BATON 직렬화 계약과 생산자→소비자 종단 간 시나리오가 성공한다.
-- 위 조건을 충족하기 전에는 README·HANDOFF와 배포 문서에서 생산자 연동 완료로 표시하지
-  않는다.
+- 현재 계약 버전의 실제 serializer와 원격 종단 간 검증을 마치기 전에는 README·HANDOFF와
+  배포 문서에서 안정 버전 연동 완료로 표시하지 않는다.
 
 ## 명시적 비목표
 

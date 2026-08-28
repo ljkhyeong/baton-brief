@@ -77,7 +77,7 @@ v2로 수신·재생하는 계약을 추가한다.
 |---|---|---|
 | `eventId` | UUID | 이벤트 식별자 |
 | `eventType` | 열거형 | 아래 버전별 종류 중 하나 |
-| `eventVersion` | 정수 | 양수이며 소비자가 지원하는 값은 `1`과 `2` |
+| `eventVersion` | 정수 | `1..2147483647`, 소비자가 지원하는 값은 `1`과 `2` |
 | `sourceSeverity` | 열거형 또는 `null` | v1은 생략·`null`, v2는 `CRITICAL` 또는 `WARNING` 필수 |
 | `workspaceId` | UUID | 불투명 원본 참조 범위 |
 | `seasonId` | UUID | 불투명 원본 참조 범위 |
@@ -131,8 +131,8 @@ PostgreSQL `TIMESTAMPTZ`와 저장·응답 스냅샷의 정밀도를 맞추기 �
   투영을 변경하지 않는다.
 
 문법적으로 잘못된 UUID·시점·열거형, 빈 `sourceReference`, 128자를 넘는
-`sourceReference`, 양수가 아닌 이벤트 버전 또는 리비전은 유효한 이벤트 수신 기록이나
-투영 효과를 만들지 않는다.
+`sourceReference`, 32비트 양의 정수 범위를 벗어난 이벤트 버전 또는 양수가 아닌 리비전은
+유효한 이벤트 수신 기록이나 투영 효과를 만들지 않는다.
 
 HTTP 상태와 응답 본문은 다음과 같다.
 
@@ -140,7 +140,7 @@ HTTP 상태와 응답 본문은 다음과 같다.
 - `DUPLICATE`, `STALE`: `200 OK`
 - `CONFLICT`: `409 Conflict`
 - `UNSUPPORTED`: `422 Unprocessable Content`
-- 요청 검증 실패: `400 Bad Request` (`eventVersion <= 0` 포함)
+- 요청 검증 실패: `400 Bad Request` (`eventVersion`의 32비트 양의 정수 범위 위반 포함)
 
 본문은 `eventId`, `status`와 적용된 경우의 `item`을 반환한다. `item`은 `reasonCode`,
 `severity`, `sourceReference`, `status`, `observedAt`, `aggregateRevision`, `ruleVersion`과
