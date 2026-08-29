@@ -70,6 +70,9 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 
 - `contracts/schemas/source-event.v2.schema.json`을 이벤트 v2 요청의 기계 판독 기준으로
   제공한다.
+- Draft 2020-12 검증기는 UUID와 시점 `format-assertion`을 활성화한다. JSON Schema가 숫자
+  token의 소수점·지수 표기를 구분하지 못하는 한계는 PRD-0002의 정수 표현 계약과 실제
+  소비자 수신 검증으로 보완한다.
 - `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
 - 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. 현재 `2.0.0-rc.2`는 BRIEF 소비자의

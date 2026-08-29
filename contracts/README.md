@@ -13,6 +13,16 @@ JSON Schema와 예시로 제공한다. BRIEF 소비자는 `VERSION`의 현재 �
 스키마는 개별 필드 형식과 v2 열거형을 정의한다. 같은 `sourceReference`의 리비전 증가,
 `ACTIVE`·`RESOLVED` 생명주기, 멱등성·충돌·HTTP 결과와 재구축 의미는 PRD-0019가 기준이다.
 
+Draft 2020-12의 `format`은 기본적으로 주석이므로 계약 검증기는 `format-assertion`을
+활성화해야 한다. UUID와 `date-time`을 실제 제약으로 검사하지 않는 기본 설정만으로 계약
+일치를 판단하지 않는다.
+
+JSON Schema는 숫자의 표기 형태를 구분하지 않으므로 수학적으로 같은 `2`와 `2.0`, `1`과
+`1.0`을 같은 값으로 다룬다. 생산자는 `eventVersion`과 `aggregateRevision`을 소수점이나
+지수 표기가 없는 JSON 정수 token으로 직렬화해야 한다. BRIEF는 소수 형태를 정수로
+변환하지 않고 `400 Bad Request`로 거부한다. `sourceReference`의 최대 128자는 Unicode
+code point를 기준으로 한다.
+
 현재 버전 `2.0.0-rc.2`는 `aggregateRevision`을 JVM `Long`·PostgreSQL `BIGINT`와 같은
 부호 있는 64비트 양수 범위로 제한하고, 계약에 없는 필드와 정수가 아닌 숫자를 거부하도록
 소비자 수신 경계를 맞춘 사전 버전이다. BRIEF 소비자와 계약 팩 검증은 완료했지만 BATON

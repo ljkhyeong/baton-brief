@@ -37,6 +37,25 @@ class BriefEventContractTest {
             .isNotEmpty()
     }
 
+    @Test
+    fun `UUID와 시점 format을 실제 제약으로 검증한다`() {
+        val template = EXAMPLES.first().getContentAsString(Charsets.UTF_8)
+        val invalidExamples = listOf(
+            template.replaceFirst(
+                Regex("\"eventId\"\\s*:\\s*\"[^\"]+\""),
+                "\"eventId\": \"not-a-uuid\"",
+            ),
+            template.replaceFirst(
+                Regex("\"occurredAt\"\\s*:\\s*\"[^\"]+\""),
+                "\"occurredAt\": \"2026-02-30T09:00:00Z\"",
+            ),
+        )
+
+        invalidExamples.forEach { example ->
+            assertThat(SCHEMA.validate(example, InputFormat.JSON)).isNotEmpty()
+        }
+    }
+
     companion object {
         private val SCHEMA_REGISTRY = SchemaRegistry.withDefaultDialect(
             SpecificationVersion.DRAFT_2020_12,
