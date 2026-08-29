@@ -112,10 +112,16 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   않는다.
 - PRD-0024의 에디션 생성은 BATON이 대상·시간대·실행 기록을 소유하고 기존 BRIEF 멱등 명령을
   호출한다. BRIEF에 scheduler·대상 registry·새 멱등 키를 추가하지 않는다.
-- BRIEF는 외부 송신 경로가 없는 내부 `data`·`proxy`에만 연결하고 Caddy만 `proxy`와
-  외부 송신용 `egress`에 연결한다. Caddy는 capability를 모두 제거한 뒤
-  `NET_BIND_SERVICE`만 추가한다. 비루트 Caddy를 채택하기 전에는 이름 있는 인증서 볼륨의
-  소유권 계획 없이 init 컨테이너나 권한 변경 스크립트를 만들지 않는다.
+- PRD-0025의 조회·생성 경계는 이벤트와 다른 서비스 Bearer를 사용한다. 서비스 전용 Caddy만
+  내부 `proxy`와 BATON 공유 `--internal` 네트워크에 연결하고, 호스트 포트 없이 운영자 제공
+  인증서로 `8443` HTTPS와 정확한 허용 목록을 제공한다. BRIEF 애플리케이션을 공유 네트워크에
+  직접 연결하거나 사설망을 이유로 평문 HTTP·인증서 검증 비활성화를 허용하지 않는다.
+- BRIEF는 외부 송신 경로가 없는 내부 `data`·`proxy`에만 연결한다. 공개 Caddy는 `proxy`와
+  외부 송신용 `egress`에 연결하고 capability를 모두 제거한 뒤 `NET_BIND_SERVICE`만
+  추가한다. 서비스 Caddy는 고정 기반 이미지의 `cap_net_bind_service` file capability를
+  빌드 시 제거하고 UID/GID `10001`, 읽기 전용 루트와 런타임 `cap_drop=ALL`로 실행한다.
+  비루트 Caddy를 채택하기 전에는 이름 있는 인증서 볼륨의 소유권 계획 없이 init 컨테이너나
+  권한 변경 스크립트를 만들지 않는다.
 - 이벤트 v2 계약 팩은 `contracts/VERSION`을 단일 버전 기준으로 삼고 JSON Schema·예시와
   PRD-0019만 Gradle 표준 `Zip`으로 묶는다. 공유 JVM DTO, 계약 서비스, 별도 배포 플러그인과
   예시 전용 제품 시나리오를 추가하지 않는다.

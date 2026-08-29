@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-29
-- 구현 상태: 계약 채택, 코드·스테이징 조립 검증 예정
+- 구현 상태: BRIEF 인증·서비스 전용 HTTPS sidecar와 Compose 구현, BATON 종단 간 검증 예정
 - 범위: BATON 백엔드가 BRIEF 조회와 에디션 생성 명령을 호출하는 서비스 전용 신뢰 경계
 
 ## 목적
@@ -40,19 +40,27 @@ BATON 사용자 계정이나 멤버십을 복제하지 않는다.
 ## 비공개 네트워크
 
 BATON과 BRIEF의 기본 Compose 파일은 서로 독립적으로 유지한다. 연결이 필요한 배포는 각
-저장소의 전용 Compose override가 같은 외부 Docker 네트워크에 두 애플리케이션 컨테이너만
-연결한다.
+저장소의 전용 Compose override가 같은 외부 Docker 네트워크에 BATON 애플리케이션과
+BRIEF 서비스 전용 Caddy만 연결한다.
 
 - 운영자는 네트워크를 `--internal`로 미리 만든다.
-- BATON `app`은 이 네트워크에서 BRIEF 컨테이너의 내부 HTTP `8080` origin을 사용한다.
-- BRIEF `https` Caddy와 데이터베이스는 이 네트워크에 연결하지 않는다.
+- BATON `app`은 `https://<BRIEF_SERVICE_HOST>:8443` origin만 사용하고 운영자가 제공한
+  truststore로 서버 인증서를 검증한다.
+- 서비스 Caddy는 `BRIEF_SERVICE_HOST`를 SAN으로 포함한 인증서와 private key를 파일 기반
+  Compose secret으로 받는다. 호스트 포트는 게시하지 않는다.
+- 서비스 Caddy 이미지는 digest로 고정한 Caddy에서 불필요한 실행 파일 file capability를
+  제거하고 UID/GID `10001`로 실행한다. 런타임 capability는 모두 제거한다.
+- 서비스 Caddy는 기존 내부 `proxy` 네트워크에서 BRIEF `8080`으로 전달하며 정확한 조회·
+  생성 허용 목록 밖의 경로는 `404`로 끝낸다.
+- BRIEF 애플리케이션과 데이터베이스, 공개 `https` Caddy는 외부 서비스 네트워크에 연결하지
+  않는다.
 - BRIEF의 호스트 게시 주소 `127.0.0.1`과 공개 Caddy의 이벤트 한 경로 허용 목록은 바꾸지
   않는다.
 - 조립 전 검증은 외부 네트워크가 실제로 존재하고 `Internal=true`인지 확인한다.
 
-같은 호스트의 `--internal` Docker 네트워크와 서비스 Bearer를 함께 사용하는 구간에서는
-내부 HTTP를 허용한다. 다른 호스트나 라우팅 가능한 네트워크로 경계를 넓히려면 HTTPS 또는
-상호 TLS와 그 인증서 수명주기를 먼저 별도 계약으로 채택한다.
+`--internal` Docker 네트워크도 기밀 전송 경계로 간주하지 않는다. loopback 밖의 서비스
+호출은 HTTPS와 정상적인 인증서 검증을 유지한다. 이번 범위는 서버 TLS와 서비스 Bearer이며
+상호 TLS, 인증서 발급 자동화와 여러 호스트 라우팅은 별도 운영 결정으로 남긴다.
 
 ## token 교체
 
@@ -67,7 +75,10 @@ BATON과 BRIEF의 기본 Compose 파일은 서로 독립적으로 유지한다. 
 - 이벤트 token으로 서비스 API를 호출할 수 없고 서비스 token으로 이벤트를 수신할 수 없다.
 - 허용한 조회와 생성만 서비스 token으로 접근할 수 있다.
 - 수신 증거·재구축·health는 같은 token으로도 서비스 API 경계를 통과하지 못한다.
-- BATON과 BRIEF 애플리케이션만 같은 `Internal=true` 네트워크에 연결된다.
+- BATON 애플리케이션과 서비스 전용 Caddy만 같은 `Internal=true` 네트워크에 연결된다.
+- BATON은 HTTPS 인증서 검증을 끄지 않고 서비스 Caddy를 호출한다.
+- 서비스 Caddy는 허용한 조회·생성 외의 경로를 `404`로 끝낸다.
+- 서비스 Caddy는 비루트·읽기 전용 루트와 capability 없는 상태로 기동한다.
 - 공개 Caddy는 계속 정확한 `POST /api/v1/events`만 전달한다.
 - 새·직전 token 교체 구간과 직전 token 제거 뒤 거부를 조립 시나리오로 확인한다.
 
@@ -76,7 +87,7 @@ BATON과 BRIEF의 기본 Compose 파일은 서로 독립적으로 유지한다. 
 - BRIEF 사용자 계정·세션·멤버십·CORS
 - 공개 Caddy의 조회·생성 허용 목록 확장
 - OAuth2 authorization server, 사용자 JWT나 서비스 계정 데이터베이스
-- 여러 호스트 사이의 평문 HTTP 또는 이번 계약에서 mTLS 운영 체계 도입
+- 평문 HTTP, 이번 계약에서 mTLS·인증서 발급 자동화 운영 체계 도입
 - 운영자용 수신 증거·재구축 API 공개
 
 ## 관련 문서
@@ -85,4 +96,3 @@ BATON과 BRIEF의 기본 Compose 파일은 서로 독립적으로 유지한다. 
 - [BATON 주도 에디션 생성](../0024_baton-driven-edition-generation/spec.md)
 - [이벤트 수신 인증](../0020_baton-event-authentication/spec.md)
 - [서비스 API 인증 결정](../../ADR/0007_baton-service-api-security/adr.md)
-

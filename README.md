@@ -144,7 +144,9 @@ BRIEF_EVENT_RECEIVER_BEARER_TOKEN=<32~200자의 URL-safe ASCII 값>
 뒤 직전 값을 제거한다.
 
 BATON 백엔드 경유 조회·생성 연결은 이벤트 token을 재사용하지 않는다. 같은 호스트에서
-연결할 때 운영자가 내부 네트워크를 한 번 만들고 서비스 API override를 함께 적용한다.
+연결할 때도 서비스 전용 HTTPS를 사용한다. 운영자는 내부 네트워크를 한 번 만들고
+`BRIEF_SERVICE_HOST`를 SAN으로 포함한 인증서·private key 경로를 설정한 뒤 서비스 API
+override를 함께 적용한다.
 
 ```shell
 docker network create --internal baton-brief-private
@@ -155,8 +157,10 @@ docker compose --env-file .env.staging \
   -f compose.staging.yml -f compose.service-api.yml up --build -d --wait
 ```
 
-`docker network inspect` 결과는 `true`여야 한다. 연결된 BATON `app`은
-`http://brief:8080`을 사용하고 BRIEF Caddy의 공개 이벤트 허용 목록은 바꾸지 않는다.
+`docker network inspect` 결과는 `true`여야 한다. 서비스 Caddy는 호스트 포트를 열지 않고
+`https://<BRIEF_SERVICE_HOST>:8443`에서 허용한 조회·생성만 전달한다. 연결된 BATON `app`은
+해당 인증서를 포함한 truststore로 검증하며 BRIEF Caddy의 공개 이벤트 허용 목록은 바꾸지
+않는다.
 
 ## 스테이징 실행
 

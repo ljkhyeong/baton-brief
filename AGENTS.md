@@ -61,9 +61,15 @@
 - BATON 백엔드의 조회·에디션 생성은 이벤트 수신 Bearer를 재사용하지 않는 별도 서비스
   인증과 비공개 네트워크 경로가 준비된 뒤 구현한다. 현재 Caddy 공개 허용 목록에 이 경로를
   추가하지 않는다.
-- BRIEF는 외부 송신 경로가 없는 내부 `data`·`proxy` 네트워크에만 연결하고, Caddy만
-  `proxy`와 외부 송신용 `egress`에 연결한다. Caddy는 모든 Linux capability를 제거한 뒤
-  80·443 바인딩에 필요한 `NET_BIND_SERVICE`만 추가한다.
+- 조회·생성 연결은 BATON 애플리케이션과 서비스 전용 Caddy만 공유 `--internal` 네트워크에
+  두고 `8443` HTTPS를 사용한다. 서비스 Caddy는 호스트 포트를 게시하지 않고 정확한 허용
+  목록만 내부 BRIEF로 전달한다. BRIEF 애플리케이션을 공유 네트워크에 직접 연결하거나
+  사설망을 이유로 평문 HTTP와 인증서 검증 비활성화를 허용하지 않는다.
+- BRIEF는 외부 송신 경로가 없는 내부 `data`·`proxy` 네트워크에만 연결한다. 공개 Caddy만
+  `proxy`와 외부 송신용 `egress`에 연결하고 모든 Linux capability를 제거한 뒤 80·443
+  바인딩에 필요한 `NET_BIND_SERVICE`만 추가한다. 서비스 Caddy는 `proxy`와 BATON 공유
+  네트워크에만 연결한다. 고정 기반 이미지의 `cap_net_bind_service` file capability를 빌드
+  시 제거하고 UID/GID `10001`, 읽기 전용 루트와 런타임 `cap_drop=ALL`로 실행한다.
 - 수신 증거 조회는 최초 기록의 `processingOutcome`을 반환한다. `DUPLICATE`와
   `CONFLICT`로 이를 덮어쓰지 않고 충돌은 선택적인 최초 탐지 시각으로만 표현하며,
   fingerprint와 원문 payload를 응답에 노출하지 않는다.

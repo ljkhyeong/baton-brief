@@ -10,6 +10,7 @@ BATON BRIEF의 로컬 MVP와 최소 스테이징 실행 경계를 구현했다.
 - 이벤트 수신 증거 단건·이상 이력, 표준 `ProblemDetail`과 aggregate health
 - BATON 전용 Bearer, 비루트 BRIEF·내부 PostgreSQL·파일 기반 비밀의 스테이징 Compose
 - 이벤트 수신 한 경로만 허용하는 Caddy HTTPS 앞단과 컨테이너 네트워크 격리
+- 조회·생성만 허용하는 별도 Bearer와 호스트 포트 없는 서비스 전용 Caddy HTTPS 앞단
 - 고정 loopback 게시 주소와 wrapper·외부 Action·Dockerfile·Caddy 설정을 확인하는 CI 경계
 
 현재 데이터베이스 마이그레이션은 V7까지다. 이벤트 v2 계약 팩 버전은
@@ -28,8 +29,8 @@ ADR-0006과 PRD-0023·0024에서 다음 경계를 채택했다.
 - 조회·생성은 이벤트 수신 Bearer와 다른 서비스 인증과 비공개 네트워크 경로를 전제로
   하며, 현재 Caddy 공개 허용 목록은 이벤트 수신 한 경로로 유지한다.
 
-이 결정은 설계만 채택한 상태다. 서비스 인증·비공개 경로, BATON 조회 client와 생성 실행
-기록·호출은 구현하거나 종단 간 검증하지 않았다.
+BRIEF의 별도 서비스 Bearer와 비공개 HTTPS 앞단은 구현했다. BATON 조회 client와 생성 실행
+기록·호출, 두 서비스를 함께 기동한 종단 간 흐름은 BRIEF 저장소에서 검증하지 않았다.
 
 ## BATON 생산자 연동 상태
 
@@ -97,6 +98,11 @@ serializer와 다시 검증해야 한다.
   `no-new-privileges`, `cap_drop=ALL`, `cap_add=NET_BIND_SERVICE`를 확인했다.
 - 실제 Docker 연결은 내부 `data`에 PostgreSQL·BRIEF, 내부 `proxy`에 BRIEF·Caddy,
   외부 송신 가능한 `egress`에 Caddy만 존재했다.
+- 서비스 전용 Caddy 이미지를 같은 digest 고정 기반 이미지에서 빌드해 실행 파일의
+  `cap_net_bind_service`를 제거하고 UID/GID `10001`을 확인했다. 읽기 전용 루트,
+  `no-new-privileges`, `cap_drop=ALL`과 임시 인증서로 내부 Docker 네트워크에서 기동했다.
+  인증서를 정상 검증한 허용 조회는 `200`, 외부 health와 메서드가 다른 허용 경로는 각각
+  `404`였다. 이 스모크는 BATON 실제 client·truststore·서비스 Bearer 검증을 대신하지 않는다.
 
 네트워크·capability 축소는 Compose만 바꿨으므로 동일 이미지의 실제 기동과 HTTPS 요청으로
 검증하고 제품 테스트와 `bootJar`를 반복하지 않았다. 모든 임시 컨테이너·네트워크·볼륨,
@@ -117,8 +123,8 @@ digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행�
 ## 미검증·미결정 범위
 
 - 공인 DNS·ACME 인증서와 실제 BATON 스테이징 호스트→BRIEF Caddy 원격 전달
-- BATON 백엔드→BRIEF 조회·에디션 생성용 서비스 인증과 비공개 네트워크 경로
-- BATON 조회 client, 생성 대상·실행 기록·재시도와 실제 사용자·생성 종단 간 검증
+- BATON truststore와 서비스 인증서·token을 사용한 실제 조회·생성 연결
+- BATON 조회 client, 생성 실행 기록·재시도와 실제 사용자·생성 종단 간 검증
 - WATCH·RELAY·GO 생산자 연동과 브로커
 - 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관과 숫자 보존 기간
 - 재구축 SLO·잠금 제한 시간, 체크포인트, 백업·복구와 RPO·RTO
@@ -144,16 +150,14 @@ digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행�
 이 작업은 실제 스테이징 DNS·비밀·방화벽 변경 권한이 필요하다. 그 권한이 없는 로컬
 작업에서는 숫자 SLO나 별도 배포 자동화를 추측해 추가하지 않는다.
 
-사용자 조회·생성 구현은 별도 서비스 인증과 비공개 네트워크 경로를 먼저 채택한 뒤 다음
+사용자 조회·생성 연결은 구현한 BRIEF 서비스 인증과 비공개 HTTPS 경계를 기준으로 다음
 순서로 진행한다.
 
-1. BATON이 권한 확인 뒤 호출할 BRIEF 조회·생성 경로의 최소 허용 목록과 자격 증명 교체
-   경계를 고정한다.
-2. BATON 백엔드에 조회 client를 연결하고 작업공간·시즌 범위 격리와 사용자 거부를 종단
+1. BATON 백엔드에 조회 client를 연결하고 작업공간·시즌 범위 격리와 사용자 거부를 종단
    간으로 확인한다.
-3. BATON의 내구성 있는 생성 실행 기록이 해당 범위의 이벤트 전달 완료를 확인한 뒤 기존
+2. BATON의 내구성 있는 생성 실행 기록이 해당 범위의 이벤트 전달 완료를 확인한 뒤 기존
    BRIEF 생성 명령을 호출하게 한다.
-4. 정상 생성, 응답 유실 뒤 재시도와 BATON 경유 조회까지 실제 두 서비스로 검증한다.
+3. 정상 생성, 응답 유실 뒤 재시도와 BATON 경유 조회까지 실제 두 서비스로 검증한다.
 
 ## 문서 진입점
 
