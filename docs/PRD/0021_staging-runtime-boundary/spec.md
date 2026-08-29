@@ -17,7 +17,7 @@ HTTP origin까지만 제공하고 PRD-0022의 명시적인 profile로 이벤트 
 - 실행 이미지는 Java 21 JRE, UID/GID `10001`, 읽기 전용 루트 파일시스템과 `/tmp`
   tmpfs를 사용한다.
 - `compose.staging.yml`의 기본 조립은 `brief`와 `postgres` 두 서비스를 제공한다.
-- PostgreSQL 18.4는 내부 `data` 네트워크와 이름 있는 볼륨만 사용하며 호스트 포트를
+- PostgreSQL 18.6은 내부 `data` 네트워크와 이름 있는 볼륨만 사용하며 호스트 포트를
   열지 않는다.
 - BRIEF 프로세스는 컨테이너 내부의 `0.0.0.0:8080`에서 요청을 받고 `data`와 `proxy`
   내부 네트워크에만 참여한다. 호스트에는 기본 `127.0.0.1:8080`으로만 게시한다.

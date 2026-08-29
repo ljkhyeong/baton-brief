@@ -87,7 +87,7 @@ class BriefServiceApiSecurityIntegrationTest(
     companion object {
         @Container
         @ServiceConnection
-        val postgres = PostgreSQLContainer("postgres:18.4-alpine")
+        val postgres = PostgreSQLContainer("postgres:18.6-alpine")
     }
 }
 

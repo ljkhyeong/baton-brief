@@ -2,6 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-27
+- 수정일: 2026-08-29
 
 ## 배경
 
@@ -21,7 +22,7 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 조립을 제공하지만 운영과 유
   배포 환경의 JDK 공급자를 강제하지 않는다.
 - 실행 컨테이너는 UID/GID `10001`, 읽기 전용 루트 파일시스템, `/tmp` tmpfs와 모든 Linux
   capability 제거를 사용한다.
-- `compose.staging.yml`의 기본 profile은 BRIEF와 PostgreSQL 18.4를 조립한다. PostgreSQL은 내부
+- `compose.staging.yml`의 기본 profile은 BRIEF와 PostgreSQL 18.6을 조립한다. PostgreSQL은 내부
   데이터 네트워크에서만 실행하고 호스트 포트를 공개하지 않는다.
 - BRIEF 프로세스는 컨테이너 내부 네트워크 요청을 받도록 `0.0.0.0:8080`에서 실행하되,
   HTTP 포트는 호스트의 `127.0.0.1`에만 게시하고 주소를 설정으로 바꾸지 못하게 한다. 후속

@@ -5,7 +5,7 @@ BATON BRIEF는 BATON 생태계의 운영 사실을 설명 가능한 관심 항�
 
 ## 현재 상태
 
-Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.4 기반의 로컬 MVP를 구현했다.
+Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.6 기반의 로컬 MVP를 구현했다.
 
 - 버전이 있는 BATON 이벤트 v1·v2의 멱등 수신, 충돌 증거와 집계 리비전 처리
 - 현재 관심 항목 투영, 상태별 키셋 조회, 상태 전이 증거와 원자적 전체 재구축
@@ -114,7 +114,7 @@ BRIEF가 소유하지 않는다.
 
 - Kotlin/JVM 2.3.21, Java 21 도구 체인과 JDK 21 실행 환경
 - Spring Boot/BOM 4.1.0, Gradle wrapper 9.2.1과 Kotlin DSL
-- PostgreSQL 18.4, Spring JDBC `JdbcClient`, Flyway, JPA 미사용
+- PostgreSQL 18.6, Spring JDBC `JdbcClient`, Flyway, JPA 미사용
 - `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap`의 다섯
   Gradle 모듈
 

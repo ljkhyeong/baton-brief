@@ -85,8 +85,9 @@ serializer와 다시 검증해야 한다.
 
 ### 패키지와 스테이징 실행
 
-- Java 21과 PostgreSQL 18.4에서 패키지 JAR의 Tomcat·Flyway·DataSource·aggregate health
-  결합을 실제 로컬 소켓으로 확인했다.
+- Java 21과 PostgreSQL 18.6에서 패키지 JAR의 Tomcat·Flyway·DataSource·aggregate health
+  결합을 실제 스테이징 컨테이너 내부 HTTP로 확인했다. 같은 검증에서 무인증 이벤트는
+  `401`이었고 파일 기반 현재 Bearer 요청은 수신 기록 한 건을 만들었다.
 - 기본 스테이징 Compose에서 digest 고정 Java 21 이미지, 비루트 UID/GID `10001`, 읽기
   전용 루트, 내부 PostgreSQL, 파일 기반 데이터베이스·Bearer와 loopback 호스트 게시를
   확인했다.
@@ -138,6 +139,8 @@ digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행�
 - 재구축 SLO·잠금 제한 시간, 체크포인트, 백업·복구와 RPO·RTO
 - Caddy 인증서 볼륨 소유권을 포함한 비루트 전환과 다중 인스턴스 고가용성
 - 이미지 registry와 릴리스 정책
+- Docker Desktop 29.7.2에서 `HostConfig`의 `127.0.0.1` 게시 설정이 실제
+  `NetworkSettings.Ports`에 반영되지 않은 원인과 해당 환경의 loopback 응답 재확인
 - Gradle dependency verification metadata의 신뢰 가능한 최초 checksum 검토와
   플랫폼 간 유지 절차. 현재 wrapper 배포본 checksum과 최소 CI를 우선하고, 실제 작업
   의존성에서 생성된 대규모 metadata는 검토 없이 추가하지 않는다.

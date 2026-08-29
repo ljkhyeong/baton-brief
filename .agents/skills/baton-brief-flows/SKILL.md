@@ -32,7 +32,7 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 1. 요청을 소유하는 서비스, PRD 동작과 장기 ADR 결정에 연결한다.
 2. ADR-0002를 정확히 적용한다. Kotlin/JVM 2.3.21, Java 21 도구 체인과 JVM 21 바이트코드 대상,
    JDK 21 실행 환경, Spring Boot/BOM 4.1.0, Kotlin DSL을 사용하는 Gradle wrapper 9.2.1,
-   PostgreSQL 18.4, Spring JDBC `JdbcClient`와 Flyway를 사용하고 JPA는 사용하지 않는다.
+   PostgreSQL 18.6, Spring JDBC `JdbcClient`와 Flyway를 사용하고 JPA는 사용하지 않는다.
    Java 25 호환성은 검증했지만 기능 필요성과 고정된 CI/실행 이미지 기준이 생길 때까지
    보류한다.
 3. `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap` 다섯
@@ -43,7 +43,7 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
    현재 구현 범위는 `HANDOFF.md`에서 확인한다. ADR-0004·ADR-0005·ADR-0007의 로컬 실행
    근거를 브로커, 스케줄러, 외부 시스템 어댑터, 공인 인증서, 장기 운영 배포 또는 권한 없는
    API 공개로 확대하지 않는다.
-5. 로컬 PostgreSQL 18.4 의존 서비스에는 `compose.yml`을 사용하고 호스트 포트는
+5. 로컬 PostgreSQL 18.6 의존 서비스에는 `compose.yml`을 사용하고 호스트 포트는
    `127.0.0.1`에만 게시한다. Spring Boot의 표준 데이터 원본 및 Flyway 속성/환경변수를
    우선하고 프레임워크 설정에 프로젝트 전용 별칭을 추가하지 않는다.
 6. 이후 장기 기술 스택, 아키텍처, 전송 또는 운영 선택은 ADR에 기록한다.
