@@ -123,8 +123,19 @@ HTTPS profile의 Compose 구문, 고정 PostgreSQL 이미지 pull, 실제 Docker
 설정 유효성을 검증한다. HTTPS profile도 실제로 기동해 BRIEF 호스트 포트 비게시, 내부
 네트워크, 비루트·읽기 전용 실행, Caddy capability, 신뢰한 내부 CA의 무인증 `401`·정상
 Bearer `202 APPLIED`, 외부 health `404`와 로그의 token 비노출을 확인한다. Dockerfile
-frontend도 digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이전
-검증 구성이 통과했다. 보강한 workflow의 원격 실행은 새 pull request에서 확인해야 한다.
+frontend도 digest로 고정한다. 전체 작업은 30분, Compose 기동은 180초로 제한하고
+실패하면 원래 종료 상태를 보존한 채 임시 컨테이너·네트워크·볼륨을 제거한다.
+
+`.github/workflows/dependency-submission.yml`은 `main` push에서 Gradle 직접·전이 의존성
+그래프를 GitHub에 제출한다. 기존에 검증한 `gradle/actions` v4.4.3 commit SHA를
+사용하고 이 workflow에만 `contents: write`를 부여한다. GitHub 저장소의 Dependabot
+취약점 알림과 보안 업데이트는 2026-08-29에 활성화했다. `.github/dependabot.yml`은
+Gradle·GitHub Actions의 minor·patch를 생태계별로 묶고 major는 개별 후보로 남긴다.
+Dockerfile·Compose 이미지는 하나의 주간 pull request로 묶되 major 자동 후보는 제외한다.
+
+2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이전 검증 구성이 통과했다.
+보강한 검증 workflow와 의존성 그래프 최초 제출은 새 pull request와 `main` 병합 후
+원격 실행으로 확인해야 한다.
 
 ## 미검증·미결정 범위
 
@@ -139,6 +150,8 @@ frontend도 digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions �
 - Gradle dependency verification metadata의 신뢰 가능한 최초 checksum 검토와
   플랫폼 간 유지 절차. 현재 wrapper 배포본 checksum과 최소 CI를 우선하고, 실제 작업
   의존성에서 생성된 대규모 metadata는 검토 없이 추가하지 않는다.
+- `gradle/actions` v6의 별도 캐시 구성요소 이용약관 검토와 major 전환. 이 결정 전에는
+  현재 검증한 v4.4.3 commit SHA를 유지한다.
 - 라이선스
 
 ## 다음 진입점
