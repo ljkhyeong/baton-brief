@@ -84,7 +84,9 @@ bootstrap ─┬─> adapter-in-web ──────────> application 
 스테이징 컨테이너 조립을, ADR-0005와 PRD-0022는 선택적인 Caddy 이벤트 수신 HTTPS 앞단을
 채택한다. 실제 공인 DNS·방화벽·ACME 발급과 장기 운영 배포 방식은 결정하지 않는다. 로컬
 MVP의 내부 HTTP 엔드포인트는 PRD-0002를 따르고 BATON 이벤트 수신 전용 Bearer는
-ADR-0003과 PRD-0020을 따른다. 다른 API의 운영 인증·인가는 별도 결정 전까지 만들지 않는다.
+ADR-0003과 PRD-0020을 따른다. 이 ADR 시점에는 다른 API의 운영 인증·인가를 별도 결정 전까지
+만들지 않는다. BATON 조회·생성 서비스 API는 후속 ADR-0007과 PRD-0025에서 별도 Bearer와
+비공개 HTTPS 경계를 채택했다.
 
 계약 팩을 게시할 저장소 릴리스·CI artifact와 장기 배포 위치는 아직 채택하지 않는다.
 현재 RC ZIP 생성은 로컬 재현성과 BATON 생산자 검증 입력을 준비하는 범위이며, 게시나

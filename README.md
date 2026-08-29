@@ -31,9 +31,10 @@ BATON 대상·시점·전달 경계 결정 ────────────�
 ```
 
 BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운영 사실과 최종 판정은 원본
-서비스가 소유하고 BRIEF는 커밋 후 전달된 이벤트만 소비한다. 사용자 조회와 에디션 생성
-실행의 다음 경계는 [PRD-0023](docs/PRD/0023_baton-mediated-brief-query/spec.md)과
-[PRD-0024](docs/PRD/0024_baton-driven-edition-generation/spec.md)를 따른다.
+서비스가 소유하고 BRIEF는 커밋 후 전달된 이벤트만 소비한다. 사용자 조회는
+[PRD-0023](docs/PRD/0023_baton-mediated-brief-query/spec.md), 에디션 생성 실행은
+[PRD-0024](docs/PRD/0024_baton-driven-edition-generation/spec.md), 서비스 인증과 비공개 연결은
+[PRD-0025](docs/PRD/0025_baton-service-api-security/spec.md)를 따른다.
 
 ## 기능 지도
 

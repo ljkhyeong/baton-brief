@@ -8,8 +8,8 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 ## 맥락을 확립한다
 
 - `AGENTS.md`, `HANDOFF.md`, `README.md`, 영향받는 PRD와 관련 ADR을 읽는다.
-- ADR-0002·ADR-0006의 서비스·모듈 경계와 PRD-0002부터 PRD-0024까지를 현재 작업 범위로
-  사용한다. 실제
+- ADR-0002·ADR-0006·ADR-0007의 서비스·모듈 경계와 PRD-0002부터 PRD-0025까지를 현재
+  작업 범위로 사용한다. 실제
   구현 상태와 검증 근거는 `HANDOFF.md`에서 확인하고, 확인한 로컬 실행을 외부 연동·운영
   배포로 확대하지 않는다.
 - 이 보완 절차를 사용하기 전에 기존 규칙을 검색하고 가장 좁게 일치하는 BRIEF 스킬을
@@ -39,10 +39,11 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 3. `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap` 다섯
    모듈을 유지한다. 의존은 `bootstrap`/어댑터에서 `application`, 다시 `domain`으로
    향하게 한다. 어댑터끼리 의존하지 않고 내부 모듈은 외부 모듈에 의존하지 않는다.
-4. PRD-0002부터 PRD-0024까지 채택한 로컬 MVP, 이벤트 수신 전용 Bearer, 최소 스테이징
-   컨테이너와 Caddy HTTPS 경계를 따른다. 현재 구현 범위는 `HANDOFF.md`에서 확인한다.
-   ADR-0004·ADR-0005의 로컬 실행 근거를 브로커, 스케줄러, 외부 시스템 어댑터, 공인
-   인증서, 장기 운영 배포 또는 다른 API 인증·인가로 확대하지 않는다.
+4. PRD-0002부터 PRD-0025까지 채택한 로컬 MVP, 이벤트 수신 전용 Bearer, 최소 스테이징
+   컨테이너, 공개 Caddy HTTPS와 서비스 API 인증·비공개 HTTPS 경계를 따른다. 현재 구현
+   범위는 `HANDOFF.md`에서 확인한다. ADR-0004·ADR-0005·ADR-0007의 로컬 실행 근거를 브로커,
+   스케줄러, 외부 시스템 어댑터, 공인 인증서, 장기 운영 배포 또는 권한 없는 API 공개로
+   확대하지 않는다.
 5. 로컬 PostgreSQL 18.4 의존 서비스에는 `compose.yml`을 사용하고 호스트 포트는
    `127.0.0.1`에만 게시한다. Spring Boot의 표준 데이터 원본 및 Flyway 속성/환경변수를
    우선하고 프레임워크 설정에 프로젝트 전용 별칭을 추가하지 않는다.
