@@ -68,6 +68,8 @@ serializer와 다시 검증해야 한다.
 - 에디션 멱등성·불변성·`A → B → A` 새 세대, 이력·비교·주간 최신과 `ETag`
 - 소수 정수·알 수 없는 필드·`24:00`·윤초를 거부하는 엄격한 이벤트 입력과 대표
   `400`·`404` `ProblemDetail`
+- 소수점 표기의 정수 token 거부, Unicode code point 기준 `sourceReference` 128자 수락과
+  129자 거부
 - 32비트 양의 미래 `eventVersion`을 문법 오류가 아니라 `UNSUPPORTED`로 보존하는 경계
 - 재구축 강제 실패의 원자적 롤백과 재구축·지원 이벤트 수신 잠금 직렬화
 - V3 이전 에디션 근거의 `null` 유지, V4 복합 기본 키와 V5·V6 열 제거 업그레이드
@@ -105,8 +107,12 @@ serializer와 다시 검증해야 한다.
 `.github/workflows/verify.yml`은 pull request와 `main` push에서 Java 21을 사용한다.
 외부 Action은 전체 commit SHA로 고정했고 `gradle/actions/setup-gradle`이 Gradle 실행 전에
 wrapper JAR을 검증하고 캐시를 구성한다. 이어 `test :bootstrap:bootJar contractsZip`, 로컬·
-HTTPS profile의 Compose 구문, 실제 Dockerfile 빌드와 고정 Caddy 이미지의 설정 유효성을
-검증한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이 검증 구성이 통과했다.
+HTTPS profile의 Compose 구문, 고정 PostgreSQL 이미지 pull, 실제 Dockerfile 빌드와
+Compose가 해석한 고정 Caddy 이미지의 설정 유효성을 검증한다. Dockerfile frontend도
+digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이전 검증 구성이
+통과했다. 이번 로컬 검증에서는 고정 PostgreSQL 이미지 pull, Compose에서 읽은 Caddy
+이미지의 설정 검증과 고정 Dockerfile frontend를 사용한 실제 이미지 빌드가 성공했으며,
+보강한 workflow의 원격 실행은 새 pull request에서 확인해야 한다.
 
 ## 미검증·미결정 범위
 
