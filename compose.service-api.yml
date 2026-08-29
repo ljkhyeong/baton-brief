@@ -7,10 +7,41 @@ services:
         target: brief.service-api.bearer-token
       - source: brief_service_api_previous_bearer_token
         target: brief.service-api.previous-bearer-token
+
+  service-api:
+    image: "${BRIEF_STAGING_SERVICE_CADDY_IMAGE:-baton-brief-service-caddy:staging}"
+    build:
+      context: .
+      dockerfile: Dockerfile.service-caddy
+    restart: unless-stopped
+    environment:
+      BRIEF_SERVICE_HOST: "${BRIEF_SERVICE_HOST:-brief-service}"
+    depends_on:
+      brief:
+        condition: service_healthy
+    expose:
+      - "8443"
+    volumes:
+      - ./ops/Caddyfile.service:/etc/caddy/Caddyfile:ro
+    secrets:
+      - source: brief_service_api_tls_cert
+        target: brief-service-tls-cert
+      - source: brief_service_api_tls_key
+        target: brief-service-tls-key
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+      - /data:rw,noexec,nosuid,nodev,size=16m,mode=1777
+      - /config:rw,noexec,nosuid,nodev,size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     networks:
+      proxy:
       service:
         aliases:
-          - brief
+          - "${BRIEF_SERVICE_HOST:-brief-service}"
 
 networks:
   service:
@@ -22,3 +53,7 @@ secrets:
     file: "${BRIEF_STAGING_SERVICE_API_BEARER_TOKEN_FILE:?BRIEF_STAGING_SERVICE_API_BEARER_TOKEN_FILE is required}"
   brief_service_api_previous_bearer_token:
     file: "${BRIEF_STAGING_SERVICE_API_PREVIOUS_BEARER_TOKEN_FILE:?BRIEF_STAGING_SERVICE_API_PREVIOUS_BEARER_TOKEN_FILE is required}"
+  brief_service_api_tls_cert:
+    file: "${BRIEF_STAGING_SERVICE_API_TLS_CERT_FILE:?BRIEF_STAGING_SERVICE_API_TLS_CERT_FILE is required}"
+  brief_service_api_tls_key:
+    file: "${BRIEF_STAGING_SERVICE_API_TLS_KEY_FILE:?BRIEF_STAGING_SERVICE_API_TLS_KEY_FILE is required}"

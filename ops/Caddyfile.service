@@ -1,0 +1,48 @@
+{
+	admin off
+}
+
+https://{$BRIEF_SERVICE_HOST:brief-service}:8443 {
+	tls /run/secrets/brief-service-tls-cert /run/secrets/brief-service-tls-key
+
+	log {
+		format filter {
+			request>headers>Authorization delete
+			request>headers>Proxy-Authorization delete
+		}
+	}
+
+	header -Server
+
+	@serviceReads {
+		method GET
+		path_regexp service_reads ^/api/v1/(?:workspaces/[^/]+/seasons/[^/]+/(?:attention-items(?:/current|/transitions)?|editions(?:/latest|/weekly/latest)?)|editions/[^/]+(?:/changes)?)$
+	}
+	handle @serviceReads {
+		header Cache-Control "no-store"
+		request_header -Forwarded
+		request_header -X-Forwarded-*
+		request_header -Proxy-Authorization
+		reverse_proxy brief:8080
+	}
+
+	@editionGeneration {
+		method POST
+		path_regexp edition_generation ^/api/v1/workspaces/[^/]+/seasons/[^/]+/editions$
+	}
+	handle @editionGeneration {
+		header Cache-Control "no-store"
+		request_header -Forwarded
+		request_header -X-Forwarded-*
+		request_header -Proxy-Authorization
+		reverse_proxy brief:8080
+	}
+
+	handle {
+		respond "" 404
+	}
+
+	handle_errors {
+		respond "" {err.status_code}
+	}
+}
