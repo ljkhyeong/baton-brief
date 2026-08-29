@@ -97,7 +97,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `migrations preserve representative V2 data through V7`() {
+    fun `migrations preserve representative V2 data through latest migration`() {
         val schema = "brief_migration_upgrade"
         jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         jdbc.sql("CREATE SCHEMA $schema").update()
