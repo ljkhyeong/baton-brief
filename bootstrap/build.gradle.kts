@@ -17,6 +17,7 @@ dependencies {
     testImplementation("com.networknt:json-schema-validator:3.0.6") {
         exclude(group = "tools.jackson.dataformat", module = "jackson-dataformat-yaml")
     }
+    testImplementation("org.flywaydb:flyway-core")
     testImplementation("org.springframework:spring-jdbc")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
