@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-28
-- 구현 상태: 설계 채택, BATON 실행 기록·서비스 인증과 종단 간 호출은 미구현
+- 구현 상태: 설계 채택, PRD-0025 서비스 인증·비공개 경로 구현 예정, BATON 실행 기록과 종단 간 호출은 미구현
 - 범위: BATON이 대상과 실행 시점을 정해 BRIEF의 기존 주간 에디션 생성 명령을 호출하는 경계
 
 ## 목적
@@ -107,3 +107,4 @@ BRIEF outbox 전달이 성공했음을 자신의 내구성 있는 실행 기록�
 - [BATON이 사용자 경계와 생성을 소유하는 결정](../../ADR/0006_baton-brief-application-boundary/adr.md)
 - [MVP 이벤트·투영·에디션 계약](../0002_mvp-contract/spec.md)
 - [주간 범위 최신 에디션 조회](../0009_weekly-latest-edition/spec.md)
+- [BATON 서비스 API 인증과 비공개 연결](../0025_baton-service-api-security/spec.md)

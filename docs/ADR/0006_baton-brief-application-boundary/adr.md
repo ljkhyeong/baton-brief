@@ -19,9 +19,8 @@ Caddy는 이벤트 수신 한 경로만 허용한다. BRIEF에 사용자 인증�
 - BATON 백엔드는 권위 있는 작업공간·시즌·IANA 시간대와 실행 시점을 선택하고 BRIEF의 기존
   에디션 생성 명령을 최소 한 번 호출한다. BRIEF는 결정적 선정·불변 저장·멱등성과
   `generation`을 계속 소유한다.
-- 사용자 조회와 에디션 생성은 이벤트 수신 전용 Bearer를 재사용하지 않는 별도 서비스 인증과
-  비공개 네트워크 경로를 전제로 한다. 구체적인 인증 방식과 배포 연결은 구현 전에 별도
-  계약으로 고정한다.
+- 사용자 조회와 에디션 생성은 이벤트 수신 전용 Bearer를 재사용하지 않는 PRD-0025의 별도
+  서비스 인증과 비공개 네트워크 경로를 사용한다.
 - 현재 Caddy의 공개 허용 목록은 `POST /api/v1/events` 하나로 유지한다. 조회·생성 경로를
   같은 공개 origin에 추가하지 않는다.
 - BRIEF에 사용자용 controller, 멤버십 저장소, CORS 정책, 생성 대상 registry나 자체
@@ -61,3 +60,4 @@ Caddy는 이벤트 수신 한 경로만 허용한다. BRIEF에 사용자 인증�
 - [BATON 주도 에디션 생성 계약](../../PRD/0024_baton-driven-edition-generation/spec.md)
 - [마이크로서비스 경계](../0001_microservice-boundary/adr.md)
 - [Caddy 이벤트 수신 앞단](../0005_caddy-event-ingress/adr.md)
+- [BATON 서비스 API 인증](../0007_baton-service-api-security/adr.md)

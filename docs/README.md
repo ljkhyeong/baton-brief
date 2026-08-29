@@ -69,6 +69,7 @@
 | --- | --- | --- |
 | [PRD-0023 BATON 백엔드 경유 조회](PRD/0023_baton-mediated-brief-query/spec.md) | 채택됨 | BATON 사용자 권한 판정 뒤 허용한 BRIEF 내부 조회 중계 |
 | [PRD-0024 BATON 주도 에디션 생성](PRD/0024_baton-driven-edition-generation/spec.md) | 채택됨 | BATON 대상·시점 결정과 기존 BRIEF 멱등 생성 명령 호출 |
+| [PRD-0025 BATON 서비스 API 인증](PRD/0025_baton-service-api-security/spec.md) | 채택됨 | 별도 Bearer, 허용 경로와 내부 Docker 네트워크 연결 |
 
 ## 아키텍처 결정
 
@@ -80,6 +81,7 @@
 | [ADR-0004 스테이징 컨테이너](ADR/0004_staging-container-runtime/adr.md) | 채택됨 | 비루트·읽기 전용 실행 이미지와 내부 데이터베이스 |
 | [ADR-0005 Caddy HTTPS 앞단](ADR/0005_caddy-event-ingress/adr.md) | 채택됨 | 자동 HTTPS, 공개 경로 허용 목록과 최소 capability |
 | [ADR-0006 BATON·BRIEF 애플리케이션 경계](ADR/0006_baton-brief-application-boundary/adr.md) | 채택됨 | BATON의 사용자 권한·생성 실행과 BRIEF 내부 읽기 모델 책임 |
+| [ADR-0007 BATON 서비스 API 인증](ADR/0007_baton-service-api-security/adr.md) | 채택됨 | 이벤트와 분리한 Bearer와 내부 Docker 네트워크 |
 
 ## 다른 기준 자료
 

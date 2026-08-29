@@ -143,6 +143,21 @@ BRIEF_EVENT_RECEIVER_BEARER_TOKEN=<32~200자의 URL-safe ASCII 값>
 기존 값을 `BRIEF_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN`에 한 번만 함께 배포하고 BATON 전환
 뒤 직전 값을 제거한다.
 
+BATON 백엔드 경유 조회·생성 연결은 이벤트 token을 재사용하지 않는다. 같은 호스트에서
+연결할 때 운영자가 내부 네트워크를 한 번 만들고 서비스 API override를 함께 적용한다.
+
+```shell
+docker network create --internal baton-brief-private
+docker network inspect --format '{{.Internal}}' baton-brief-private
+docker compose --env-file .env.staging \
+  -f compose.staging.yml -f compose.service-api.yml config --quiet
+docker compose --env-file .env.staging \
+  -f compose.staging.yml -f compose.service-api.yml up --build -d --wait
+```
+
+`docker network inspect` 결과는 `true`여야 한다. 연결된 BATON `app`은
+`http://brief:8080`을 사용하고 BRIEF Caddy의 공개 이벤트 허용 목록은 바꾸지 않는다.
+
 ## 스테이징 실행
 
 `.env.staging.example`을 추적되지 않는 `.env.staging`으로 복사하고 데이터베이스·Bearer
