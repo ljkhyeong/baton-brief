@@ -14,6 +14,8 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 조립을 제공하지만 운영과 유
 
 - `Dockerfile`은 Gradle wrapper로 `:bootstrap:bootJar`를 빌드하고 JRE만 포함한 실행
   이미지에 결과를 복사한다.
+- BuildKit이 해석하는 Dockerfile frontend도 `docker/dockerfile:1.7`의 다중 플랫폼 digest로
+  고정한다.
 - 빌드와 실행 이미지는 Eclipse Temurin 21.0.11+10 Alpine 이미지를 digest로 고정한다.
   이는 ADR-0002의 Java 21 기준을 스테이징 컨테이너에서 재현하기 위한 선택이며 다른
   배포 환경의 JDK 공급자를 강제하지 않는다.

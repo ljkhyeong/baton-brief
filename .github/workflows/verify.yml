@@ -34,13 +34,23 @@ jobs:
           docker compose -f compose.yml config --quiet
           docker compose --env-file .env.staging.example -f compose.staging.yml --profile https config --quiet
 
+      - name: 스테이징 PostgreSQL 이미지 확인
+        run: >-
+          docker compose --env-file .env.staging.example
+          -f compose.staging.yml pull postgres
+
       - name: 스테이징 이미지 빌드
         run: docker build --tag baton-brief:ci .
 
       - name: Caddy 설정 검증
-        run: >-
-          docker run --rm --network none
-          --env BRIEF_STAGING_HOST=brief.invalid
-          --volume "${{ github.workspace }}/ops/Caddyfile:/etc/caddy/Caddyfile:ro"
-          caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
-          caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+        run: |
+          caddy_image="$(
+            docker compose --env-file .env.staging.example \
+              -f compose.staging.yml --profile https config --format json \
+              | jq -r '.services.https.image'
+          )"
+          docker run --rm --network none \
+            --env BRIEF_STAGING_HOST=brief.invalid \
+            --volume "${{ github.workspace }}/ops/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            "$caddy_image" \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
