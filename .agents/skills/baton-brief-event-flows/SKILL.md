@@ -46,10 +46,10 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
   전달하고 다른 경로를 거부하며 Bearer 판정은 Spring Security에 남긴다. 로컬 내부 CA
   검증을 공인 인증서나 실제 BATON 원격 전달로 확대하지 않는다.
 - `contracts/VERSION`과 `contracts/schemas/source-event.v2.schema.json`을 언어 중립 v2
-  요청 계약 팩의 기준으로 사용한다. 현재 `2.0.0-rc.2`는 BRIEF 소비자 입력 계약의 근거이고,
-  BATON 실제 Java/Jackson serializer·송신기와 로컬 원본 API·초기 정합화·전달을 교차
-  검증한 버전은 `2.0.0-rc.1`까지다. 현재 버전의 생산자 재검증과 실제 BATON 스테이징
-  호스트의 공인 HTTPS 경계를 확인하기 전에는 안정 버전으로 승격하지 않는다.
+  요청 계약 팩의 기준으로 사용한다. BATON 실제 Java/Jackson serializer·송신기와 교차
+  검증한 버전, 현재 계약의 재검증 범위와 안정 버전 승격 조건은 `HANDOFF.md`에서 확인한다.
+  필요한 생산자 검증과 실제 BATON 스테이징 호스트의 공인 HTTPS 경계를 확인하기 전에는
+  안정 버전으로 승격하지 않는다.
 - PRD-0008을 현재 보존 기준으로 사용한다. `UNSUPPORTED`를 포함한 모든 최초 수신 기록과
   이벤트별 최초 충돌 한 건은 대체 계약을 채택·마이그레이션·검증하기 전까지
   `retain-all`로 보존한다. 현재 구현·검증 근거는 `HANDOFF.md`에서 확인한다.
