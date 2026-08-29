@@ -13,6 +13,7 @@ jobs:
   verify:
     name: 빌드와 설정 검증
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -66,3 +67,130 @@ jobs:
             --volume "${{ github.workspace }}/ops/Caddyfile.service:/etc/caddy/Caddyfile:ro" \
             baton-brief-service-caddy:ci \
             adapt --config /etc/caddy/Caddyfile --adapter caddyfile
+
+      - name: 스테이징 HTTPS 실행 경계 검증
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          staging_dir="$(mktemp -d)"
+          compose=(
+            docker compose
+            --project-name baton-brief-ci
+            --env-file .env.staging.example
+            -f compose.staging.yml
+            --profile https
+          )
+          cleanup() {
+            local original_status=$?
+            local cleanup_status=0
+            trap - EXIT
+            set +e
+            "${compose[@]}" down --volumes --remove-orphans || cleanup_status=$?
+            rm -rf "$staging_dir" || cleanup_status=$?
+            if ((original_status != 0)); then
+              exit "$original_status"
+            fi
+            exit "$cleanup_status"
+          }
+          trap cleanup EXIT
+
+          event_token="ci-event-token-000000000000000000000000"
+          printf '%s' "ci-database-password" > "$staging_dir/database-password"
+          printf '%s' "$event_token" > "$staging_dir/event-bearer-token"
+          : > "$staging_dir/event-previous-bearer-token"
+
+          export BRIEF_STAGING_DATABASE_PASSWORD_FILE="$staging_dir/database-password"
+          export BRIEF_STAGING_EVENT_RECEIVER_BEARER_TOKEN_FILE="$staging_dir/event-bearer-token"
+          export BRIEF_STAGING_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN_FILE="$staging_dir/event-previous-bearer-token"
+          export BRIEF_STAGING_IMAGE="baton-brief:ci"
+          export BRIEF_STAGING_HOST="localhost"
+          export BRIEF_STAGING_HTTP_PUBLISH="127.0.0.1:18080:80"
+          export BRIEF_STAGING_HTTPS_TCP_PUBLISH="127.0.0.1:18443:443"
+          export BRIEF_STAGING_HTTPS_UDP_PUBLISH="127.0.0.1:18443:443/udp"
+
+          "${compose[@]}" up --detach --wait --wait-timeout 180 --no-build
+
+          brief_id="$("${compose[@]}" ps --quiet brief)"
+          https_id="$("${compose[@]}" ps --quiet https)"
+          test -n "$brief_id"
+          test -n "$https_id"
+          test -z "$(docker port "$brief_id")"
+          test "$(docker inspect --format '{{.State.Health.Status}}' "$brief_id")" = "healthy"
+          test "$(docker exec "$brief_id" id -u)" = "10001"
+          docker inspect "$brief_id" | jq --exit-status \
+            '.[0].HostConfig.ReadonlyRootfs == true and .[0].HostConfig.CapDrop == ["ALL"]'
+
+          test "$(
+            docker inspect "$brief_id" \
+              | jq '.[0].NetworkSettings.Networks | length'
+          )" = "2"
+          brief_networks="$(
+            docker inspect "$brief_id" \
+              | jq --raw-output '.[0].NetworkSettings.Networks | keys[]'
+          )"
+          while IFS= read -r network; do
+            test "$(docker network inspect --format '{{.Internal}}' "$network")" = "true"
+          done <<< "$brief_networks"
+
+          docker inspect "$https_id" | jq --exit-status \
+            '.[0].HostConfig.ReadonlyRootfs == true
+             and .[0].HostConfig.CapDrop == ["ALL"]
+             and (.[0].HostConfig.CapAdd | length == 1)
+             and (.[0].HostConfig.CapAdd[0] | endswith("NET_BIND_SERVICE"))'
+          docker port "$https_id" 443/tcp | grep --fixed-strings --line-regexp '127.0.0.1:18443'
+
+          for attempt in $(seq 1 30); do
+            if docker cp \
+              "$https_id:/data/caddy/pki/authorities/local/root.crt" \
+              "$staging_dir/root.crt" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          test -s "$staging_dir/root.crt"
+
+          unauthenticated_status="$(
+            curl --silent --show-error \
+              --cacert "$staging_dir/root.crt" \
+              --resolve 'localhost:18443:127.0.0.1' \
+              --header 'Content-Type: application/json' \
+              --data-binary '@contracts/examples/role-unassigned.active-r1-critical.json' \
+              --output /dev/null \
+              --write-out '%{http_code}' \
+              https://localhost:18443/api/v1/events
+          )"
+          test "$unauthenticated_status" = "401"
+
+          authenticated_status="$(
+            curl --silent --show-error \
+              --cacert "$staging_dir/root.crt" \
+              --resolve 'localhost:18443:127.0.0.1' \
+              --header 'Content-Type: application/json' \
+              --header "Authorization: Bearer $event_token" \
+              --data-binary '@contracts/examples/role-unassigned.active-r1-critical.json' \
+              --output "$staging_dir/event-response.json" \
+              --write-out '%{http_code}' \
+              https://localhost:18443/api/v1/events
+          )"
+          test "$authenticated_status" = "202"
+          jq --exit-status '.status == "APPLIED"' "$staging_dir/event-response.json"
+
+          health_status="$(
+            curl --silent --show-error \
+              --cacert "$staging_dir/root.crt" \
+              --resolve 'localhost:18443:127.0.0.1' \
+              --output /dev/null \
+              --write-out '%{http_code}' \
+              https://localhost:18443/actuator/health
+          )"
+          test "$health_status" = "404"
+
+          if docker logs "$brief_id" 2>&1 | grep --fixed-strings --quiet "$event_token"; then
+            echo "BRIEF 로그에 Bearer token이 노출됐습니다." >&2
+            exit 1
+          fi
+          if docker logs "$https_id" 2>&1 | grep --fixed-strings --quiet "$event_token"; then
+            echo "Caddy 로그에 Bearer token이 노출됐습니다." >&2
+            exit 1
+          fi

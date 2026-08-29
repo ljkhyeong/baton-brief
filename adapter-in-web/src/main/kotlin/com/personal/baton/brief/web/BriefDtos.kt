@@ -53,7 +53,8 @@ data class SourceEventRequest(
 
     @get:AssertTrue(message = "eventVersion, eventType and sourceSeverity must match")
     val validVersionContract: Boolean
-        get() = SourceEvent.isReceivable(eventVersion, eventType, sourceSeverity)
+        get() = eventVersion <= 0 ||
+            SourceEvent.isReceivable(eventVersion, eventType, sourceSeverity)
 
     fun toDomain(): SourceEvent = SourceEvent(
         eventId = eventId,

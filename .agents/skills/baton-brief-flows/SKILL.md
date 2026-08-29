@@ -8,10 +8,9 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 ## 맥락을 확립한다
 
 - `AGENTS.md`, `HANDOFF.md`, `README.md`, 영향받는 PRD와 관련 ADR을 읽는다.
-- ADR-0002·ADR-0006의 서비스·모듈 경계와 PRD-0002부터 PRD-0024까지를 현재 작업 범위로
-  사용한다. 실제
-  구현 상태와 검증 근거는 `HANDOFF.md`에서 확인하고, 확인한 로컬 실행을 외부 연동·운영
-  배포로 확대하지 않는다.
+- `docs/README.md`에 색인된 채택 PRD·ADR을 현재 작업 범위로 사용한다. 실제 구현 상태와
+  검증 근거는 `HANDOFF.md`에서 확인하고, 확인한 로컬 실행을 외부 연동·운영 배포로
+  확대하지 않는다.
 - 이 보완 절차를 사용하기 전에 기존 규칙을 검색하고 가장 좁게 일치하는 BRIEF 스킬을
   선택한다.
 
@@ -32,18 +31,19 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 
 1. 요청을 소유하는 서비스, PRD 동작과 장기 ADR 결정에 연결한다.
 2. ADR-0002를 정확히 적용한다. Kotlin/JVM 2.3.21, Java 21 도구 체인과 JVM 21 바이트코드 대상,
-   JDK 21 실행 환경, Spring Boot/BOM 4.1.0, Kotlin DSL을 사용하는 Gradle wrapper 9.2.1,
-   PostgreSQL 18.4, Spring JDBC `JdbcClient`와 Flyway를 사용하고 JPA는 사용하지 않는다.
+   JDK 21 실행 환경, Spring Boot/BOM 4.1.1, Kotlin DSL을 사용하는 Gradle wrapper 9.2.1,
+   PostgreSQL 18.6, Spring JDBC `JdbcClient`와 Flyway를 사용하고 JPA는 사용하지 않는다.
    Java 25 호환성은 검증했지만 기능 필요성과 고정된 CI/실행 이미지 기준이 생길 때까지
    보류한다.
 3. `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap` 다섯
    모듈을 유지한다. 의존은 `bootstrap`/어댑터에서 `application`, 다시 `domain`으로
    향하게 한다. 어댑터끼리 의존하지 않고 내부 모듈은 외부 모듈에 의존하지 않는다.
-4. PRD-0002부터 PRD-0024까지 채택한 로컬 MVP, 이벤트 수신 전용 Bearer, 최소 스테이징
-   컨테이너와 Caddy HTTPS 경계를 따른다. 현재 구현 범위는 `HANDOFF.md`에서 확인한다.
-   ADR-0004·ADR-0005의 로컬 실행 근거를 브로커, 스케줄러, 외부 시스템 어댑터, 공인
-   인증서, 장기 운영 배포 또는 다른 API 인증·인가로 확대하지 않는다.
-5. 로컬 PostgreSQL 18.4 의존 서비스에는 `compose.yml`을 사용하고 호스트 포트는
+4. `docs/README.md`에 색인된 채택 PRD가 정의한 로컬 MVP, 이벤트 수신 전용 Bearer, 최소
+   스테이징 컨테이너, 공개 Caddy HTTPS와 서비스 API 인증·비공개 HTTPS 경계를 따른다.
+   현재 구현 범위는 `HANDOFF.md`에서 확인한다. ADR-0004·ADR-0005·ADR-0007의 로컬 실행
+   근거를 브로커, 스케줄러, 외부 시스템 어댑터, 공인 인증서, 장기 운영 배포 또는 권한 없는
+   API 공개로 확대하지 않는다.
+5. 로컬 PostgreSQL 18.6 의존 서비스에는 `compose.yml`을 사용하고 호스트 포트는
    `127.0.0.1`에만 게시한다. Spring Boot의 표준 데이터 원본 및 Flyway 속성/환경변수를
    우선하고 프레임워크 설정에 프로젝트 전용 별칭을 추가하지 않는다.
 6. 이후 장기 기술 스택, 아키텍처, 전송 또는 운영 선택은 ADR에 기록한다.
@@ -100,7 +100,7 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   교체는 현재 token과 직전 token 한 건만 BRIEF에서 함께 허용하고 BATON 전환 뒤 직전
   값을 제거한다. token 목록·회전 작업·별도 저장소를 만들지 않는다.
 - PRD-0021의 스테이징 조립은 digest로 고정한 Java 21 이미지, 비루트·읽기 전용 실행,
-  내부 PostgreSQL, loopback 호스트 게시와 파일 기반 Compose secrets를 유지한다. 컨테이너
+  내부 PostgreSQL, 호스트 포트 없는 BRIEF와 파일 기반 Compose secrets를 유지한다. 컨테이너
   프로세스는 내부 `proxy` 네트워크의 Caddy 요청을 받도록 `0.0.0.0`에서 실행하고, Spring
   Boot `configtree:`를 사용하며 별도 비밀 로더와 커스텀 health를 추가하지 않는다.
 - PRD-0022의 선택적인 Caddy profile은 이벤트 수신 한 경로만 외부에 허용하고 다른 경로를
@@ -154,15 +154,17 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   기동을 주장할 때만 격리된 PostgreSQL과 웹 포트에서 한 번 확인하고, 같은 제품 시나리오를
   다시 재생하거나 전용 스모크 스크립트·테스트를 추가하지 않는다.
 - 기존 열 제거, 기본 키 전환과 호환 열 추가는 빈 데이터베이스 최종 스키마만 확인하지
-  않고 대표 이전 버전 행에 실제 마이그레이션 SQL을 순서대로 적용한다. Spring JDBC의
-  표준 SQL 실행기를 사용하고 임시 연결 세션 상태는 `use`와 `finally`로 복원한다.
+  않는다. Flyway API로 기준 버전까지 마이그레이션한 별도 스키마에 대표 이전 버전 데이터를
+  Spring JDBC `ResourceDatabasePopulator`로 적재하고, 다시 Flyway API로 최신 버전까지
+  마이그레이션한다. 임시 연결 세션 상태는 `use`와 `finally`로 복원한다.
 - 계약 변경에는 생산자/소비자 호환성과 재생 동작을 검증한다.
 - 투영 또는 에디션 변경에는 중복, 순서가 뒤바뀐 전달, 재구축과 고정 시각 동작을
   검증한다.
 - 스캐폴드 근거만으로 외부 연동, 배포, 내구성 또는 종단 간 동작을 주장하지 않는다.
 - 스테이징 조립을 바꾸면 Compose 구문과 이미지 빌드 뒤 실제 컨테이너에서 DB aggregate
-  health, 비루트·읽기 전용 실행과 파일 기반 Bearer 한 건만 확인한다. 이 loopback 증거를
-  공인 HTTPS나 BATON 원격 스테이징 전달 완료로 기록하지 않는다.
+  health, 비루트·읽기 전용 실행, BRIEF 호스트 포트 비게시와 파일 기반 Bearer 한 건만
+  확인한다. 로컬 Caddy 내부 CA 증거를 공인 HTTPS나 BATON 원격 스테이징 전달 완료로
+  기록하지 않는다.
 - Caddy 조립을 바꾸면 설정 유효성, 정상 인증서 검증을 사용한 무인증 `401`·정상 Bearer
   수신, 이벤트 외 경로 `404`, Authorization 로그 비노출과 임시 자원 정리를 한 번
   확인한다. 네트워크나 capability를 바꾸면 실제 컨테이너 연결과 `cap_drop`·`cap_add`도

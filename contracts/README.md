@@ -23,12 +23,11 @@ JSON Schema는 숫자의 표기 형태를 구분하지 않으므로 수학적으
 변환하지 않고 `400 Bad Request`로 거부한다. `sourceReference`의 최대 128자는 Unicode
 code point를 기준으로 한다.
 
-현재 버전 `2.0.0-rc.2`는 `aggregateRevision`을 JVM `Long`·PostgreSQL `BIGINT`와 같은
-부호 있는 64비트 양수 범위로 제한하고, 계약에 없는 필드와 정수가 아닌 숫자를 거부하도록
-소비자 수신 경계를 맞춘 사전 버전이다. BRIEF 소비자와 계약 팩 검증은 완료했지만 BATON
-실제 serializer·outbox·송신기와 전용 Bearer를 포함한 교차 검증 근거는 `2.0.0-rc.1`까지다.
-현재 버전의 생산자 재검증과 실제 BATON 스테이징 호스트의 공인 HTTPS 전달을 확인하기
-전에는 안정 버전으로 올리지 않는다.
+v2 계약은 `aggregateRevision`을 JVM `Long`·PostgreSQL `BIGINT`와 같은 부호 있는 64비트
+양수 범위로 제한하고, 계약에 없는 필드와 정수가 아닌 숫자를 거부한다. 현재 계약 버전과
+생산자 교차 검증 범위는 각각 `VERSION`과 BRIEF 저장소의 `HANDOFF.md`를 기준으로 확인한다.
+BATON 실제 serializer·outbox·송신기와 전용 Bearer를 포함한 현재 버전의 생산자 재검증과
+실제 스테이징 공인 HTTPS 전달을 확인하기 전에는 안정 버전으로 올리지 않는다.
 
 ## 검증과 생성
 
@@ -37,6 +36,6 @@ code point를 기준으로 한다.
 ./gradlew --no-daemon contractsZip
 ```
 
-`contractsZip`은 `build/distributions/baton-brief-contracts-2.0.0-rc.2.zip`에
+`contractsZip`은 `build/distributions/baton-brief-contracts-<VERSION>.zip`에
 `contracts/**`와 PRD-0019를 재현 가능한 순서와 고정된 파일 시각으로 묶는다. 공유 JVM DTO
 JAR, 별도 배포 플러그인과 계약 서비스는 만들지 않는다.

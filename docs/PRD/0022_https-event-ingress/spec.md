@@ -17,8 +17,8 @@ PRD-0020은 BATON 전용 Bearer를, PRD-0021은 내부 HTTP 애플리케이션�
 - 그 밖의 메서드와 경로는 Caddy에서 빈 본문의 `404`로 끝내며 BRIEF에 전달하지 않는다.
 - `/actuator/health`는 BRIEF 컨테이너 healthcheck에만 사용하고 외부 HTTPS에서 노출하지
   않는다.
-- BRIEF HTTP 포트의 기본 `127.0.0.1` 호스트 게시는 유지한다. 다른 호스트는 Caddy HTTPS를
-  거치며 PostgreSQL은 계속 호스트 포트를 열지 않는다.
+- BRIEF와 PostgreSQL은 호스트 포트를 게시하지 않는다. 호스트의 공개 이벤트 요청은 Caddy
+  HTTPS만 거친다.
 
 이 계약은 이벤트 수신 외 API의 인증·인가를 결정한 것이 아니다. 운영자·사용자 조회를
 외부에 제공하려면 별도 권한과 노출 계약을 먼저 채택해야 한다.
@@ -69,8 +69,8 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https co
 docker compose --env-file .env.staging -f compose.staging.yml --profile https up --build -d --wait
 ```
 
-기본 profile은 기존 loopback 호스트 게시 스테이징 조립을 유지한다. 공개 호스트를 준비하지
-않은 개발 환경에서 `https` profile을 자동 활성화하지 않는다.
+기본 profile에는 호스트 인입 경로가 없다. 공개 호스트를 준비하지 않은 개발 환경에서
+`https` profile을 자동 활성화하지 않는다.
 
 ## 수용 기준
 

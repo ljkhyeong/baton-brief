@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-11
-- 수정일: 2026-08-27
+- 수정일: 2026-08-29
 
 ## 맥락
 
@@ -29,17 +29,18 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
 - Kotlin/JVM 2.3.21을 사용한다.
 - Java 21 툴체인을 사용하고 Kotlin 바이트코드 대상을 JVM 21로 고정한다. BRIEF 실행 환경도
   JDK 21을 사용한다.
-- Spring Boot와 Spring Boot BOM은 4.1.0을 사용한다.
+- Spring Boot와 Spring Boot BOM은 4.1.1을 사용한다.
 - 빌드 스크립트는 Kotlin DSL을 사용한다. 빌드는 Gradle 다중 프로젝트로 구성하고 Gradle
-  래퍼는 9.2.1로 고정한다.
-- BRIEF 전용 데이터베이스는 PostgreSQL 18.4를 사용한다.
+  래퍼는 9.2.1로 고정한다. Kotlin 플러그인과 Spring Boot/BOM 버전은 Gradle 표준 version
+  catalog에서 한 번만 관리한다.
+- BRIEF 전용 데이터베이스는 PostgreSQL 18.6을 사용한다.
 - 영속성 구현은 Spring JDBC의 `JdbcClient`와 Flyway 마이그레이션을 사용한다.
 - JPA와 ORM 엔티티는 사용하지 않는다. 도메인 모델과 데이터베이스 행 매핑을 분리한다.
-- 로컬 데이터베이스는 `postgres:18.4-alpine`을 사용하는 `compose.yml`로 제공한다. 애플리케이션은
+- 로컬 데이터베이스는 `postgres:18.6-alpine`을 사용하는 `compose.yml`로 제공한다. 애플리케이션은
   로컬 프로필 전용 별칭 대신 Spring Boot 표준 데이터 소스·Flyway 속성을 사용하고
   Flyway를 기본 활성화한다.
-- ADR-0004의 스테이징 컨테이너는 digest로 고정한 Eclipse Temurin 21.0.11+10 JDK/JRE
-  Alpine 이미지와 PostgreSQL 18.4 Alpine 이미지를 사용한다. 이 공급자 선택은 해당
+- ADR-0004의 스테이징 컨테이너는 digest로 고정한 Eclipse Temurin 21.0.12+8 JDK/JRE
+  Alpine 이미지와 PostgreSQL 18.6 Alpine 이미지를 사용한다. 이 공급자 선택은 해당
   컨테이너의 재현성 경계이며 Java 21 도구 체인 결정을 대체하지 않는다.
 - 테스트는 필요한 모듈에만 두고 BOM이 관리하는 JUnit Jupiter, AssertJ와 PostgreSQL
   Testcontainers를 사용한다. 개별 라이브러리 버전은 별도로 고정하지 않는다.
@@ -52,8 +53,8 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   `/actuator/health`에서 aggregate 상태만 노출하며 별도 controller, DTO,
   `HealthIndicator`와 DB 확인 SQL을 만들지 않는다.
 
-CAL의 미병합 MVP 작업에서 진행 중인 Kotlin/JVM과 Spring Boot 4.1.0 기준은 참고하되 JDK
-25나 Gradle 9.6.1까지 복제하지 않는다. Kotlin 2.3.21이 공식적으로 지원하는 Gradle 범위는
+CAL의 미병합 MVP 작업에서 당시 진행 중이던 Kotlin/JVM과 Spring Boot 4.1 계열 기준은
+참고하되 JDK 25나 Gradle 9.6.1까지 복제하지 않는다. Kotlin 2.3.21이 공식적으로 지원하는 Gradle 범위는
 9.3까지이므로 BRIEF는 호환 범위 안의 9.2.1을 의도적으로 유지한다.
 
 ### 모듈과 의존 방향
@@ -84,7 +85,9 @@ bootstrap ─┬─> adapter-in-web ──────────> application 
 스테이징 컨테이너 조립을, ADR-0005와 PRD-0022는 선택적인 Caddy 이벤트 수신 HTTPS 앞단을
 채택한다. 실제 공인 DNS·방화벽·ACME 발급과 장기 운영 배포 방식은 결정하지 않는다. 로컬
 MVP의 내부 HTTP 엔드포인트는 PRD-0002를 따르고 BATON 이벤트 수신 전용 Bearer는
-ADR-0003과 PRD-0020을 따른다. 다른 API의 운영 인증·인가는 별도 결정 전까지 만들지 않는다.
+ADR-0003과 PRD-0020을 따른다. 이 ADR 시점에는 다른 API의 운영 인증·인가를 별도 결정 전까지
+만들지 않는다. BATON 조회·생성 서비스 API는 후속 ADR-0007과 PRD-0025에서 별도 Bearer와
+비공개 HTTPS 경계를 채택했다.
 
 계약 팩을 게시할 저장소 릴리스·CI artifact와 장기 배포 위치는 아직 채택하지 않는다.
 현재 RC ZIP 생성은 로컬 재현성과 BATON 생산자 검증 입력을 준비하는 범위이며, 게시나
@@ -126,7 +129,7 @@ Java 25 뼈대에서의 과거 성공 결과를 Kotlin/JDK 21 산출물의 성�
 
 - JDBC 행 매핑, 애그리게이트 조립과 SQL을 직접 관리해야 한다.
 - 작은 초기 서비스에도 다섯 모듈의 Kotlin 빌드 설정과 경계 검증이 필요하다.
-- Spring Boot 4.1.0과 PostgreSQL 18.4에 맞춘 로컬·CI 환경을 준비해야 한다.
+- Spring Boot 4.1.1과 PostgreSQL 18.6에 맞춘 로컬·CI 환경을 준비해야 한다.
 - Kotlin 플러그인과 Gradle의 공식 호환 범위를 함께 관리해야 한다.
 
 ## 보류한 대안

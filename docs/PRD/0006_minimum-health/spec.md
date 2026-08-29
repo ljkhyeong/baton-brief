@@ -56,7 +56,7 @@ Actuator의 표준 health 자동 구성을 사용해 최소 상태 확인 경계
 
 ## 노출 범위
 
-Spring Boot 4.1.0은 health만 기본 웹 endpoint로 노출하고 상세를 기본 숨김 처리한다. 같은
+Spring Boot 4.1.1은 health만 기본 웹 endpoint로 노출하고 상세를 기본 숨김 처리한다. 같은
 기본값을 설정에 반복하지 않는다. 반면 health probes의 기본값은 `true`이므로 배포 계약이
 없는 현재 MVP에서는 `management.endpoint.health.probes.enabled=false`를 명시한다.
 

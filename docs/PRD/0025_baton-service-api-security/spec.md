@@ -2,7 +2,6 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-29
-- 구현 상태: BRIEF 인증·서비스 전용 HTTPS sidecar와 BATON client·Compose 구현, 로컬 교차 서비스 검증 완료, 실제 스테이징 활성화 예정
 - 범위: BATON 백엔드가 BRIEF 조회와 에디션 생성 명령을 호출하는 서비스 전용 신뢰 경계
 
 ## 목적
@@ -54,8 +53,7 @@ BRIEF 서비스 전용 Caddy만 연결한다.
   생성 허용 목록 밖의 경로는 `404`로 끝낸다.
 - BRIEF 애플리케이션과 데이터베이스, 공개 `https` Caddy는 외부 서비스 네트워크에 연결하지
   않는다.
-- BRIEF의 호스트 게시 주소 `127.0.0.1`과 공개 Caddy의 이벤트 한 경로 허용 목록은 바꾸지
-  않는다.
+- BRIEF의 호스트 포트 비게시와 공개 Caddy의 이벤트 한 경로 허용 목록은 바꾸지 않는다.
 - 조립 전 검증은 외부 네트워크가 실제로 존재하고 `Internal=true`인지 확인한다.
 
 `--internal` Docker 네트워크도 기밀 전송 경계로 간주하지 않는다. loopback 밖의 서비스
@@ -89,19 +87,6 @@ BRIEF 서비스 전용 Caddy만 연결한다.
 - OAuth2 authorization server, 사용자 JWT나 서비스 계정 데이터베이스
 - 평문 HTTP, 이번 계약에서 mTLS·인증서 발급 자동화 운영 체계 도입
 - 운영자용 수신 증거·재구축 API 공개
-
-## 검증 상태
-
-선택 실행 테스트는 `Internal=true` 서비스 네트워크에 BATON 앱과 서비스 Caddy만 연결하고,
-BRIEF 앱은 별도 `data`·`proxy` 네트워크에 유지했다. Caddy는 실제 고정 Dockerfile에서 빌드해
-UID `10001`, file capability 없음, 읽기 전용 rootfs, `cap_drop=ALL`과 호스트 포트 없음으로
-실행했다. BATON은 PKCS12 truststore로 자체 생성 서비스 인증서를 정상 검증했다.
-
-BRIEF가 새·직전 token을 함께 허용할 때 BATON의 직전 token 생성·조회가 성공했고, 직전 값을
-제거한 뒤 같은 client는 `503 BRIEF_CONFIGURATION_ERROR`를 반환했다. BATON을 새 token으로
-전환한 뒤 기존 조회와 새 범위 생성이 다시 성공했으며 BATON·BRIEF·Caddy 로그에 두 token
-원문이 남지 않았다. 이 근거는 운영자 제공 인증서·실제 배포 비밀과 여러 호스트 환경을
-검증한 결과가 아니다.
 
 ## 관련 문서
 

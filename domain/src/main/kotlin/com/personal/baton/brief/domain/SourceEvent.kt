@@ -51,7 +51,7 @@ data class SourceEvent(
             eventType: SourceEventType,
             sourceSeverity: SourceEventSeverity?,
         ): Boolean = isSupportedContract(eventVersion, eventType, sourceSeverity) ||
-            eventVersion !in 1..2 ||
+            eventVersion > 2 ||
             (eventVersion == 2 && eventType.contractVersion == 1 && sourceSeverity == null)
 
         private fun isSupportedContract(

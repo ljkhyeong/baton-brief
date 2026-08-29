@@ -22,6 +22,8 @@ import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.flywaydb.core.Flyway
+import org.flywaydb.core.api.MigrationVersion
 import org.hamcrest.Matchers.contains
 import org.hamcrest.Matchers.nullValue
 import org.hamcrest.Matchers.startsWith
@@ -95,31 +97,30 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `migrations preserve representative V2 data through V7`() {
+    fun `migrations preserve representative V2 data through latest migration`() {
         val schema = "brief_migration_upgrade"
         jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         jdbc.sql("CREATE SCHEMA $schema").update()
 
         try {
+            val flywayConfiguration = Flyway.configure()
+                .dataSource(dataSource)
+                .defaultSchema(schema)
+                .schemas(schema)
+
+            flywayConfiguration.target("2").load().migrate()
             dataSource.connection.use { connection ->
-                connection.createStatement().use { it.execute("SET search_path TO $schema") }
+                val originalSchema = connection.schema
                 try {
+                    connection.schema = schema
                     ResourceDatabasePopulator(
-                        *listOf(
-                            "db/migration/V1__create_brief_mvp.sql",
-                            "db/migration/V2__allow_recurring_edition_state.sql",
-                            "fixtures/representative_v2_data.sql",
-                            "db/migration/V3__freeze_edition_revision_evidence.sql",
-                            "db/migration/V4__remove_attention_item_surrogate_key.sql",
-                            "db/migration/V5__remove_unused_projection_timestamp.sql",
-                            "db/migration/V6__derive_attention_reason_code.sql",
-                            "db/migration/V7__support_baton_continuity_events.sql",
-                        ).map(::ClassPathResource).toTypedArray(),
+                        ClassPathResource("fixtures/representative_v2_data.sql"),
                     ).populate(connection)
                 } finally {
-                    connection.createStatement().use { it.execute("RESET search_path") }
+                    connection.schema = originalSchema
                 }
             }
+            flywayConfiguration.target(MigrationVersion.LATEST).load().migrate()
 
             assertThat(
                 jdbc.sql("SELECT COUNT(*) FROM $schema.attention_item")
@@ -1399,7 +1400,7 @@ class BriefMvpIntegrationTest(
     companion object {
         @Container
         @ServiceConnection
-        val postgres = PostgreSQLContainer("postgres:18.4-alpine")
+        val postgres = PostgreSQLContainer("postgres:18.6-alpine")
     }
 }
 
