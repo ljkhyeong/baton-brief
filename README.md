@@ -13,6 +13,7 @@ Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.4 기반의 로컬 MVP를 구현
 - RFC 9457 `ProblemDetail`, Spring Boot Actuator aggregate health
 - BATON 전용 Bearer와 파일 기반 비밀을 사용하는 스테이징 컨테이너
 - 이벤트 수신 한 경로만 허용하는 선택적 Caddy HTTPS 앞단
+- BATON 백엔드 조회·생성을 위한 별도 Bearer와 호스트 포트 없는 서비스 Caddy HTTPS 앞단
 
 현재 검증 근거와 남은 작업은 [HANDOFF.md](HANDOFF.md), 제품·구조 문서의 전체 지도는
 [문서 색인](docs/README.md)을 기준으로 확인한다.
@@ -24,9 +25,9 @@ BATON 도메인 이벤트 ──> BRIEF 수신 기록 ──> AttentionItem 현�
                                                 │
                                                 └─> 불변 BriefEdition
 
-설계한 다음 연결(미구현):
-BATON UI ──> BATON 백엔드 권한 판정 ──> BRIEF 내부 조회
-BATON 백엔드 대상·시점 결정 ──────────> BRIEF 에디션 생성 명령
+구현하고 로컬 교차 검증한 백엔드 연결:
+BATON 사용자 API ──> 세션·멤버십·접근 키 판정 ──> 서비스 Caddy ──> BRIEF 내부 조회
+BATON 대상·시점·전달 경계 결정 ────────────────> 서비스 Caddy ──> BRIEF 에디션 생성
 ```
 
 BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운영 사실과 최종 판정은 원본
@@ -70,6 +71,8 @@ BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운�
 - Caddy는 외부에서 정확한 `POST /api/v1/events`만 전달하고 다른 경로는 `404`로 종료한다.
 - BRIEF는 내부 `data`·`proxy` 네트워크에만 참여하고 외부 송신용 `egress`에는 Caddy만
   연결된다.
+- 서비스 Caddy는 이벤트와 다른 Bearer로 허용한 조회·생성만 비공개 HTTPS로 전달하며
+  호스트 포트를 게시하지 않는다.
 
 정확한 경로, 필드, 상태와 비목표는 [문서 색인](docs/README.md)의 해당 PRD를 따른다.
 
