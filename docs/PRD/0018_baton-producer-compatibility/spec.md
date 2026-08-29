@@ -105,11 +105,11 @@ BATON은 `PRD-0006: BATON–BRIEF 연속성 신호 생산 계약`에서 다음 �
   `1`부터 연속 증가한다.
 - 원본 변경과 시간 경계 재조정은 같은 신호 계산·저장 경계를 사용하고, 동일 상태에서는
   새 리비전과 outbox를 만들지 않는다.
-- BRIEF 전용 불변 outbox와 커밋 뒤 최소 한 번 전달을 사용한다. 현재 생산자 구현은 이벤트
-  v2 소비 계약을 선행한 이 경계를 따른다.
+- BRIEF 전용 불변 outbox와 커밋 뒤 최소 한 번 전달을 사용한다. BATON 생산자는 이벤트 v2
+  소비 계약을 선행한 이 경계를 따라야 한다.
 
-BRIEF는 `contracts/VERSION`의 `2.0.0-rc.2`를 기준으로 이벤트 v2 JSON Schema와 예시를
-제공하고, 같은 예시를 소비자 통합 시나리오에서 검증한다. 이 파일은 소비자 소유 계약
+BRIEF는 `contracts/VERSION`을 기준으로 이벤트 v2 JSON Schema와 예시를 제공하고, 같은
+예시를 소비자 통합 시나리오에서 검증한다. 이 파일은 소비자 소유 계약
 팩이며 BATON 실제 serializer 출력이 아니다. BATON은 같은 계약 버전을 고정한 생산자
 테스트를 통과한 뒤에만 직렬화 호환을 주장할 수 있다. 현재 교차 검증 범위는
 `HANDOFF.md`를 따른다.
@@ -121,15 +121,6 @@ BRIEF는 `contracts/VERSION`의 `2.0.0-rc.2`를 기준으로 이벤트 v2 JSON S
 - BRIEF에는 생산 방향을 뒤집는 BATON client, broker adapter, 인증 예외, 추측 enum,
   임시 source reference 변환과 생산자 의미가 없는 고정 fixture를 추가하지 않는다.
 
-## 현재 적용 상태
-
-- BATON은 다섯 연속성 신호의 영속 정체성·리비전·상태 전이, 시간 재조정과 BRIEF 전용
-  outbox·HTTP 전달을 구현했다.
-- 로컬 실행 JAR과 MySQL·PostgreSQL을 함께 사용한 교차 검증 근거는 계약 팩
-  `2.0.0-rc.1`까지다.
-- 현재 소비자 계약 `2.0.0-rc.2`는 BATON 실제 serializer 재검증과 공인 HTTPS 원격 전달이
-  남아 있으므로 안정 버전으로 승격하지 않는다.
-
 ## 수용 기준
 
 - 생산 이벤트 종류마다 BATON의 권위 있는 발생·해소 사실과 심각도 의미가 문서화된다.
@@ -137,8 +128,8 @@ BRIEF는 `contracts/VERSION`의 `2.0.0-rc.2`를 기준으로 이벤트 v2 JSON S
 - 날짜 경계와 초기 상태를 다루는 재조정이 동일 상태에서 멱등하다.
 - 원본 변경과 같은 트랜잭션의 전용 outbox, 커밋 뒤 최소 한 번 전달과 결과 분류가 있다.
 - 실제 BATON 직렬화 계약과 생산자→소비자 종단 간 시나리오가 성공한다.
-- 현재 계약 버전의 실제 serializer와 원격 종단 간 검증을 마치기 전에는 README·HANDOFF와
-  배포 문서에서 안정 버전 연동 완료로 표시하지 않는다.
+- `contracts/VERSION`에 기록된 계약 버전의 실제 serializer와 원격 종단 간 검증을 마치기
+  전에는 README·HANDOFF와 배포 문서에서 안정 버전 연동 완료로 표시하지 않는다.
 
 ## 명시적 비목표
 

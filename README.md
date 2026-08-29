@@ -97,16 +97,16 @@ BRIEF가 소유하지 않는다.
 ## 이벤트 v2 계약 팩
 
 [이벤트 계약 팩](contracts/README.md)은 BATON 생산자가 사용할 v2 요청 JSON Schema와
-다섯 연속성 신호의 예시를 제공한다. 현재 버전 `2.0.0-rc.2`는 BRIEF 소비자 입력 계약을
-엄격하게 한 사전 버전이다. 생산자 호환성의 현재 검증 범위는 [계약 팩 안내](contracts/README.md)와
-[HANDOFF.md](HANDOFF.md)를 따른다.
+다섯 연속성 신호의 예시를 제공한다. 현재 계약 버전은
+[`contracts/VERSION`](contracts/VERSION), 생산자 호환성의 현재 검증 범위는
+[HANDOFF.md](HANDOFF.md)를 기준으로 확인한다.
 
 ```shell
 ./gradlew --no-daemon :bootstrap:test --tests 'com.personal.baton.brief.BriefEventContractTest'
 ./gradlew --no-daemon contractsZip
 ```
 
-생성 파일은 `build/distributions/baton-brief-contracts-2.0.0-rc.2.zip`이다.
+생성 파일은 `build/distributions/baton-brief-contracts-<VERSION>.zip`이다.
 
 ## 기술 스택
 

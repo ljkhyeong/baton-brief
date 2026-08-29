@@ -89,7 +89,7 @@ PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secret
 - OAuth2 authorization server, JWT, token introspection, mTLS와 복수 생산자 권한
 - token 발급·자동 회전과 비밀 관리 제품 선택
 - 실제 공인 DNS, 방화벽, ACME 인증서 발급과 BATON 원격 스테이징 전달
-- 계약 팩 `2.0.0-rc.2`의 생산자 재검증과 안정 버전 승격
+- `contracts/VERSION`에 기록된 계약의 생산자 재검증과 안정 버전 승격
 
 ## 관련 문서
 

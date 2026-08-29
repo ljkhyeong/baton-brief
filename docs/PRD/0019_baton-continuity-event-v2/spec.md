@@ -75,11 +75,10 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
   소비자 수신 검증으로 보완한다.
 - `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
-- 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. 현재 `2.0.0-rc.2`는 BRIEF 소비자의
-  입력 계약 엄격화까지 반영한다. BATON 생산자는 같은 버전을 고정해 실제 serializer와
-  송신 경계를 검증해야 한다.
+- 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 생산자는 그 값을 고정해 실제
+  serializer와 송신 경계를 검증해야 한다.
 - Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD를
-  `baton-brief-contracts-2.0.0-rc.2.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
+  `baton-brief-contracts-<VERSION>.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
   배포 플러그인은 만들지 않는다.
 - BRIEF의 기존 v2 PostgreSQL 통합 시나리오는 계약 예시를 직접 요청 본문으로 사용한다.
   예시를 위한 별도 제품 시나리오를 복제하지 않는다.
