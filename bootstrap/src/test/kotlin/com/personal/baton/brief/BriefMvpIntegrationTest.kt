@@ -110,10 +110,15 @@ class BriefMvpIntegrationTest(
 
             flywayConfiguration.target("2").load().migrate()
             dataSource.connection.use { connection ->
-                connection.schema = schema
-                ResourceDatabasePopulator(
-                    ClassPathResource("fixtures/representative_v2_data.sql"),
-                ).populate(connection)
+                val originalSchema = connection.schema
+                try {
+                    connection.schema = schema
+                    ResourceDatabasePopulator(
+                        ClassPathResource("fixtures/representative_v2_data.sql"),
+                    ).populate(connection)
+                } finally {
+                    connection.schema = originalSchema
+                }
             }
             flywayConfiguration.target(MigrationVersion.LATEST).load().migrate()
 
