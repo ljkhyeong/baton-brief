@@ -539,6 +539,7 @@ class JdbcBriefPersistenceAdapter(
         SELECT * FROM attention_item
          WHERE workspace_id = :workspaceId
            AND season_id = :seasonId
+           AND item_status = 'ACTIVE'
            AND observed_at >= :windowStart
            AND observed_at < :windowEnd
         """.trimIndent(),
