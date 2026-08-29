@@ -16,7 +16,6 @@ import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
-import jakarta.validation.constraints.Size
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -26,6 +25,7 @@ import java.time.format.ResolverStyle
 import java.time.temporal.ChronoField
 import java.util.Locale
 import java.util.UUID
+import org.hibernate.validator.constraints.CodePointLength
 
 data class SourceEventRequest(
     val eventId: UUID,
@@ -36,7 +36,7 @@ data class SourceEventRequest(
     val workspaceId: UUID,
     val seasonId: UUID,
     @field:NotBlank
-    @field:Size(max = 128)
+    @field:CodePointLength(max = 128)
     val sourceReference: String,
     @field:Positive
     val aggregateRevision: Long,
@@ -110,7 +110,7 @@ data class EditionWeekRequest(
 data class CurrentAttentionItemPageRequest(
     val status: SourceEventState = SourceEventState.ACTIVE,
     val afterEventType: SourceEventType? = null,
-    @field:Size(max = 128)
+    @field:CodePointLength(max = 128)
     val afterSourceReference: String? = null,
 ) {
     @get:AssertTrue(message = "afterEventType and afterSourceReference must be provided together")

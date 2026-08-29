@@ -5,6 +5,10 @@
 .env.*
 !.env.example
 !.env.staging.example
+*.key
+*.pem
+*.p12
+*.pfx
 .gradle/
 .kotlin/
 build/

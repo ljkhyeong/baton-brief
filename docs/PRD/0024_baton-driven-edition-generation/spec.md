@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-28
-- 구현 상태: 설계 채택, BATON 실행 기록·서비스 인증과 종단 간 호출은 미구현
+- 구현 상태: BATON V26 실행 기록·호출과 BRIEF 서비스 인증·비공개 경로 구현, 로컬 교차 서비스 검증 완료, 실제 스테이징 활성화 예정
 - 범위: BATON이 대상과 실행 시점을 정해 BRIEF의 기존 주간 에디션 생성 명령을 호출하는 경계
 
 ## 목적
@@ -101,9 +101,18 @@ BRIEF outbox 전달이 성공했음을 자신의 내구성 있는 실행 기록�
 - 에디션 내용 수정, 예약 에디션, 초안·발행 상태와 삭제 API
 - 브로커, 새 생성 endpoint, 새 스키마·마이그레이션과 배포 자동화
 
+## 검증 상태
+
+BATON 선택 실행 테스트는 시즌 시간대의 현재 주차와 완료된 전달 watermark로 실제 BRIEF
+생성 명령을 호출하고 새 에디션 `201`을 저장했다. BRIEF 저장 뒤 BATON 성공 상태만 재시도
+상태로 되돌리면 같은 실행이 다시 claim되어 BRIEF `200` 재사용으로 끝나고, 같은
+`executionId`·`editionId`와 에디션 한 건을 유지하는지 확인했다. 이는 실제 TCP 응답 절단이나
+프로세스 강제 종료가 아니라 저장 상태 되돌리기로 재현한 응답 유실이다.
+
 ## 관련 문서
 
 - [BATON 백엔드 경유 조회 계약](../0023_baton-mediated-brief-query/spec.md)
 - [BATON이 사용자 경계와 생성을 소유하는 결정](../../ADR/0006_baton-brief-application-boundary/adr.md)
 - [MVP 이벤트·투영·에디션 계약](../0002_mvp-contract/spec.md)
 - [주간 범위 최신 에디션 조회](../0009_weekly-latest-edition/spec.md)
+- [BATON 서비스 API 인증과 비공개 연결](../0025_baton-service-api-security/spec.md)

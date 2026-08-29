@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-28
-- 구현 상태: 설계 채택, 서비스 인증·비공개 경로와 BATON 호출자는 미구현
+- 구현 상태: BRIEF 서비스 인증·비공개 경로와 BATON 호출자 구현, 로컬 교차 서비스 검증 완료, 실제 스테이징 활성화 예정
 - 범위: BATON 사용자가 BRIEF 현재 투영과 불변 에디션을 조회하는 애플리케이션 경계
 
 ## 목적
@@ -48,8 +48,7 @@ BRIEF 경로를 BATON의 공개 사용자 API와 일대일로 노출할 필요�
 - BRIEF는 사용자 token, 세션, 멤버십과 BATON 권한 데이터를 저장하지 않는다.
 - BATON→BRIEF 호출은 PRD-0020의 이벤트 수신 Bearer와 다른 서비스 자격 증명을 사용한다.
 - 현재 PRD-0022 Caddy 공개 허용 목록은 이벤트 수신 한 경로로 유지한다.
-- 서비스 자격 증명의 방식, 교체, 권한 범위와 비공개 네트워크 연결은 구현 전 별도 보안·배포
-  계약으로 고정한다.
+- 서비스 자격 증명의 방식, 교체, 권한 범위와 비공개 네트워크 연결은 PRD-0025를 따른다.
 
 권한이 없거나 존재를 공개하면 안 되는 대상의 사용자 HTTP 표현은 BATON 정책이 소유한다.
 BRIEF의 빈 페이지나 `404`를 사용자 권한 판정으로 사용하지 않는다.
@@ -83,9 +82,18 @@ BRIEF의 빈 페이지나 `404`를 사용자 권한 판정으로 사용하지 �
 - 자유 검색, 통합 전체 개수, 새 캐시나 GraphQL gateway
 - 현재 Caddy의 이벤트 수신 외 공개 경로 확장
 
+## 검증 상태
+
+BATON 선택 실행 테스트는 실제 BATON·BRIEF 실행 JAR, MySQL 8.4·PostgreSQL 18.4와 서비스
+Caddy를 기동했다. 실제 계정 로그인·활동 중인 팀 멤버십·워크스페이스 접근 키 확인 뒤
+BATON 최신 조회가 Caddy HTTPS와 별도 서비스 Bearer를 거쳐 저장된 BRIEF 에디션을 반환하고,
+BRIEF `ETag`와 `If-None-Match` `304`가 유지되는지 확인했다. 로컬 생성 인증서와 폐기 가능한
+데이터를 사용했으므로 실제 스테이징 인증서·비밀 배포를 대신하지 않는다.
+
 ## 관련 문서
 
 - [BATON 주도 에디션 생성 계약](../0024_baton-driven-edition-generation/spec.md)
 - [BATON이 사용자 경계와 생성을 소유하는 결정](../../ADR/0006_baton-brief-application-boundary/adr.md)
 - [현재 관심 항목 상태 필터](../0015_attention-item-status-filter/spec.md)
 - [에디션 조건부 조회](../0012_edition-etag/spec.md)
+- [BATON 서비스 API 인증과 비공개 연결](../0025_baton-service-api-security/spec.md)

@@ -1126,6 +1126,22 @@ class BriefMvpIntegrationTest(
             .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 1.5")
         postEvent(fractionalRevision).andExpect(status().isBadRequest)
 
+        val decimalVersion = eventJson(
+            eventId,
+            workspaceId,
+            seasonId,
+            "invalid",
+            1,
+            type = "ROLE_UNASSIGNED",
+            eventVersion = 2,
+            sourceSeverity = "CRITICAL",
+        ).replace("\"eventVersion\": 2", "\"eventVersion\": 2.0")
+        postEvent(decimalVersion).andExpect(status().isBadRequest)
+
+        val decimalRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
+            .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 1.0")
+        postEvent(decimalRevision).andExpect(status().isBadRequest)
+
         val overflowingRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
             .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 9223372036854775808")
         postEvent(overflowingRevision).andExpect(status().isBadRequest)
@@ -1159,6 +1175,32 @@ class BriefMvpIntegrationTest(
                 revision = 1,
                 type = "ROLE_UNASSIGNED",
                 eventVersion = 2,
+            ),
+        ).andExpect(status().isBadRequest)
+
+        postEvent(
+            eventJson(
+                eventId = "30000000-0000-0000-0000-000000000013",
+                workspaceId = workspaceId,
+                seasonId = seasonId,
+                sourceReference = "😀".repeat(128),
+                revision = 1,
+                type = "ROLE_UNASSIGNED",
+                eventVersion = 2,
+                sourceSeverity = "CRITICAL",
+            ),
+        ).andExpect(status().isAccepted)
+
+        postEvent(
+            eventJson(
+                eventId = "30000000-0000-0000-0000-000000000014",
+                workspaceId = workspaceId,
+                seasonId = seasonId,
+                sourceReference = "😀".repeat(129),
+                revision = 1,
+                type = "ROLE_UNASSIGNED",
+                eventVersion = 2,
+                sourceSeverity = "CRITICAL",
             ),
         ).andExpect(status().isBadRequest)
 

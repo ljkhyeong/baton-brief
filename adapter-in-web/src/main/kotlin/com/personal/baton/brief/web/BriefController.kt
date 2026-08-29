@@ -16,9 +16,9 @@ import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
-import jakarta.validation.constraints.Size
 import java.net.URI
 import java.util.UUID
+import org.hibernate.validator.constraints.CodePointLength
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -79,7 +79,7 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("eventType") eventType: SourceEventType,
-        @RequestParam("sourceReference") @NotBlank @Size(max = 128) sourceReference: String,
+        @RequestParam("sourceReference") @NotBlank @CodePointLength(max = 128) sourceReference: String,
     ): ResponseEntity<AttentionItemResponse> {
         val item = brief.findAttentionItem(
             workspaceId,
@@ -113,7 +113,7 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("eventType") eventType: SourceEventType,
-        @RequestParam("sourceReference") @NotBlank @Size(max = 128) sourceReference: String,
+        @RequestParam("sourceReference") @NotBlank @CodePointLength(max = 128) sourceReference: String,
         @RequestParam("beforeAggregateRevision", required = false)
         @Positive beforeAggregateRevision: Long?,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,

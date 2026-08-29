@@ -10,6 +10,7 @@ BATON BRIEF의 로컬 MVP와 최소 스테이징 실행 경계를 구현했다.
 - 이벤트 수신 증거 단건·이상 이력, 표준 `ProblemDetail`과 aggregate health
 - BATON 전용 Bearer, 비루트 BRIEF·내부 PostgreSQL·파일 기반 비밀의 스테이징 Compose
 - 이벤트 수신 한 경로만 허용하는 Caddy HTTPS 앞단과 컨테이너 네트워크 격리
+- 조회·생성만 허용하는 별도 Bearer와 호스트 포트 없는 서비스 전용 Caddy HTTPS 앞단
 - 고정 loopback 게시 주소와 wrapper·외부 Action·Dockerfile·Caddy 설정을 확인하는 CI 경계
 
 현재 데이터베이스 마이그레이션은 V7까지다. 이벤트 v2 계약 팩 버전은
@@ -28,8 +29,10 @@ ADR-0006과 PRD-0023·0024에서 다음 경계를 채택했다.
 - 조회·생성은 이벤트 수신 Bearer와 다른 서비스 인증과 비공개 네트워크 경로를 전제로
   하며, 현재 Caddy 공개 허용 목록은 이벤트 수신 한 경로로 유지한다.
 
-이 결정은 설계만 채택한 상태다. 서비스 인증·비공개 경로, BATON 조회 client와 생성 실행
-기록·호출은 구현하거나 종단 간 검증하지 않았다.
+BRIEF의 별도 서비스 Bearer와 비공개 HTTPS 앞단, BATON 조회 client와 V26 생성 실행 기록을
+구현했다. BATON 선택 실행 교차 서비스 테스트에서 실제 두 실행 JAR과 MySQL 8.4·PostgreSQL
+18.4, 서비스 Caddy를 함께 기동해 계정 로그인·멤버십·접근 키 판정부터 HTTPS 생성·조회,
+`ETag` 조건부 조회, 생성 성공 상태 유실 뒤 재시도와 서비스 token 교체를 확인했다.
 
 ## BATON 생산자 연동 상태
 
@@ -68,6 +71,8 @@ serializer와 다시 검증해야 한다.
 - 에디션 멱등성·불변성·`A → B → A` 새 세대, 이력·비교·주간 최신과 `ETag`
 - 소수 정수·알 수 없는 필드·`24:00`·윤초를 거부하는 엄격한 이벤트 입력과 대표
   `400`·`404` `ProblemDetail`
+- 소수점 표기의 정수 token 거부, Unicode code point 기준 `sourceReference` 128자 수락과
+  129자 거부
 - 32비트 양의 미래 `eventVersion`을 문법 오류가 아니라 `UNSUPPORTED`로 보존하는 경계
 - 재구축 강제 실패의 원자적 롤백과 재구축·지원 이벤트 수신 잠금 직렬화
 - V3 이전 에디션 근거의 `null` 유지, V4 복합 기본 키와 V5·V6 열 제거 업그레이드
@@ -95,6 +100,17 @@ serializer와 다시 검증해야 한다.
   `no-new-privileges`, `cap_drop=ALL`, `cap_add=NET_BIND_SERVICE`를 확인했다.
 - 실제 Docker 연결은 내부 `data`에 PostgreSQL·BRIEF, 내부 `proxy`에 BRIEF·Caddy,
   외부 송신 가능한 `egress`에 Caddy만 존재했다.
+- 서비스 전용 Caddy 이미지를 같은 digest 고정 기반 이미지에서 빌드해 실행 파일의
+  `cap_net_bind_service`를 제거하고 UID/GID `10001`을 확인했다. 읽기 전용 루트,
+  `no-new-privileges`, `cap_drop=ALL`과 임시 인증서로 내부 Docker 네트워크에서 기동했다.
+  인증서를 정상 검증한 허용 조회는 `200`, 외부 health와 메서드가 다른 허용 경로는 각각
+  `404`였다.
+- BATON 선택 실행 테스트는 BATON data, BRIEF data·proxy와 `Internal=true` 서비스 네트워크를
+  분리하고 BATON 앱과 서비스 Caddy만 서비스 네트워크에 연결했다. 실제 BATON client가
+  PKCS12 truststore로 Caddy 인증서를 검증하고 직전 서비스 token으로 생성·조회한 뒤,
+  BRIEF에서 직전 값을 제거하면 `503`으로 실패하고 BATON을 새 token으로 바꾸면 조회와 새
+  범위 생성이 다시 성공했다. BRIEF 저장 뒤 BATON 성공 상태만 재시도 상태로 되돌렸을 때
+  같은 실행·에디션과 저장 한 건으로 수렴했으며 양쪽 앱·Caddy 로그에 token 원문이 없었다.
 
 네트워크·capability 축소는 Compose만 바꿨으므로 동일 이미지의 실제 기동과 HTTPS 요청으로
 검증하고 제품 테스트와 `bootJar`를 반복하지 않았다. 모든 임시 컨테이너·네트워크·볼륨,
@@ -105,14 +121,18 @@ serializer와 다시 검증해야 한다.
 `.github/workflows/verify.yml`은 pull request와 `main` push에서 Java 21을 사용한다.
 외부 Action은 전체 commit SHA로 고정했고 `gradle/actions/setup-gradle`이 Gradle 실행 전에
 wrapper JAR을 검증하고 캐시를 구성한다. 이어 `test :bootstrap:bootJar contractsZip`, 로컬·
-HTTPS profile의 Compose 구문, 실제 Dockerfile 빌드와 고정 Caddy 이미지의 설정 유효성을
-검증한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이 검증 구성이 통과했다.
+HTTPS profile의 Compose 구문, 고정 PostgreSQL 이미지 pull, 실제 Dockerfile 빌드와
+Compose가 해석한 고정 Caddy 이미지의 설정 유효성을 검증한다. Dockerfile frontend도
+digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이전 검증 구성이
+통과했다. 이번 로컬 검증에서는 고정 PostgreSQL 이미지 pull, Compose에서 읽은 Caddy
+이미지의 설정 검증과 고정 Dockerfile frontend를 사용한 실제 이미지 빌드가 성공했으며,
+보강한 workflow의 원격 실행은 새 pull request에서 확인해야 한다.
 
 ## 미검증·미결정 범위
 
 - 공인 DNS·ACME 인증서와 실제 BATON 스테이징 호스트→BRIEF Caddy 원격 전달
-- BATON 백엔드→BRIEF 조회·에디션 생성용 서비스 인증과 비공개 네트워크 경로
-- BATON 조회 client, 생성 대상·실행 기록·재시도와 실제 사용자·생성 종단 간 검증
+- 운영자 제공 서비스 인증서·실제 배포 비밀을 사용한 스테이징 조회·생성 활성화
+- 실제 TCP 응답 절단이나 프로세스 중단 뒤 BATON 생성 실행 재시도
 - WATCH·RELAY·GO 생산자 연동과 브로커
 - 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관과 숫자 보존 기간
 - 재구축 SLO·잠금 제한 시간, 체크포인트, 백업·복구와 RPO·RTO
@@ -138,16 +158,11 @@ HTTPS profile의 Compose 구문, 실제 Dockerfile 빌드와 고정 Caddy 이미
 이 작업은 실제 스테이징 DNS·비밀·방화벽 변경 권한이 필요하다. 그 권한이 없는 로컬
 작업에서는 숫자 SLO나 별도 배포 자동화를 추측해 추가하지 않는다.
 
-사용자 조회·생성 구현은 별도 서비스 인증과 비공개 네트워크 경로를 먼저 채택한 뒤 다음
-순서로 진행한다.
-
-1. BATON이 권한 확인 뒤 호출할 BRIEF 조회·생성 경로의 최소 허용 목록과 자격 증명 교체
-   경계를 고정한다.
-2. BATON 백엔드에 조회 client를 연결하고 작업공간·시즌 범위 격리와 사용자 거부를 종단
-   간으로 확인한다.
-3. BATON의 내구성 있는 생성 실행 기록이 해당 범위의 이벤트 전달 완료를 확인한 뒤 기존
-   BRIEF 생성 명령을 호출하게 한다.
-4. 정상 생성, 응답 유실 뒤 재시도와 BATON 경유 조회까지 실제 두 서비스로 검증한다.
+사용자 조회·생성 연결의 로컬 구현과 교차 서비스 검증은 완료했다. 다음 운영 진입점은
+실제 스테이징 배포의 서비스 인증서·truststore·서로 다른 현재 token을 주입해 조회와 생성을
+한 번 확인하고, 교체할 때만 BRIEF의 직전 token 슬롯을 사용한 뒤 제거하는 것이다. 로컬
+검증은 자체 생성 인증서와 저장 상태 되돌리기를 사용했으므로 실제 TCP 응답 절단이나
+프로세스 중단을 포함한 장애 주입은 스테이징 실행 기록을 보존한 상태에서 별도로 확인한다.
 
 ## 문서 진입점
 
