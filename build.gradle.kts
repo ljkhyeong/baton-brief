@@ -3,9 +3,9 @@ import org.gradle.api.tasks.bundling.Zip
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
 plugins {
-    kotlin("jvm") version "2.3.21" apply false
-    kotlin("plugin.spring") version "2.3.21" apply false
-    id("org.springframework.boot") version "4.1.0" apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.spring) apply false
+    alias(libs.plugins.spring.boot) apply false
 }
 
 allprojects {
