@@ -50,7 +50,7 @@ description: BATON BRIEF 문서화 작업 절차. 제품 코드를 주로 변경
   직접 증거로 확대하지 않는다. 검증한 상호작용과 미검증 상호작용을 구분한다.
 - 로컬 통합·기동 근거를 실제 네트워크, 생산자 연동, 운영 배포, 전달 완전성 또는 보존·
   격리 운영이 검증되었다는 주장으로 확대하지 않는다.
-- 스테이징 컨테이너의 loopback health·Bearer 수신과 로컬 Caddy 내부 CA HTTPS를 공인
+- 스테이징 컨테이너 내부 health·Bearer 수신과 로컬 Caddy 내부 CA HTTPS를 공인
   DNS·ACME 인증서, 실제 BATON 원격 스테이징 전달이나 장기 운영 배포가 검증되었다는
   주장으로 확대하지 않는다.
 - 계약 팩의 JSON Schema·예시·ZIP 생성 성공을 BATON 실제 serializer, 버전 고정, 게시나

@@ -72,6 +72,8 @@ BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운�
 - Caddy는 외부에서 정확한 `POST /api/v1/events`만 전달하고 다른 경로는 `404`로 종료한다.
 - BRIEF는 내부 `data`·`proxy` 네트워크에만 참여하고 외부 송신용 `egress`에는 Caddy만
   연결된다.
+- 스테이징 BRIEF는 호스트 포트를 직접 게시하지 않으며 공개 이벤트 인입은 Caddy만
+  담당한다.
 - 서비스 Caddy는 이벤트와 다른 Bearer로 허용한 조회·생성만 비공개 HTTPS로 전달하며
   호스트 포트를 게시하지 않는다.
 
@@ -113,7 +115,7 @@ BRIEF가 소유하지 않는다.
 [ADR-0002](docs/ADR/0002_technology-stack/adr.md)를 기술 기준으로 사용한다.
 
 - Kotlin/JVM 2.3.21, Java 21 도구 체인과 JDK 21 실행 환경
-- Spring Boot/BOM 4.1.0, Gradle wrapper 9.2.1과 Kotlin DSL
+- Spring Boot/BOM 4.1.1, Gradle wrapper 9.2.1과 Kotlin DSL
 - PostgreSQL 18.6, Spring JDBC `JdbcClient`, Flyway, JPA 미사용
 - `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap`의 다섯
   Gradle 모듈
@@ -176,9 +178,10 @@ docker compose --env-file .env.staging -f compose.staging.yml config --quiet
 docker compose --env-file .env.staging -f compose.staging.yml up --build -d --wait
 ```
 
-기본 조립은 PostgreSQL의 호스트 포트를 열지 않고 BRIEF HTTP를 `127.0.0.1:8080`에만
-바인딩한다. 호스트 주소는 Compose에서 고정되며 포트만 바꿀 수 있다. 공개 호스트가 준비된
-환경에서만 Caddy profile을 명시적으로 활성화한다.
+기본 조립은 PostgreSQL과 BRIEF의 호스트 포트를 열지 않는다. 컨테이너 healthcheck만으로
+내부 애플리케이션·데이터베이스 상태를 확인하며, 호스트에서 이벤트를 보내려면 공개 호스트가
+준비된 환경에서 Caddy profile을 명시적으로 활성화한다. 개발 중 직접 HTTP 호출은 위의
+로컬 실행 절차를 사용한다.
 
 ```shell
 docker compose --env-file .env.staging -f compose.staging.yml --profile https config --quiet

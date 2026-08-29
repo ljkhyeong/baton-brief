@@ -41,7 +41,7 @@ description: BATON BRIEF의 이벤트 계약 및 수신 처리 작업 절차. �
   건만 함께 허용하고 BATON 전환 뒤 직전 값을 제거한다.
 - PRD-0021을 BRIEF 스테이징 수신 실행 경계로 사용한다. 현재·직전 token은 저장소 밖
   파일에서 Compose secrets와 Spring config tree로 주입하고 인증 필수를 고정한다. 이
-  조립의 loopback 호스트 게시 성공을 공인 HTTPS나 비밀 관리 제품 검증으로 확대하지 않는다.
+  조립의 컨테이너 내부 수신 성공을 공인 HTTPS나 비밀 관리 제품 검증으로 확대하지 않는다.
 - PRD-0022를 스테이징 HTTPS 이벤트 수신 경계로 사용한다. Caddy는 정확한 수신 경로만
   전달하고 다른 경로를 거부하며 Bearer 판정은 Spring Security에 남긴다. 로컬 내부 CA
   검증을 공인 인증서나 실제 BATON 원격 전달로 확대하지 않는다.

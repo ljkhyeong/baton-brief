@@ -5,10 +5,11 @@
 
 ## 배경
 
-ADR-0004의 BRIEF 컨테이너는 HTTP 포트를 호스트 loopback에만 게시하고 BATON 생산자는
-loopback 밖 주소에 HTTPS origin을 요구한다. 애플리케이션에 TLS와 인증서 생명주기를
-넣지 않으면서 실제 스테이징 형태를 구성해야 한다. 동시에 BRIEF 조회·에디션·재구축 API의
-외부 권한은 아직 결정되지 않았으므로 reverse proxy가 모든 경로를 그대로 공개해서는 안 된다.
+ADR-0004의 BRIEF 컨테이너는 외부 송신 차단을 유지하기 위해 HTTP 포트를 호스트에 게시하지
+않고 BATON 생산자는 loopback 밖 주소에 HTTPS origin을 요구한다. 애플리케이션에 TLS와
+인증서 생명주기를 넣지 않으면서 실제 스테이징 형태를 구성해야 한다. 동시에 BRIEF 조회·
+에디션·재구축 API의 외부 권한은 아직 결정되지 않았으므로 reverse proxy가 모든 경로를
+그대로 공개해서는 안 된다.
 
 ## 결정
 
@@ -21,7 +22,7 @@ loopback 밖 주소에 HTTPS origin을 요구한다. 애플리케이션에 TLS�
 - Bearer 검증은 Spring Security가 계속 소유한다. Caddy는 Authorization 값을 해석하거나
   복제하지 않고 접근 로그에서 해당 헤더만 제거한다.
 - 외부 전달 헤더를 신뢰하지 않고 Caddy가 HTTPS 기준 `X-Forwarded-*`를 다시 설정한다.
-- BRIEF의 loopback 호스트 게시, PostgreSQL 내부 네트워크와 파일 기반 Compose secrets를
+- BRIEF와 PostgreSQL의 호스트 포트 비게시, 내부 네트워크와 파일 기반 Compose secrets를
   유지한다. Caddy는 `proxy` 내부 네트워크로 BRIEF의 컨테이너 포트에 접근한다.
 - PostgreSQL·BRIEF의 `data`와 BRIEF·Caddy의 `proxy`를 외부 송신 경로가 없는 내부
   네트워크로 분리한다. ACME와 외부 HTTPS에 필요한 `egress`에는 Caddy만 연결한다.
@@ -39,11 +40,13 @@ loopback 밖 주소에 HTTPS origin을 요구한다. 애플리케이션에 TLS�
 - BRIEF 컨테이너가 외부 송신 네트워크에 참여하지 않아 애플리케이션 침해 시 외부 연결
   경로를 줄인다.
 - Caddy 자동 HTTPS와 저장 볼륨으로 공인 인증서 발급·갱신 책임을 배포 경계에 둔다.
-- 기존 loopback 스테이징 실행은 profile을 활성화하지 않으면 그대로 유지된다.
+- profile을 활성화하지 않은 기본 조립에는 호스트에서 BRIEF API로 들어가는 우회 경로가
+  없다.
 
 ### 비용과 한계
 
 - DNS가 올바르게 연결되고 80/443 접근이 가능해야 공인 인증서 발급이 성공한다.
+- 호스트에서 스테이징 BRIEF API를 호출하려면 Caddy profile을 명시적으로 활성화해야 한다.
 - Caddy 데이터 볼륨의 백업·복구와 다중 인스턴스 인증서 조정은 아직 결정하지 않았다.
 - 로컬 내부 CA 검증만으로 공인 ACME 발급과 실제 BATON 원격 전달을 입증할 수 없다.
 - 이벤트 수신 외 API를 공개하려면 별도 권한·경로 계약과 Caddy 설정 변경이 필요하다.

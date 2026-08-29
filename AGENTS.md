@@ -120,7 +120,7 @@
 ## 채택한 기술과 모듈 경계
 
 - ADR-0002를 기술 스택의 기준 문서로 사용한다. Kotlin/JVM 2.3.21, Java 21
-  도구 체인·JVM 21 바이트코드 대상·JDK 21 실행 환경, Spring Boot/BOM 4.1.0, Gradle wrapper
+  도구 체인·JVM 21 바이트코드 대상·JDK 21 실행 환경, Spring Boot/BOM 4.1.1, Gradle wrapper
   9.2.1과 Kotlin DSL, PostgreSQL 18.6을 임의로 바꾸지 않는다.
 - 영속성은 Spring JDBC `JdbcClient`와 Flyway로 구현하며 JPA를 추가하지 않는다.
 - 테스트 의존성은 실제 테스트가 있는 모듈에만 둔다. PostgreSQL 통합 테스트가
@@ -143,10 +143,10 @@
 - 스테이징 이미지는 ADR-0004의 digest로 고정한 Java 21 JDK/JRE, UID/GID `10001`, 읽기
   전용 루트와 `/tmp` tmpfs를 유지한다. PostgreSQL과 Bearer 비밀은 파일 기반 Compose
   secrets와 Spring config tree로 주입하고 일반 환경 변수·별도 비밀 로더를 만들지 않는다.
-- 스테이징 BRIEF HTTP는 기본 loopback 바인딩을 유지한다. 공인 DNS·방화벽, 백업·복구,
+- 스테이징 BRIEF HTTP는 호스트 포트를 게시하지 않고 내부 `data`·`proxy` 네트워크에서만
+  수신한다. 호스트 인입은 공개 Caddy의 명시적인 `https` profile이나 서비스 전용 Caddy만
+  담당하며 BRIEF 직접 게시로 허용 목록을 우회하지 않는다. 공인 DNS·방화벽, 백업·복구,
   registry와 실제 운영 배포를 구현되거나 검증된 것으로 가정하지 않는다.
-- 스테이징 BRIEF의 호스트 게시 주소는 Compose에서 `127.0.0.1`로 고정한다. 환경 변수로
-  외부 주소를 허용해 Caddy 허용 목록을 우회하지 않는다.
 - 선택적인 `https` profile은 digest로 고정한 Caddy와 자동 HTTPS를 사용한다. 실제
   `BRIEF_STAGING_HOST`가 준비된 환경에서만 활성화하고 기본 `brief.invalid`를 운영 주소로
   사용하지 않는다. 로컬 내부 CA 결과를 공인 DNS·ACME 발급이나 BATON 원격 전달 완료로

@@ -11,7 +11,7 @@ BATON BRIEF의 로컬 MVP와 최소 스테이징 실행 경계를 구현했다.
 - BATON 전용 Bearer, 비루트 BRIEF·내부 PostgreSQL·파일 기반 비밀의 스테이징 Compose
 - 이벤트 수신 한 경로만 허용하는 Caddy HTTPS 앞단과 컨테이너 네트워크 격리
 - 조회·생성만 허용하는 별도 Bearer와 호스트 포트 없는 서비스 전용 Caddy HTTPS 앞단
-- 고정 loopback 게시 주소와 wrapper·외부 Action·Dockerfile·Caddy 설정을 확인하는 CI 경계
+- BRIEF 호스트 포트 비게시와 wrapper·외부 Action·Dockerfile·Caddy 실제 조립을 확인하는 CI 경계
 
 현재 데이터베이스 마이그레이션은 V7까지다. 이벤트 v2 계약 팩 버전은
 `2.0.0-rc.2`이며 원격 스테이징 호환을 완료한 안정 버전이 아니다. 계약과 구조 결정의
@@ -85,15 +85,12 @@ serializer와 다시 검증해야 한다.
 
 ### 패키지와 스테이징 실행
 
-- Java 21과 PostgreSQL 18.6에서 패키지 JAR의 Tomcat·Flyway·DataSource·aggregate health
-  결합을 실제 스테이징 컨테이너 내부 HTTP로 확인했다. 같은 검증에서 무인증 이벤트는
-  `401`이었고 파일 기반 현재 Bearer 요청은 수신 기록 한 건을 만들었다.
-- 기본 스테이징 Compose에서 digest 고정 Java 21 이미지, 비루트 UID/GID `10001`, 읽기
-  전용 루트, 내부 PostgreSQL, 파일 기반 데이터베이스·Bearer와 loopback 호스트 게시를
-  확인했다.
-- BRIEF 호스트 게시 주소를 환경 변수에서 제거하고 `127.0.0.1`로 고정했다. 새 이미지를
-  실제 빌드한 뒤 임시 Compose에서 `HostIp=127.0.0.1`, 비루트·읽기 전용 실행, 내부
-  PostgreSQL aggregate health, 무인증 `401`과 현재 Bearer의 계약 v2 예시 `202`를 확인했다.
+- Eclipse Temurin 21.0.12+8과 PostgreSQL 18.6에서 패키지 JAR의 Tomcat·Flyway·DataSource·
+  aggregate health 결합을 실제 스테이징 컨테이너 내부 HTTP로 확인했다. 같은 검증에서
+  무인증 이벤트는 `401`이었고 파일 기반 현재 Bearer 요청은 수신 기록 한 건을 만들었다.
+- 기본 스테이징 Compose에서 BRIEF와 PostgreSQL이 호스트 포트를 게시하지 않고 BRIEF가
+  내부 `data`·`proxy`에만 연결된 것을 확인했다. BRIEF는 비루트 UID/GID `10001`, 읽기 전용
+  루트와 capability 없는 상태로 실행됐다.
 - Caddy `https` profile을 `BRIEF_STAGING_HOST=localhost`와 비기본 host port로 기동하고
   내부 CA 루트를 `curl --cacert`로 신뢰했다. 무인증 이벤트 `401`, 현재 Bearer의 계약 v2
   예시 `202 APPLIED`, 외부 `/actuator/health` `404`를 확인했다.
@@ -122,12 +119,12 @@ serializer와 다시 검증해야 한다.
 `.github/workflows/verify.yml`은 pull request와 `main` push에서 Java 21을 사용한다.
 외부 Action은 전체 commit SHA로 고정했고 `gradle/actions/setup-gradle`이 Gradle 실행 전에
 wrapper JAR을 검증하고 캐시를 구성한다. 이어 `test :bootstrap:bootJar contractsZip`, 로컬·
-HTTPS profile의 Compose 구문, 고정 PostgreSQL 이미지 pull, 실제 Dockerfile 빌드와
-Compose가 해석한 고정 Caddy 이미지의 설정 유효성을 검증한다. Dockerfile frontend도
-digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이전 검증 구성이
-통과했다. 이번 로컬 검증에서는 고정 PostgreSQL 이미지 pull, Compose에서 읽은 Caddy
-이미지의 설정 검증과 고정 Dockerfile frontend를 사용한 실제 이미지 빌드가 성공했으며,
-보강한 workflow의 원격 실행은 새 pull request에서 확인해야 한다.
+HTTPS profile의 Compose 구문, 고정 PostgreSQL 이미지 pull, 실제 Dockerfile 빌드와 Caddy
+설정 유효성을 검증한다. HTTPS profile도 실제로 기동해 BRIEF 호스트 포트 비게시, 내부
+네트워크, 비루트·읽기 전용 실행, Caddy capability, 신뢰한 내부 CA의 무인증 `401`·정상
+Bearer `202 APPLIED`, 외부 health `404`와 로그의 token 비노출을 확인한다. Dockerfile
+frontend도 digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이전
+검증 구성이 통과했다. 보강한 workflow의 원격 실행은 새 pull request에서 확인해야 한다.
 
 ## 미검증·미결정 범위
 
@@ -139,8 +136,6 @@ digest로 고정한다. 2026-08-28 PR #1의 최초 GitHub Actions 원격 실행�
 - 재구축 SLO·잠금 제한 시간, 체크포인트, 백업·복구와 RPO·RTO
 - Caddy 인증서 볼륨 소유권을 포함한 비루트 전환과 다중 인스턴스 고가용성
 - 이미지 registry와 릴리스 정책
-- Docker Desktop 29.7.2에서 `HostConfig`의 `127.0.0.1` 게시 설정이 실제
-  `NetworkSettings.Ports`에 반영되지 않은 원인과 해당 환경의 loopback 응답 재확인
 - Gradle dependency verification metadata의 신뢰 가능한 최초 checksum 검토와
   플랫폼 간 유지 절차. 현재 wrapper 배포본 checksum과 최소 CI를 우선하고, 실제 작업
   의존성에서 생성된 대규모 metadata는 검토 없이 추가하지 않는다.

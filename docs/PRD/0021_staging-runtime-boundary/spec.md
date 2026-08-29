@@ -7,8 +7,8 @@
 ## 목적
 
 실제 BATON→BRIEF 공개 HTTPS 전달을 검증하기 전에 BRIEF 실행 이미지, PostgreSQL 연결과
-파일 기반 비밀 주입을 운영과 유사한 컨테이너 경계에서 재현한다. 기본 조립은 loopback
-HTTP origin까지만 제공하고 PRD-0022의 명시적인 profile로 이벤트 수신 전용 HTTPS 앞단을
+파일 기반 비밀 주입을 운영과 유사한 컨테이너 경계에서 재현한다. 기본 조립은 Docker 내부
+HTTP만 제공하고 PRD-0022의 명시적인 profile로 호스트의 이벤트 수신 전용 HTTPS 앞단을
 추가한다.
 
 ## 실행 조립
@@ -20,7 +20,7 @@ HTTP origin까지만 제공하고 PRD-0022의 명시적인 profile로 이벤트 
 - PostgreSQL 18.6은 내부 `data` 네트워크와 이름 있는 볼륨만 사용하며 호스트 포트를
   열지 않는다.
 - BRIEF 프로세스는 컨테이너 내부의 `0.0.0.0:8080`에서 요청을 받고 `data`와 `proxy`
-  내부 네트워크에만 참여한다. 호스트에는 기본 `127.0.0.1:8080`으로만 게시한다.
+  내부 네트워크에만 참여하며 호스트에는 포트를 게시하지 않는다.
 - 기존 Spring Boot aggregate health인 `/actuator/health`가 애플리케이션과 필수
   데이터베이스 상태를 확인한다.
 - 선택적인 `https` profile은 Caddy만 `proxy`와 외부 송신용 `egress` 네트워크에 연결하며
@@ -33,7 +33,7 @@ HTTP origin까지만 제공하고 PRD-0022의 명시적인 profile로 이벤트 
 - `BRIEF_STAGING_DATABASE_PASSWORD_FILE`
 - `BRIEF_STAGING_EVENT_RECEIVER_BEARER_TOKEN_FILE`
 - `BRIEF_STAGING_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN_FILE`
-- 데이터베이스 이름·사용자, 이미지 이름과 loopback 게시 포트
+- 데이터베이스 이름·사용자와 이미지 이름
 - `https` profile에서 사용할 공개 호스트 이름과 HTTP/HTTPS 포트 매핑
 
 실제 비밀 파일은 저장소 밖에 두고 Git에 추가하지 않는다. Compose는 세 파일을
@@ -62,13 +62,14 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https co
 docker compose --env-file .env.staging -f compose.staging.yml --profile https up --build -d --wait
 ```
 
-BRIEF의 호스트 게시 주소는 Compose에서 `127.0.0.1`로 고정한다. 공개할 주소를 환경 변수로
-받지 않으며 외부 접근은 PRD-0022의 Caddy 허용 경로를 통해서만 제공한다.
+기본 조립의 BRIEF는 호스트 포트를 게시하지 않는다. 호스트 접근은 PRD-0022의 Caddy
+profile이나 PRD-0025의 비공개 서비스 Caddy를 통해서만 제공한다.
 
 ## 수용 기준
 
 - 고정한 Java 21 이미지에서 실행 JAR을 빌드하고 컨테이너가 health 상태가 된다.
 - PostgreSQL은 호스트 포트 없이 기동하고 Flyway V1~V7을 적용한다.
+- BRIEF도 호스트 포트를 게시하지 않고 내부 `data`·`proxy` 네트워크에만 참여한다.
 - BRIEF 실행 컨테이너는 UID/GID `10001`과 읽기 전용 루트 파일시스템을 사용한다.
 - Bearer 없는 `POST /api/v1/events`는 `401`이고 파일에서 주입한 현재 Bearer로 기존 v2
   계약 예시를 수신할 수 있다.

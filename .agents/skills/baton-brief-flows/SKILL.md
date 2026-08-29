@@ -31,7 +31,7 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 
 1. 요청을 소유하는 서비스, PRD 동작과 장기 ADR 결정에 연결한다.
 2. ADR-0002를 정확히 적용한다. Kotlin/JVM 2.3.21, Java 21 도구 체인과 JVM 21 바이트코드 대상,
-   JDK 21 실행 환경, Spring Boot/BOM 4.1.0, Kotlin DSL을 사용하는 Gradle wrapper 9.2.1,
+   JDK 21 실행 환경, Spring Boot/BOM 4.1.1, Kotlin DSL을 사용하는 Gradle wrapper 9.2.1,
    PostgreSQL 18.6, Spring JDBC `JdbcClient`와 Flyway를 사용하고 JPA는 사용하지 않는다.
    Java 25 호환성은 검증했지만 기능 필요성과 고정된 CI/실행 이미지 기준이 생길 때까지
    보류한다.
@@ -100,7 +100,7 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   교체는 현재 token과 직전 token 한 건만 BRIEF에서 함께 허용하고 BATON 전환 뒤 직전
   값을 제거한다. token 목록·회전 작업·별도 저장소를 만들지 않는다.
 - PRD-0021의 스테이징 조립은 digest로 고정한 Java 21 이미지, 비루트·읽기 전용 실행,
-  내부 PostgreSQL, loopback 호스트 게시와 파일 기반 Compose secrets를 유지한다. 컨테이너
+  내부 PostgreSQL, 호스트 포트 없는 BRIEF와 파일 기반 Compose secrets를 유지한다. 컨테이너
   프로세스는 내부 `proxy` 네트워크의 Caddy 요청을 받도록 `0.0.0.0`에서 실행하고, Spring
   Boot `configtree:`를 사용하며 별도 비밀 로더와 커스텀 health를 추가하지 않는다.
 - PRD-0022의 선택적인 Caddy profile은 이벤트 수신 한 경로만 외부에 허용하고 다른 경로를
@@ -162,8 +162,9 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   검증한다.
 - 스캐폴드 근거만으로 외부 연동, 배포, 내구성 또는 종단 간 동작을 주장하지 않는다.
 - 스테이징 조립을 바꾸면 Compose 구문과 이미지 빌드 뒤 실제 컨테이너에서 DB aggregate
-  health, 비루트·읽기 전용 실행과 파일 기반 Bearer 한 건만 확인한다. 이 loopback 증거를
-  공인 HTTPS나 BATON 원격 스테이징 전달 완료로 기록하지 않는다.
+  health, 비루트·읽기 전용 실행, BRIEF 호스트 포트 비게시와 파일 기반 Bearer 한 건만
+  확인한다. 로컬 Caddy 내부 CA 증거를 공인 HTTPS나 BATON 원격 스테이징 전달 완료로
+  기록하지 않는다.
 - Caddy 조립을 바꾸면 설정 유효성, 정상 인증서 검증을 사용한 무인증 `401`·정상 Bearer
   수신, 이벤트 외 경로 `404`, Authorization 로그 비노출과 임시 자원 정리를 한 번
   확인한다. 네트워크나 capability를 바꾸면 실제 컨테이너 연결과 `cap_drop`·`cap_add`도
