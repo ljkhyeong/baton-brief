@@ -158,8 +158,15 @@ force push와 브랜치 삭제는 허용하지 않는다. 이 설명보다 GitHu
 [저장소 검증](https://github.com/ljkhyeong/baton-brief/actions/runs/33262434555)과
 [의존성 그래프 최초 제출](https://github.com/ljkhyeong/baton-brief/actions/runs/33262434669)이
 성공했다. JSON Schema 검증기는 3.0.6을 유지하고 Spring Boot BOM으로 제품과 테스트의
-Jackson 3.1.5가 일치하는 것과 저장소 전체 검증을 확인했다. v6.3.0 Action과 분리 제출은 이
-변경의 첫 pull request와 `main` 실행 전이므로 원격 성공으로 기록하지 않는다.
+Jackson 3.1.5가 일치하는 것과 저장소 전체 검증을 확인했다.
+
+2026-08-30 PR #8의
+[pull request 검증](https://github.com/ljkhyeong/baton-brief/actions/runs/33298731080)과 병합 뒤
+[main 저장소 검증](https://github.com/ljkhyeong/baton-brief/actions/runs/33298896589),
+[분리된 의존성 그래프 생성·제출](https://github.com/ljkhyeong/baton-brief/actions/runs/33298896603)이
+성공했다. v6.3.0 Action, 생성·제출 권한 분리, 공개 이벤트 Caddy와 서비스 Caddy의 동시
+실행 조립, Linux 비루트 Caddy의 TLS 파일 읽기 권한과 dependency graph 실제 갱신까지
+원격 근거로 확인했다.
 
 ## 미검증·미결정 범위
 
