@@ -11,6 +11,7 @@ import com.personal.baton.brief.domain.ProjectionDecision
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
+import io.micrometer.core.instrument.MeterRegistry
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -71,6 +72,7 @@ class BriefMvpIntegrationTest(
     private val jdbc: JdbcClient,
     private val persistence: BriefPersistencePort,
     private val dataSource: DataSource,
+    private val meterRegistry: MeterRegistry,
 ) {
     @BeforeEach
     fun clearDatabase() {
@@ -98,6 +100,8 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(get("/actuator"))
             .andExpect(status().isNotFound)
         mockMvc.perform(get("/actuator/health/liveness"))
+            .andExpect(status().isNotFound)
+        mockMvc.perform(get("/actuator/metrics"))
             .andExpect(status().isNotFound)
     }
 
@@ -219,6 +223,9 @@ class BriefMvpIntegrationTest(
 
     @Test
     fun `ingestion distinguishes duplicate conflict unsupported stale and gap`() {
+        val countsBefore = IngestStatus.entries.associateWith { outcome ->
+            meterRegistry.find("brief.events.received").tag("outcome", outcome.name).counter()?.count() ?: 0.0
+        }
         val workspaceId = "10000000-0000-0000-0000-000000000001"
         val seasonId = "20000000-0000-0000-0000-000000000001"
         val eventId = "30000000-0000-0000-0000-000000000001"
@@ -333,6 +340,19 @@ class BriefMvpIntegrationTest(
         postEvent(unsupported)
             .andExpect(status().isUnprocessableContent)
             .andExpect(jsonPath("$.status").value("UNSUPPORTED"))
+        mapOf(
+            IngestStatus.APPLIED to 1.0,
+            IngestStatus.APPLIED_WITH_GAP to 1.0,
+            IngestStatus.DUPLICATE to 1.0,
+            IngestStatus.STALE to 1.0,
+            IngestStatus.CONFLICT to 2.0,
+            IngestStatus.UNSUPPORTED to 2.0,
+        ).forEach { (outcome, count) ->
+            assertThat(
+                meterRegistry.get("brief.events.received").tag("outcome", outcome.name).counter().count() -
+                    countsBefore.getValue(outcome),
+            ).describedAs("%s 수신 응답 수", outcome).isEqualTo(count)
+        }
         assertThat(
             jdbc.sql(
                 "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
