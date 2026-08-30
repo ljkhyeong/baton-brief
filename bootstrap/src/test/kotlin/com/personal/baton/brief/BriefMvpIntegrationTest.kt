@@ -100,7 +100,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `migrations preserve representative V2 data through latest migration`() {
+    fun `V2와 V7 대표 데이터를 최신 마이그레이션까지 보존한다`() {
         val schema = "brief_migration_upgrade"
         jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         jdbc.sql("CREATE SCHEMA $schema").update()
@@ -111,16 +111,21 @@ class BriefMvpIntegrationTest(
                 .defaultSchema(schema)
                 .schemas(schema)
 
-            flywayConfiguration.target("2").load().migrate()
-            dataSource.connection.use { connection ->
-                val originalSchema = connection.schema
-                try {
-                    connection.schema = schema
-                    ResourceDatabasePopulator(
-                        ClassPathResource("fixtures/representative_v2_data.sql"),
-                    ).populate(connection)
-                } finally {
-                    connection.schema = originalSchema
+            listOf(
+                "2" to "representative_v2_data.sql",
+                "7" to "representative_v7_data.sql",
+            ).forEach { (version, fixture) ->
+                flywayConfiguration.target(version).load().migrate()
+                dataSource.connection.use { connection ->
+                    val originalSchema = connection.schema
+                    try {
+                        connection.schema = schema
+                        ResourceDatabasePopulator(
+                            ClassPathResource("fixtures/$fixture"),
+                        ).populate(connection)
+                    } finally {
+                        connection.schema = originalSchema
+                    }
                 }
             }
             flywayConfiguration.target(MigrationVersion.LATEST).load().migrate()
@@ -181,10 +186,30 @@ class BriefMvpIntegrationTest(
             }.isInstanceOf(DataIntegrityViolationException::class.java)
             assertThat(
                 jdbc.sql(
-                    "SELECT source_severity FROM $schema.source_event_receipt",
-                ).query(String::class.java)
-                    .optional(),
-            ).isEmpty()
+                    """
+                    SELECT COUNT(*) FROM $schema.source_event_receipt
+                     WHERE (event_version = 1 OR processing_outcome = 'UNSUPPORTED')
+                       AND source_severity IS NULL
+                    """.trimIndent(),
+                ).query(Long::class.java).single(),
+            ).isEqualTo(2)
+            assertThat(
+                jdbc.sql(
+                    """
+                    SELECT source_severity FROM $schema.source_event_receipt
+                     WHERE event_version = 2 AND processing_outcome = 'APPLIED'
+                    """.trimIndent(),
+                ).query(String::class.java).single(),
+            ).isEqualTo("CRITICAL")
+            assertThatThrownBy {
+                jdbc.sql(
+                    """
+                    UPDATE $schema.source_event_receipt SET source_severity = NULL
+                     WHERE event_version = 2 AND processing_outcome = 'APPLIED'
+                    """.trimIndent(),
+                ).update()
+            }.isInstanceOf(DataIntegrityViolationException::class.java)
+                .hasMessageContaining("source_event_receipt_supported_contract")
         } finally {
             jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         }
@@ -1282,6 +1307,48 @@ class BriefMvpIntegrationTest(
                 jsonPath("$.instance")
                     .value("/api/v1/editions/50000000-0000-0000-0000-000000000001"),
             )
+    }
+
+    @Test
+    fun `주간 날짜는 네 자리 연도만 받고 양 끝 주간을 저장 조회한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000010"
+        val seasonId = "20000000-0000-0000-0000-000000000010"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+
+        listOf("0000-01-03", "9999-12-27").forEach { weekStart ->
+            val request = JSON.writeValueAsString(
+                JSON.createObjectNode().put("weekStart", weekStart).put("zoneId", "UTC"),
+            )
+            val editionId = JsonPath.read<String>(
+                postEdition(path, request)
+                    .andExpect(status().isCreated)
+                    .andReturn().response.contentAsString,
+                "$.editionId",
+            )
+            mockMvc.perform(
+                get("$path/weekly/latest")
+                    .param("weekStart", weekStart)
+                    .param("zoneId", "UTC"),
+            ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.editionId").value(editionId))
+                .andExpect(jsonPath("$.weekStart").value(weekStart))
+        }
+
+        listOf("-5000-01-06", "+10000-01-03", "+6000000-01-03", "+999999999-12-27")
+            .forEach { weekStart ->
+                val request = JSON.writeValueAsString(
+                    JSON.createObjectNode().put("weekStart", weekStart).put("zoneId", "UTC"),
+                )
+                postEdition(path, request)
+                    .andExpect(status().isBadRequest)
+                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                mockMvc.perform(
+                    get("$path/weekly/latest")
+                        .param("weekStart", weekStart)
+                        .param("zoneId", "UTC"),
+                ).andExpect(status().isBadRequest)
+                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            }
     }
 
     @Test
