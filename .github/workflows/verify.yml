@@ -199,7 +199,7 @@ jobs:
           test -s "$staging_dir/root.crt"
 
           unauthenticated_status="$(
-            curl --silent --show-error \
+            curl --silent --show-error --connect-timeout 5 --max-time 10 \
               --cacert "$staging_dir/root.crt" \
               --resolve 'localhost:38443:127.0.0.1' \
               --header 'Content-Type: application/json' \
@@ -211,7 +211,7 @@ jobs:
           test "$unauthenticated_status" = "401"
 
           authenticated_status="$(
-            curl --silent --show-error \
+            curl --silent --show-error --connect-timeout 5 --max-time 10 \
               --cacert "$staging_dir/root.crt" \
               --resolve 'localhost:38443:127.0.0.1' \
               --header 'Content-Type: application/json' \
@@ -225,7 +225,7 @@ jobs:
           jq --exit-status '.status == "APPLIED"' "$staging_dir/event-response.json"
 
           health_status="$(
-            curl --silent --show-error \
+            curl --silent --show-error --connect-timeout 5 --max-time 10 \
               --cacert "$staging_dir/root.crt" \
               --resolve 'localhost:38443:127.0.0.1' \
               --output /dev/null \
