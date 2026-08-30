@@ -14,7 +14,6 @@ import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
-import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
 import java.net.URI
@@ -80,7 +79,7 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("eventType") eventType: SourceEventType,
-        @RequestParam("sourceReference") @NotBlank @CodePointLength(max = 128)
+        @RequestParam("sourceReference") @CodePointLength(max = 128)
         @Pattern(regexp = SOURCE_REFERENCE_PATTERN) sourceReference: String,
     ): ResponseEntity<AttentionItemResponse> {
         val item = brief.findAttentionItem(
@@ -115,7 +114,7 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("eventType") eventType: SourceEventType,
-        @RequestParam("sourceReference") @NotBlank @CodePointLength(max = 128)
+        @RequestParam("sourceReference") @CodePointLength(max = 128)
         @Pattern(regexp = SOURCE_REFERENCE_PATTERN) sourceReference: String,
         @RequestParam("beforeAggregateRevision", required = false)
         @Positive beforeAggregateRevision: Long?,

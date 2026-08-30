@@ -14,7 +14,6 @@ import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.constraints.AssertTrue
-import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
 import java.time.DayOfWeek
@@ -30,7 +29,8 @@ import org.hibernate.validator.constraints.CodePointLength
 
 private const val UUID_PATTERN =
     "(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-internal const val SOURCE_REFERENCE_PATTERN = "[^\\u0000]*"
+internal const val SOURCE_REFERENCE_PATTERN =
+    "(?s)(?=.*\\P{javaWhitespace})[^\\u0000\\uD800-\\uDFFF]*"
 
 data class SourceEventRequest(
     @field:Pattern(regexp = UUID_PATTERN)
@@ -43,7 +43,6 @@ data class SourceEventRequest(
     val workspaceId: String,
     @field:Pattern(regexp = UUID_PATTERN)
     val seasonId: String,
-    @field:NotBlank
     @field:CodePointLength(max = 128)
     @field:Pattern(regexp = SOURCE_REFERENCE_PATTERN)
     val sourceReference: String,
@@ -134,13 +133,9 @@ data class CurrentAttentionItemPageRequest(
     @field:Pattern(regexp = SOURCE_REFERENCE_PATTERN)
     val afterSourceReference: String? = null,
 ) {
-    @get:AssertTrue(message = "afterEventType and afterSourceReference must be provided together")
+    @get:AssertTrue(message = "afterEventType과 afterSourceReference는 함께 제공하거나 생략해야 합니다")
     val validCursor: Boolean
-        get() = if (afterEventType == null) {
-            afterSourceReference == null
-        } else {
-            !afterSourceReference.isNullOrBlank()
-        }
+        get() = (afterEventType == null) == (afterSourceReference == null)
 
     fun toCursor(): AttentionItemCursor? = afterEventType?.let {
         AttentionItemCursor(it, checkNotNull(afterSourceReference))
