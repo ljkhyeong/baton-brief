@@ -181,6 +181,12 @@ jobs:
           while IFS= read -r network; do
             test "$(docker network inspect --format '{{.Internal}}' "$network")" = "true"
           done <<< "$service_api_networks"
+          service_api_ip="$(
+            docker inspect "$service_api_id" \
+              | jq --raw-output --arg network "$service_network" \
+                '.[0].NetworkSettings.Networks[$network].IPAddress'
+          )"
+          test -n "$service_api_ip"
 
           for attempt in $(seq 1 30); do
             if docker cp \
@@ -234,6 +240,7 @@ jobs:
               "$curl_image" \
               --silent --show-error --fail \
               --cacert /tmp/service-tls-cert.pem \
+              --resolve "brief-service:8443:$service_api_ip" \
               --header="Authorization: Bearer $service_token" \
               'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
           )"
@@ -245,6 +252,7 @@ jobs:
               "$curl_image" \
               --silent --show-error \
               --cacert /tmp/service-tls-cert.pem \
+              --resolve "brief-service:8443:$service_api_ip" \
               --output /dev/null --write-out '%{http_code}' \
               'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
           )"
@@ -256,6 +264,7 @@ jobs:
               "$curl_image" \
               --silent --show-error \
               --cacert /tmp/service-tls-cert.pem \
+              --resolve "brief-service:8443:$service_api_ip" \
               --header="Authorization: Bearer $service_token" \
               --output /dev/null --write-out '%{http_code}' \
               'https://brief-service:8443/actuator/health'
