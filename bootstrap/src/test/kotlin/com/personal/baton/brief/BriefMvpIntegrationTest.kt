@@ -204,6 +204,13 @@ class BriefMvpIntegrationTest(
         postEvent(first)
             .andExpect(status().isAccepted)
             .andExpect(jsonPath("$.status").value("APPLIED"))
+        assertThat(
+            jdbc.sql(
+                "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
+            ).param("eventId", UUID.fromString(eventId))
+                .query(String::class.java)
+                .single(),
+        ).isEqualTo("abf432596fd0f8614fd0ba91815d8f7f736dc0b99182e6a8fa9e2bea6717c93e")
 
         postEvent(first)
             .andExpect(status().isOk)
@@ -596,6 +603,13 @@ class BriefMvpIntegrationTest(
 
         val firstEventId = "70000000-0000-0000-0000-000000000001"
         val firstReference = "baton-continuity:60000000-0000-0000-0000-000000000001"
+        assertThat(
+            jdbc.sql(
+                "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
+            ).param("eventId", UUID.fromString(firstEventId))
+                .query(String::class.java)
+                .single(),
+        ).isEqualTo("69bf5f24726545fd73fba11ae22261f7ec1c7d9279f3e12543c03061344b5c55")
         postEvent(
             contractEvent("role-unassigned.active-r1-critical.json")
                 .replace("\"sourceSeverity\": \"CRITICAL\"", "\"sourceSeverity\": \"WARNING\""),
@@ -685,6 +699,12 @@ class BriefMvpIntegrationTest(
             .andReturn()
         val firstEditionId = JsonPath.read<String>(firstResult.response.contentAsString, "$.editionId")
         val firstEditionEtag = checkNotNull(firstResult.response.getHeader(HttpHeaders.ETAG))
+        assertThat(
+            jdbc.sql("SELECT state_fingerprint FROM brief_edition WHERE edition_id = :editionId")
+                .param("editionId", UUID.fromString(firstEditionId))
+                .query(String::class.java)
+                .single(),
+        ).isEqualTo("df93d4d5a31fdb77c50cc87eef92ce89899a4793a754ea13e96d664b9352b1b7")
         assertThat(firstResult.response.getHeader("Location"))
             .isEqualTo("/api/v1/editions/$firstEditionId")
 
