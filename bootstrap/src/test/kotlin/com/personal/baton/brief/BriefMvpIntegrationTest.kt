@@ -50,6 +50,9 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.databind.node.ObjectNode
+import tools.jackson.databind.util.RawValue
 
 @Testcontainers
 @SpringBootTest(
@@ -610,10 +613,11 @@ class BriefMvpIntegrationTest(
                 .query(String::class.java)
                 .single(),
         ).isEqualTo("69bf5f24726545fd73fba11ae22261f7ec1c7d9279f3e12543c03061344b5c55")
-        postEvent(
-            contractEvent("role-unassigned.active-r1-critical.json")
-                .replace("\"sourceSeverity\": \"CRITICAL\"", "\"sourceSeverity\": \"WARNING\""),
-        ).andExpect(status().isConflict)
+        val conflictingEvent = JSON.readTree(
+            contractEvent("role-unassigned.active-r1-critical.json"),
+        ) as ObjectNode
+        postEvent(conflictingEvent.put("sourceSeverity", "WARNING"))
+            .andExpect(status().isConflict)
 
         mockMvc.perform(get("/api/v1/events/$firstEventId/receipt"))
             .andExpect(status().isOk)
@@ -1087,11 +1091,14 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000003"
         val seasonId = "20000000-0000-0000-0000-000000000003"
         val eventId = "30000000-0000-0000-0000-000000000010"
+        val unauthorizedBody = JSON.writeValueAsString(
+            eventJson(eventId, workspaceId, seasonId, "unauthorized", 1),
+        )
 
         mockMvc.perform(
             post("/api/v1/events")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(eventJson(eventId, workspaceId, seasonId, "unauthorized", 1)),
+                .content(unauthorizedBody),
         ).andExpect(status().isUnauthorized)
             .andExpect(
                 header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")),
@@ -1101,7 +1108,7 @@ class BriefMvpIntegrationTest(
             post("/api/v1/events")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer wrong-token-000000000000000000000")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(eventJson(eventId, workspaceId, seasonId, "unauthorized", 1)),
+                .content(unauthorizedBody),
         ).andExpect(status().isUnauthorized)
 
         mockMvc.perform(
@@ -1109,12 +1116,14 @@ class BriefMvpIntegrationTest(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $PREVIOUS_EVENT_BEARER_TOKEN")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    eventJson(
-                        "30000000-0000-0000-0000-000000000011",
-                        workspaceId,
-                        seasonId,
-                        "rotation-overlap",
-                        1,
+                    JSON.writeValueAsString(
+                        eventJson(
+                            "30000000-0000-0000-0000-000000000011",
+                            workspaceId,
+                            seasonId,
+                            "rotation-overlap",
+                            1,
+                        ),
                     ),
                 ),
         ).andExpect(status().isAccepted)
@@ -1140,11 +1149,11 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.status").value("UNSUPPORTED"))
 
         val numericInstant = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"occurredAt\": \"2026-08-12T09:00:00Z\"", "\"occurredAt\": 1786525200")
+            .put("occurredAt", 1786525200)
         postEvent(numericInstant).andExpect(status().isBadRequest)
 
         val fractionalRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 1.5")
+            .put("aggregateRevision", 1.5)
         postEvent(fractionalRevision).andExpect(status().isBadRequest)
 
         val decimalVersion = eventJson(
@@ -1156,19 +1165,19 @@ class BriefMvpIntegrationTest(
             type = "ROLE_UNASSIGNED",
             eventVersion = 2,
             sourceSeverity = "CRITICAL",
-        ).replace("\"eventVersion\": 2", "\"eventVersion\": 2.0")
+        ).putRawValue("eventVersion", RawValue("2.0"))
         postEvent(decimalVersion).andExpect(status().isBadRequest)
 
         val decimalRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 1.0")
+            .putRawValue("aggregateRevision", RawValue("1.0"))
         postEvent(decimalRevision).andExpect(status().isBadRequest)
 
         val overflowingRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 9223372036854775808")
+            .put("aggregateRevision", "9223372036854775808".toBigInteger())
         postEvent(overflowingRevision).andExpect(status().isBadRequest)
 
         val unknownField = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"state\": \"ACTIVE\"", "\"state\": \"ACTIVE\", \"unexpected\": true")
+            .put("unexpected", true)
         postEvent(unknownField).andExpect(status().isBadRequest)
 
         listOf(
@@ -1180,7 +1189,7 @@ class BriefMvpIntegrationTest(
             ).andExpect(status().isBadRequest)
         }
 
-        listOf("\\u0000", "valid\\u0000suffix").forEach { sourceReference ->
+        listOf("\u0000", "valid\u0000suffix").forEach { sourceReference ->
             postEvent(
                 eventJson(eventId, workspaceId, seasonId, sourceReference, 1),
             ).andExpect(status().isBadRequest)
@@ -1273,6 +1282,45 @@ class BriefMvpIntegrationTest(
                 jsonPath("$.instance")
                     .value("/api/v1/editions/50000000-0000-0000-0000-000000000001"),
             )
+    }
+
+    @Test
+    fun `조회 원본 참조의 따옴표와 역슬래시는 보존하고 U+0000은 거부한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000009"
+        val seasonId = "20000000-0000-0000-0000-000000000009"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        val sourceReference = "handoff:\"quoted\"\\path"
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000091",
+                workspaceId,
+                seasonId,
+                sourceReference,
+                1,
+            ),
+        ).andExpect(status().isAccepted)
+        mockMvc.perform(
+            get("$path/current")
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", sourceReference),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.sourceReference").value(sourceReference))
+
+        listOf(
+            get("$path/current")
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "invalid\u0000reference"),
+            get("$path/transitions")
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "invalid\u0000reference"),
+            get(path)
+                .param("afterEventType", "HANDOFF_BLOCKED")
+                .param("afterSourceReference", "invalid\u0000reference"),
+        ).forEach { request ->
+            mockMvc.perform(request)
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
     }
 
     @Test
@@ -1376,6 +1424,8 @@ class BriefMvpIntegrationTest(
         ).isEqualTo(1)
     }
 
+    private fun postEvent(event: ObjectNode) = postEvent(JSON.writeValueAsString(event))
+
     private fun postEvent(json: String) = mockMvc.perform(
         post("/api/v1/events")
             .header(HttpHeaders.AUTHORIZATION, "Bearer $EVENT_BEARER_TOKEN")
@@ -1418,21 +1468,21 @@ class BriefMvpIntegrationTest(
         occurredAt: String = "2026-08-12T09:00:00Z",
         eventVersion: Int = 1,
         sourceSeverity: String? = null,
-    ): String = """
-        {
-          "eventId": "$eventId",
-          "eventType": "$type",
-          "eventVersion": $eventVersion${sourceSeverity?.let { ",\n          \"sourceSeverity\": \"$it\"" }.orEmpty()},
-          "workspaceId": "$workspaceId",
-          "seasonId": "$seasonId",
-          "sourceReference": "$sourceReference",
-          "aggregateRevision": $revision,
-          "occurredAt": "$occurredAt",
-          "state": "$state"
-        }
-    """.trimIndent()
+    ): ObjectNode = JSON.createObjectNode()
+        .put("eventId", eventId)
+        .put("eventType", type)
+        .put("eventVersion", eventVersion)
+        .put("workspaceId", workspaceId)
+        .put("seasonId", seasonId)
+        .put("sourceReference", sourceReference)
+        .put("aggregateRevision", revision)
+        .put("occurredAt", occurredAt)
+        .put("state", state)
+        .apply { sourceSeverity?.let { put("sourceSeverity", it) } }
 
     companion object {
+        private val JSON = JsonMapper.builder().build()
+
         @Container
         @ServiceConnection
         val postgres = PostgreSQLContainer("postgres:18.6-alpine")
