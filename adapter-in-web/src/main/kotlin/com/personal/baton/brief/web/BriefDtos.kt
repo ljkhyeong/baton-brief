@@ -30,6 +30,7 @@ import org.hibernate.validator.constraints.CodePointLength
 
 private const val UUID_PATTERN =
     "(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+internal const val SOURCE_REFERENCE_PATTERN = "[^\\u0000]*"
 
 data class SourceEventRequest(
     @field:Pattern(regexp = UUID_PATTERN)
@@ -44,7 +45,7 @@ data class SourceEventRequest(
     val seasonId: String,
     @field:NotBlank
     @field:CodePointLength(max = 128)
-    @field:Pattern(regexp = "[^\\u0000]*")
+    @field:Pattern(regexp = SOURCE_REFERENCE_PATTERN)
     val sourceReference: String,
     @field:Positive
     val aggregateRevision: Long,
@@ -120,6 +121,7 @@ data class CurrentAttentionItemPageRequest(
     val status: SourceEventState = SourceEventState.ACTIVE,
     val afterEventType: SourceEventType? = null,
     @field:CodePointLength(max = 128)
+    @field:Pattern(regexp = SOURCE_REFERENCE_PATTERN)
     val afterSourceReference: String? = null,
 ) {
     @get:AssertTrue(message = "afterEventType and afterSourceReference must be provided together")

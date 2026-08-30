@@ -15,6 +15,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
 import java.net.URI
 import java.util.UUID
@@ -79,7 +80,8 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("eventType") eventType: SourceEventType,
-        @RequestParam("sourceReference") @NotBlank @CodePointLength(max = 128) sourceReference: String,
+        @RequestParam("sourceReference") @NotBlank @CodePointLength(max = 128)
+        @Pattern(regexp = SOURCE_REFERENCE_PATTERN) sourceReference: String,
     ): ResponseEntity<AttentionItemResponse> {
         val item = brief.findAttentionItem(
             workspaceId,
@@ -113,7 +115,8 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("eventType") eventType: SourceEventType,
-        @RequestParam("sourceReference") @NotBlank @CodePointLength(max = 128) sourceReference: String,
+        @RequestParam("sourceReference") @NotBlank @CodePointLength(max = 128)
+        @Pattern(regexp = SOURCE_REFERENCE_PATTERN) sourceReference: String,
         @RequestParam("beforeAggregateRevision", required = false)
         @Positive beforeAggregateRevision: Long?,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
