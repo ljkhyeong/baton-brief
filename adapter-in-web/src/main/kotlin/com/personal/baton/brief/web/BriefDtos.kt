@@ -96,9 +96,11 @@ data class EditionWeekRequest(
     val weekStart: String,
     val zoneId: ZoneId,
 ) {
-    private val weekStartDate = runCatching { LocalDate.parse(weekStart) }.getOrNull()
+    private val weekStartDate = runCatching {
+        LocalDate.parse(weekStart, WEEK_START_FORMATTER)
+    }.getOrNull()
 
-    @get:AssertTrue(message = "weekStart must be a Monday")
+    @get:AssertTrue(message = "weekStart는 연도 네 자리의 uuuu-MM-dd 형식이며 월요일이어야 합니다")
     val validWeekStart: Boolean
         get() = weekStartDate?.dayOfWeek == DayOfWeek.MONDAY
 
@@ -115,6 +117,14 @@ data class EditionWeekRequest(
         checkNotNull(weekStartDate),
         zoneId,
     )
+
+    companion object {
+        private val WEEK_START_FORMATTER = DateTimeFormatterBuilder()
+            .appendValue(ChronoField.YEAR, 4)
+            .appendPattern("-MM-dd")
+            .toFormatter(Locale.ROOT)
+            .withResolverStyle(ResolverStyle.STRICT)
+    }
 }
 
 data class CurrentAttentionItemPageRequest(
