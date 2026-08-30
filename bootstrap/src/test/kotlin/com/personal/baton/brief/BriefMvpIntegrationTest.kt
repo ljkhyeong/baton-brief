@@ -50,6 +50,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.core.json.JsonWriteFeature
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.databind.node.ObjectNode
 import tools.jackson.databind.util.RawValue
@@ -1352,7 +1353,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `조회 원본 참조의 따옴표와 역슬래시는 보존하고 U+0000은 거부한다`() {
+    fun `원본 참조의 정상 문자는 보존하고 저장할 수 없는 문자는 거부한다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000009"
         val seasonId = "20000000-0000-0000-0000-000000000009"
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
@@ -1373,6 +1374,26 @@ class BriefMvpIntegrationTest(
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.sourceReference").value(sourceReference))
 
+        val validEvent = eventJson(
+            "30000000-0000-0000-0000-000000000092",
+            workspaceId,
+            seasonId,
+            "review:?",
+            1,
+            type = "ROLE_UNASSIGNED",
+            eventVersion = 2,
+            sourceSeverity = "CRITICAL",
+        )
+        val escapedJson = JSON.writer().with(JsonWriteFeature.ESCAPE_NON_ASCII)
+        listOf("review:\uD800", "review:\uDC00").forEach { invalidReference ->
+            postEvent(
+                escapedJson.writeValueAsString(validEvent.deepCopy().put("sourceReference", invalidReference)),
+            )
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+        postEvent(validEvent).andExpect(status().isAccepted)
+
         listOf(
             get("$path/current")
                 .param("eventType", "HANDOFF_BLOCKED")
@@ -1388,6 +1409,46 @@ class BriefMvpIntegrationTest(
                 .andExpect(status().isBadRequest)
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
         }
+    }
+
+    @Test
+    fun `수신한 NBSP 원본 참조로 다음 페이지를 조회한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000011"
+        val seasonId = "20000000-0000-0000-0000-000000000011"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000111",
+                workspaceId,
+                seasonId,
+                "\u00a0",
+                1,
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000112",
+                workspaceId,
+                seasonId,
+                "next-item",
+                1,
+                type = "ROUTINE_MISSED",
+            ),
+        ).andExpect(status().isAccepted)
+
+        val firstPage = mockMvc.perform(get(path).param("limit", "1"))
+            .andExpect(status().isOk)
+            .andReturn().response.contentAsByteArray
+        val cursor = JSON.readTree(firstPage).path("nextCursor")
+        assertThat(cursor.path("sourceReference").stringValue()).isEqualTo("\u00a0")
+        mockMvc.perform(
+            get(path)
+                .param("limit", "1")
+                .param("afterEventType", cursor.path("eventType").stringValue())
+                .param("afterSourceReference", cursor.path("sourceReference").stringValue()),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[0].sourceReference").value("next-item"))
+            .andExpect(jsonPath("$.nextCursor").doesNotExist())
     }
 
     @Test

@@ -73,12 +73,18 @@ class BriefEventContractTest {
     }
 
     @Test
-    fun `sourceReference는 U+0000을 허용하지 않는다`() {
-        listOf("\u0000", "valid\u0000suffix").forEach { sourceReference ->
-            val invalidExample = EXAMPLE_DOCUMENT.deepCopy().put("sourceReference", sourceReference)
-            assertThat(SCHEMA.validate(JSON.writeValueAsString(invalidExample), InputFormat.JSON))
-                .isNotEmpty()
+    fun `sourceReference는 원문을 보존할 수 있는 문자와 같은 공백 기준을 사용한다`() {
+        listOf("\u00a0", "\nreference", "😀".repeat(128)).forEach { sourceReference ->
+            val validExample = EXAMPLE_DOCUMENT.deepCopy().put("sourceReference", sourceReference)
+            assertThat(SCHEMA.validate(JSON.writeValueAsString(validExample), InputFormat.JSON))
+                .isEmpty()
         }
+        listOf("", " \t\n", "\u2003", "\u0000", "valid\u0000suffix", "\uD800", "\uDC00")
+            .forEach { sourceReference ->
+                val invalidExample = EXAMPLE_DOCUMENT.deepCopy().put("sourceReference", sourceReference)
+                assertThat(SCHEMA.validate(JSON.writeValueAsString(invalidExample), InputFormat.JSON))
+                    .isNotEmpty()
+            }
     }
 
     companion object {
