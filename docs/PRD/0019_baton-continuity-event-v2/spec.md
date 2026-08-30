@@ -87,9 +87,9 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
 - 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 생산자는 그 값을 고정해 실제
   serializer와 송신 경계를 검증해야 한다.
-- Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD를
-  `baton-brief-contracts-<VERSION>.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
-  배포 플러그인은 만들지 않는다.
+- Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD, 직접 참조하는 PRD-0002·0007·0018을
+  `baton-brief-contracts-<VERSION>.zip`으로 묶는다. 문서의 원래 경로를 유지해 ZIP 안에서
+  상대 링크를 열 수 있게 한다. JVM DTO JAR, 별도 계약 서비스와 배포 플러그인은 만들지 않는다.
 - BRIEF의 기존 v2 PostgreSQL 통합 시나리오는 계약 예시를 직접 요청 본문으로 사용한다.
   예시를 위한 별도 제품 시나리오를 복제하지 않는다.
 
@@ -124,7 +124,8 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
   SQL은 기존 이름의 저장 제약으로 거부한다.
 - 이벤트 v2 계약 예시가 JSON Schema와 일치하고 같은 예시가 실제 BRIEF 수신·재구축
   시나리오에서 처리된다.
-- `contracts/VERSION`에서 이름을 정한 계약 팩 ZIP에 스키마·예시와 이 PRD가 포함된다.
+- `contracts/VERSION`에서 이름을 정한 계약 팩 ZIP에 스키마·예시와 이 PRD 및 직접 참조하는
+  PRD-0002·0007·0018이 포함되며, 포함 문서의 상대 링크 대상이 ZIP 안에 존재한다.
 - 전체 테스트와 실행 JAR 생성이 성공한다.
 
 ## 명시적 비목표

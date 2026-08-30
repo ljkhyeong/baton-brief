@@ -38,6 +38,10 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   catalog에서 한 번만 관리한다.
 - BRIEF 전용 데이터베이스는 PostgreSQL 18.6을 사용한다.
 - 영속성 구현은 Spring JDBC의 `JdbcClient`와 Flyway 마이그레이션을 사용한다.
+- 단순 행 매핑은 Spring `DataClassRowMapper`를 사용하되 `Instant` 열 읽기만 확장한다.
+  PostgreSQL `TIMESTAMPTZ`는 JDBC 4.2의 `OffsetDateTime`으로 읽고 `toInstant()`로 변환해
+  구형 `Timestamp` 경유 시 과거 날짜가 달라지는 문제를 피한다. 생성자·필드 매핑은 Spring에
+  맡기며 날짜 입력 범위를 추가로 제한하지 않는다.
 - JPA와 ORM 엔티티는 사용하지 않는다. 도메인 모델과 데이터베이스 행 매핑을 분리한다.
 - 로컬 데이터베이스는 `postgres:18.6-alpine`을 사용하는 `compose.yml`로 제공한다. 애플리케이션은
   로컬 프로필 전용 별칭 대신 Spring Boot 표준 데이터 소스·Flyway 속성을 사용하고
@@ -49,8 +53,9 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   Testcontainers를 사용한다. 개별 라이브러리 버전은 별도로 고정하지 않는다.
 - 이벤트 v2의 언어 중립 계약은 Draft 2020-12 JSON Schema와 JSON 예시로 제공한다.
   `contracts/VERSION`을 계약 팩 버전의 단일 기준으로 사용하고 Gradle 표준 `Zip` 작업으로
-  `contracts/**`와 해당 PRD를 묶는다. 계약 스키마 검증기는 제품 런타임이 아닌
-  `bootstrap` 테스트에만 두며 Spring Boot BOM이 관리하지 않으므로 버전을 명시한다.
+  `contracts/**`와 PRD-0019 및 직접 참조하는 PRD-0002·0007·0018을 원래 경로로 묶는다.
+  계약 스키마 검증기는 제품 런타임이 아닌 `bootstrap` 테스트에만 두며 Spring Boot BOM이
+  관리하지 않으므로 버전을 명시한다.
 - 실행 상태 확인에는 `spring-boot-starter-actuator`의 표준 aggregate health와 `DataSource`
   기반 DB health contributor 자동 구성을 사용한다. 제품 API와 분리된
   `/actuator/health`에서 aggregate 상태만 노출하며 별도 controller, DTO,

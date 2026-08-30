@@ -9,6 +9,10 @@ JSON Schema와 예시로 제공한다. BRIEF 소비자는 `VERSION`의 현재 �
 - `schemas/source-event.v2.schema.json`: `POST /api/v1/events`에 전달하는 이벤트 v2 요청
 - `examples/*.json`: BATON 다섯 신호와 `ROLE_UNASSIGNED`의 심각도 변경·해소 예시
 - `VERSION`: 계약 팩 버전의 단일 기준
+- ZIP에는 [이벤트 v2 소비 계약](../docs/PRD/0019_baton-continuity-event-v2/spec.md)과
+  직접 참조하는 [MVP 계약](../docs/PRD/0002_mvp-contract/spec.md),
+  [수신 증거 조회](../docs/PRD/0007_event-receipt-query/spec.md),
+  [생산자 선행조건](../docs/PRD/0018_baton-producer-compatibility/spec.md)을 원래 경로로 포함한다.
 
 스키마는 개별 필드 형식과 v2 열거형을 정의한다. 같은 `sourceReference`의 리비전 증가,
 `ACTIVE`·`RESOLVED` 생명주기, 멱등성·충돌·HTTP 결과와 재구축 의미는 PRD-0019가 기준이다.
@@ -42,5 +46,6 @@ BATON 실제 serializer·outbox·송신기와 전용 Bearer를 포함한 현재 
 ```
 
 `contractsZip`은 `build/distributions/baton-brief-contracts-<VERSION>.zip`에
-`contracts/**`와 PRD-0019를 재현 가능한 순서와 고정된 파일 시각으로 묶는다. 공유 JVM DTO
-JAR, 별도 배포 플러그인과 계약 서비스는 만들지 않는다.
+`contracts/**`와 위 PRD 네 문서를 재현 가능한 순서와 고정된 파일 시각으로 묶는다.
+ZIP에 포함한 문서의 상대 링크는 ZIP 안에서도 열 수 있어야 한다. 공유 JVM DTO JAR,
+별도 배포 플러그인과 계약 서비스는 만들지 않는다.
