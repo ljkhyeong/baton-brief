@@ -32,7 +32,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.jvm.optionals.getOrNull
-import org.springframework.jdbc.core.SimplePropertyRowMapper
+import org.springframework.jdbc.core.DataClassRowMapper
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
@@ -750,12 +750,12 @@ class JdbcBriefPersistenceAdapter(
 
     companion object {
         private const val PROJECTION_LOCK = "brief:projection"
-        private val SOURCE_EVENT_RECEIPT_MAPPER = SimplePropertyRowMapper(SourceEventReceipt::class.java)
-        private val SOURCE_EVENT_MAPPER = SimplePropertyRowMapper(SourceEvent::class.java)
-        private val ATTENTION_ITEM_MAPPER = SimplePropertyRowMapper(AttentionItem::class.java)
-        private val ATTENTION_ITEM_TRANSITION_MAPPER = SimplePropertyRowMapper(AttentionItemTransition::class.java)
-        private val EDITION_SUMMARY_MAPPER = SimplePropertyRowMapper(EditionSummary::class.java)
-        private val EDITION_ITEM_MAPPER = SimplePropertyRowMapper(BriefEditionItem::class.java)
+        private val SOURCE_EVENT_RECEIPT_MAPPER = PostgresDataClassRowMapper(SourceEventReceipt::class.java)
+        private val SOURCE_EVENT_MAPPER = PostgresDataClassRowMapper(SourceEvent::class.java)
+        private val ATTENTION_ITEM_MAPPER = PostgresDataClassRowMapper(AttentionItem::class.java)
+        private val ATTENTION_ITEM_TRANSITION_MAPPER = PostgresDataClassRowMapper(AttentionItemTransition::class.java)
+        private val EDITION_SUMMARY_MAPPER = PostgresDataClassRowMapper(EditionSummary::class.java)
+        private val EDITION_ITEM_MAPPER = PostgresDataClassRowMapper(BriefEditionItem::class.java)
         private val UPSERT_ATTENTION = """
             INSERT INTO attention_item (
                 workspace_id, season_id, event_type, source_reference, severity,
@@ -787,4 +787,14 @@ class JdbcBriefPersistenceAdapter(
               LEFT JOIN source_event_conflict conflict ON conflict.event_id = receipt.event_id
         """.trimIndent()
     }
+}
+
+private class PostgresDataClassRowMapper<T : Any>(mappedClass: Class<T>) : DataClassRowMapper<T>(mappedClass) {
+    override fun getColumnValue(result: ResultSet, index: Int, paramType: Class<*>): Any? =
+        if (paramType == Instant::class.java) {
+            // 구형 Timestamp를 경유하면 과거 날짜가 달라지므로 JDBC 4.2 타입으로 읽는다.
+            result.getObject(index, OffsetDateTime::class.java)?.toInstant()
+        } else {
+            super.getColumnValue(result, index, paramType)
+        }
 }
