@@ -37,24 +37,42 @@ BRIEF의 별도 서비스 Bearer와 비공개 HTTPS 앞단, BATON 조회 client�
 ## BATON 생산자 연동 상태
 
 BATON 작업 브랜치에서 권위 있는 다섯 연속성 신호, 신호별 리비전, 설정형 시간 재조정,
-불변 outbox와 최소 한 번 HTTP 전달을 구현했다. 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·
-PostgreSQL 18.4를 함께 기동한 선택 실행 테스트에서 다음 흐름을 확인했다.
+불변 outbox와 최소 한 번 HTTP 전달을 구현했다. 2026-08-30 BATON `4a7f6d1`의 격리된
+소스 복사본과 BRIEF `0e6cd2a`의 실행 JAR로 현재 계약 팩 `2.0.0-rc.4` 호환성을 확인했다.
+BATON 실제 이벤트 record의 Jackson 직렬화가 다섯 신호를 포함한 일곱 예시와 JSON Schema를
+모두 통과했다. 실제 두 실행 JAR과 MySQL 8.4·PostgreSQL 18.6을 함께 기동한 선택 실행
+테스트에서는 다음 흐름을 확인했다.
 
-- 원본 API 변경과 초기 정합화 후 BRIEF 현재 투영 수렴
+- `ROLE_UNASSIGNED` 원본 API 변경과 초기 정합화 후 BRIEF 현재 투영 수렴
 - BRIEF 미기동 네트워크 실패 뒤 재시도
 - 최초 `202`, 응답 유실을 재현한 동일 이벤트의 `200`
 - 원본 심각도 변경과 `RESOLVED` 수렴
 - 현재·직전 Bearer 중첩 교체 구간
 
-두 교차 서비스 검증은 당시 PostgreSQL 18.4에서 수행했다. 현재 BRIEF의 채택 기준인
-PostgreSQL 18.6은 저장소 통합 테스트와 스테이징 조립에서 별도로 확인했으며, 같은 BATON
-교차 서비스 시나리오를 18.6 조합으로 다시 실행한 근거는 아니다.
+BATON의 진행 중인 CAL 변경은 포함하지 않았다. 임시 복사본에 BRIEF 계약 팩을 그대로
+추가하고 기존 직렬화 테스트의 입력 경로와 전달 테스트의 PostgreSQL 이미지 버전만
+바꿨다. 제품 코드와 검증 로직은 추가하지 않았다. BRIEF의 `:bootstrap:bootJar contractsZip`
+성공 뒤 BATON 복사본에서 다음 두 대상 테스트가 각각 성공했다.
+
+```shell
+./gradlew --no-daemon :adapter-out-external:test \
+  --tests com.personal.baton.adapter.out.external.brief.BriefContinuityEventContractTest
+./gradlew --no-daemon :application:briefCrossServiceTest \
+  -PbriefBootJar=/absolute/path/to/baton-brief/bootstrap/build/libs/bootstrap-0.1.0-SNAPSHOT.jar \
+  --tests com.personal.baton.application.brief.BriefDeliveryEndToEndTest
+```
+
+이 검증은 loopback HTTP를 사용했다. 응답 유실은 실제 TCP 응답 절단이 아니라 BRIEF 수신
+뒤 BATON 전달 상태를 재시도 상태로 되돌려 재현했다. 일곱 예시의 직렬화 성공을 모든
+Unicode 경계 입력의 생산자 검증으로 확대하지 않는다. BATON 저장소의 계약 고정 버전은
+여전히 `2.0.0-rc.1`이며 임시 복사본의 성공은 버전 고정 변경을 뜻하지 않는다. 양쪽 저장소
+전체 테스트와 조회·에디션 생성 교차 서비스 테스트는 다시 실행하지 않았다. 위 조회·생성
+교차 검증의 PostgreSQL 18.4 근거는 그대로 유지한다.
 
 BATON 프로덕션 설정에 BRIEF HTTPS origin과 파일 기반 Bearer 주입을 연결했지만 실제 두
-스테이징 호스트 사이의 공인 HTTPS 전달은 아직 검증하지 않았다. 로컬 Caddy 내부 CA
-검증을 원격 전달 완료로 해석하지 않는다. 위 생산자·소비자 교차 검증은 계약 팩
-`2.0.0-rc.1`까지의 근거다. 입력 계약을 엄격하게 한 현재 `2.0.0-rc.4`는 BATON 실제
-serializer와 다시 검증해야 한다.
+스테이징 호스트 사이의 공인 HTTPS 전달은 아직 검증하지 않았다. 이번 작업에는 실제
+스테이징 호스트·접속 방법·배포 비밀 파일 경로가 제공되지 않았다. 로컬 검증을 원격 전달
+완료로 해석하지 않고 계약 팩도 RC로 유지한다.
 
 ## 현재 검증 근거
 
@@ -111,8 +129,8 @@ V8은 기존 이름의 지원 이벤트 제약을 교체해 v2 필수 심각도�
 불일치가 있으면 마이그레이션이 실패하며 원본 근거 없이 값을 채우거나 삭제하지 않는다.
 이벤트 요청·지문·JSON Schema와 계약 팩 버전은 유지했고, 저장 제약 설명을 반영한 PRD-0019를
 포함해 계약 ZIP을 다시 생성했다. V8 반영 당시에는 새 실행 JAR 생성까지 확인했고 스테이징
-이미지와 BATON 교차 서비스 시나리오는 실행하지 않았다. 이후 로컬 이미지 실행 근거는
-아래 패키지와 스테이징 실행 절을 따른다.
+이미지와 BATON 교차 서비스 시나리오는 실행하지 않았다. 이후 검증은 위 BATON 생산자
+연동 상태와 아래 패키지와 스테이징 실행 절을 따른다.
 
 원본 참조의 Unicode·공백 규칙 보완 뒤에도 위 전체 검증이 성공했다. 수신·단건 조회·전이
 이력·목록 커서는 같은 `@Pattern`으로 JDK 21 공백 기준과 `U+0000`·짝이 없는 surrogate
@@ -124,8 +142,8 @@ V8은 기존 이름의 지원 이벤트 제약을 교체해 v2 필수 심각도�
 계약 팩은 `2.0.0-rc.4`로 올리고 JSON Schema에 같은 공백 문자와 정상 surrogate 쌍을
 명시했다. 계약 테스트와 별도로 ECMAScript 기본·Unicode 모드에서 대표 문자열 20건의
 패턴 판정을 확인했다. 이 대조는 다른 언어의 전체 JSON Schema 검증이나 BATON 실제
-serializer 검증을 대신하지 않는다. 새 실행 JAR·계약 ZIP을 생성했으며 실제 BATON
-serializer와 스테이징 교차 서비스 시나리오는 다시 실행하지 않았다.
+serializer 검증을 대신하지 않는다. 새 실행 JAR·계약 ZIP을 생성했으며, 이후 수행한
+BATON 실제 serializer와 로컬 전달 검증 범위는 위 BATON 생산자 연동 상태를 따른다.
 
 주요 통합 증거는 다음 계약을 포함한다.
 
@@ -193,8 +211,8 @@ CI 컨테이너 검사에 로그 설정 확인만 포함했다.
 health, BRIEF·서비스 Caddy의 비루트·읽기 전용 실행, 호스트 포트 비게시와 내부 네트워크를
 확인했다. 인증서를 검증한 이벤트 수신·서비스 조회, 무인증 `401`, 허용하지 않은 health
 `404`와 token 로그 비노출도 통과했다. 검증용 컨테이너·네트워크·볼륨·임시 비밀은 제거했다.
-제품 코드와 계약은 바꾸지 않아 전체 테스트와 계약 ZIP 생성을 반복하지 않았다. BATON 실제
-serializer·교차 서비스와 공인 HTTPS·원격 CI는 다시 검증하지 않았다.
+제품 코드와 계약은 바꾸지 않아 전체 테스트와 계약 ZIP 생성을 반복하지 않았다. 이 조립
+검증에는 BATON 실제 serializer·교차 서비스와 공인 HTTPS·원격 CI를 포함하지 않았다.
 
 ### 자동 검증 구성
 
@@ -256,6 +274,7 @@ Jackson 3.1.5가 일치하는 것과 저장소 전체 검증을 확인했다.
 
 ## 미검증·미결정 범위
 
+- BATON 저장소의 계약 팩·직렬화 테스트 입력을 `2.0.0-rc.4`로 고정하는 변경
 - 공인 DNS·ACME 인증서와 실제 BATON 스테이징 호스트→BRIEF Caddy 원격 전달
 - 운영자 제공 서비스 인증서·실제 배포 비밀을 사용한 스테이징 조회·생성 활성화
 - 실제 TCP 응답 절단이나 프로세스 중단 뒤 BATON 생성 실행 재시도
