@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.awaitility.Awaitility.await
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
 import org.hamcrest.Matchers.contains
@@ -1545,30 +1546,28 @@ class BriefMvpIntegrationTest(
                     }
                 }
 
-                val waitDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
-                var sharedLockWaitObserved: Boolean
-                do {
-                    sharedLockWaitObserved = jdbc.sql(
-                        """
-                        SELECT EXISTS (
-                            SELECT 1
-                              FROM pg_locks
-                             WHERE database = (
-                                       SELECT oid
-                                         FROM pg_database
-                                        WHERE datname = current_database()
-                                   )
-                               AND locktype = 'advisory'
-                               AND mode = 'ShareLock'
-                               AND NOT granted
-                        )
-                        """.trimIndent(),
-                    ).query(Boolean::class.java).single()
-                    if (!sharedLockWaitObserved) {
-                        TimeUnit.MILLISECONDS.sleep(10)
+                await()
+                    .pollDelay(0, TimeUnit.MILLISECONDS)
+                    .pollInterval(10, TimeUnit.MILLISECONDS)
+                    .atMost(10, TimeUnit.SECONDS)
+                    .until {
+                        jdbc.sql(
+                            """
+                            SELECT EXISTS (
+                                SELECT 1
+                                  FROM pg_locks
+                                 WHERE database = (
+                                           SELECT oid
+                                             FROM pg_database
+                                            WHERE datname = current_database()
+                                       )
+                                   AND locktype = 'advisory'
+                                   AND mode = 'ShareLock'
+                                   AND NOT granted
+                            )
+                            """.trimIndent(),
+                        ).query(Boolean::class.java).single()
                     }
-                } while (!sharedLockWaitObserved && System.nanoTime() < waitDeadline)
-                assertThat(sharedLockWaitObserved).isTrue()
                 releaseRebuild.countDown()
 
                 rebuild.get(10, TimeUnit.SECONDS)
