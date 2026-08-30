@@ -21,8 +21,12 @@ JSON Schema는 숫자의 표기 형태를 구분하지 않으므로 수학적으
 `1.0`을 같은 값으로 다룬다. 생산자는 `eventVersion`과 `aggregateRevision`을 소수점이나
 지수 표기가 없는 JSON 정수 token으로 직렬화해야 한다. BRIEF는 소수 형태를 정수로
 변환하지 않고 `400 Bad Request`로 거부한다. `sourceReference`의 최대 128자는 Unicode
-code point를 기준으로 하며 `U+0000`은 허용하지 않는다. `eventId`, `workspaceId`,
-`seasonId`는 ASCII 16진수의 36자 `8-4-4-4-12` 하이픈 UUID로 직렬화한다.
+code point를 기준으로 하며 `U+0000`과 짝이 없는 UTF-16 surrogate는 허용하지 않는다.
+정상 surrogate 쌍으로 표현되는 이모지는 허용한다. 공백 판정은 기존 수신과 같은 JDK 21
+`Character.isWhitespace` 기준이며 NBSP(`U+00A0`)는 원문 그대로 허용한다. 스키마는 해당
+공백 문자와 surrogate 쌍을 명시해 Java·ECMAScript의 기본 문자 분류 차이를 피한다.
+`eventId`, `workspaceId`, `seasonId`는 ASCII 16진수의 36자 `8-4-4-4-12` 하이픈 UUID로
+직렬화한다.
 
 v2 계약은 `aggregateRevision`을 JVM `Long`·PostgreSQL `BIGINT`와 같은 부호 있는 64비트
 양수 범위로 제한하고, 계약에 없는 필드와 정수가 아닌 숫자를 거부한다. 현재 계약 버전과

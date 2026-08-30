@@ -78,8 +78,11 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - Draft 2020-12 검증기는 UUID와 시점 `format-assertion`을 활성화한다. JSON Schema가 숫자
   token의 소수점·지수 표기를 구분하지 못하는 한계는 PRD-0002의 정수 표현 계약과 실제
   소비자 수신 검증으로 보완한다.
-- 세 UUID는 36자 하이픈 표기를 사용하고 `sourceReference`는 `U+0000`을 포함하지 않는다.
-  JSON Schema와 실제 소비자 수신 검증은 이 형식 경계를 함께 확인한다.
+- 세 UUID는 36자 하이픈 표기를 사용하고 `sourceReference`는 PRD-0002의 문자·공백 규칙을
+  따른다. JSON Schema와 실제 소비자 수신 검증은 이 형식 경계를 함께 확인한다.
+- 문자열 패턴은 JDK 21 공백 문자를 명시하고 정상 surrogate 쌍을 허용하는 ECMAScript
+  표현을 사용한다. Java 전용 문자 클래스나 엔진마다 다른 기본 공백 분류에 의존하지 않는다.
+  NBSP·이모지·줄바꿈 뒤의 정상 문자는 허용하고 `U+0000`·짝이 없는 surrogate는 거부한다.
 - `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
 - 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 생산자는 그 값을 고정해 실제
