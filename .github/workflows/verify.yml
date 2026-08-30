@@ -172,7 +172,10 @@ jobs:
           docker inspect "$service_api_id" | jq --exit-status \
             '.[0].HostConfig.ReadonlyRootfs == true
              and .[0].HostConfig.CapDrop == ["ALL"]
-             and ((.[0].HostConfig.CapAdd // []) | length == 0)'
+             and ((.[0].HostConfig.CapAdd // []) | length == 0)
+             and .[0].HostConfig.LogConfig.Type == "json-file"
+             and .[0].HostConfig.LogConfig.Config["max-size"] == "10m"
+             and .[0].HostConfig.LogConfig.Config["max-file"] == "3"'
           test "$(
             docker inspect "$service_api_id" \
               | jq '.[0].NetworkSettings.Networks | length'
