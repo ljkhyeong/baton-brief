@@ -119,7 +119,7 @@
 
 ## 채택한 기술과 모듈 경계
 
-- ADR-0002를 기술 스택의 기준 문서로 사용한다. Kotlin/JVM 2.3.21, Java 21
+- ADR-0002를 기술 스택의 기준 문서로 사용한다. Kotlin/JVM·Kotlin BOM 2.4.10, Java 21
   도구 체인·JVM 21 바이트코드 대상·JDK 21 실행 환경, Spring Boot/BOM 4.1.1, Gradle wrapper
   9.2.1과 Kotlin DSL, PostgreSQL 18.6을 임의로 바꾸지 않는다.
 - 영속성은 Spring JDBC `JdbcClient`와 Flyway로 구현하며 JPA를 추가하지 않는다.

@@ -114,7 +114,7 @@ BRIEF가 소유하지 않는다.
 
 [ADR-0002](docs/ADR/0002_technology-stack/adr.md)를 기술 기준으로 사용한다.
 
-- Kotlin/JVM 2.3.21, Java 21 도구 체인과 JDK 21 실행 환경
+- Kotlin/JVM·Kotlin BOM 2.4.10, Java 21 도구 체인과 JDK 21 실행 환경
 - Spring Boot/BOM 4.1.1, Gradle wrapper 9.2.1과 Kotlin DSL
 - PostgreSQL 18.6, Spring JDBC `JdbcClient`, Flyway, JPA 미사용
 - `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap`의 다섯

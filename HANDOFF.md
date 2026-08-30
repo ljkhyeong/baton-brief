@@ -64,9 +64,17 @@ serializer와 다시 검증해야 한다.
 ./gradlew --no-daemon test :bootstrap:bootJar contractsZip
 ```
 
-성공했다. 다섯 모듈의 전체 테스트, PostgreSQL Testcontainers 빈 데이터베이스 V1~V7
+2026-08-30 Kotlin/JVM·Kotlin BOM 2.4.10과 Gradle 9.2.1·Java 21 조합에서 성공했다.
+다섯 모듈의 전체 테스트, PostgreSQL Testcontainers 빈 데이터베이스 V1~V7
 적용, 대표 V2 데이터의 V3~V7 업그레이드와
 `bootstrap-0.1.0-SNAPSHOT.jar`, 재현 가능한 이벤트 계약 ZIP 생성을 확인했다.
+
+`bootstrap`의 `runtimeClasspath`와 `testRuntimeClasspath`에서 `kotlin-stdlib`·
+`kotlin-reflect`가 모두 2.4.10으로 해석되며 실행 JAR에도 두 라이브러리의 2.4.10이 포함된다.
+Kotlin 플러그인과 BOM은 같은 version catalog 값을 사용한다. 제품 코드·검증 코드를
+추가하지 않았고 Spring Boot 4.1.1·Jackson 3.1.5·PostgreSQL 18.6과 계약 팩 버전은 유지했다.
+Gradle 9.7.1 자동 제안은 Kotlin 2.4.10의 완전 지원 상한인 9.5.0을 넘으므로 보류했다.
+기술 선택의 근거는 [ADR-0002](docs/ADR/0002_technology-stack/adr.md)를 따른다.
 
 주요 통합 증거는 다음 계약을 포함한다.
 
@@ -89,6 +97,10 @@ serializer와 다시 검증해야 한다.
 않는다.
 
 ### 패키지와 스테이징 실행
+
+아래 컨테이너·교차 서비스 실행과 이후에 링크한 원격 CI는 Kotlin 2.3.21 시점의 근거다.
+Kotlin 2.4.10에서는 위 저장소 전체 검증과 실행 JAR 구성을 확인했으며, 새 이미지의 실제
+기동·BATON 교차 서비스·원격 CI는 아직 다시 검증하지 않았다.
 
 - Eclipse Temurin 21.0.12+8과 PostgreSQL 18.6에서 패키지 JAR의 Tomcat·Flyway·DataSource·
   aggregate health 결합을 실제 스테이징 컨테이너 내부 HTTP로 확인했다. 같은 검증에서
@@ -143,7 +155,7 @@ wrapper JAR을 검증하고 `basic` cache provider로 캐시를 구성한다. �
 구성요소를 사용하지 않는다.
 
 GitHub 저장소의 Dependabot 취약점 알림과 보안 업데이트는 2026-08-29에 활성화했다.
-`.github/dependabot.yml`은 함께 유지해야 하는 Kotlin 플러그인만 minor·patch 그룹으로
+`.github/dependabot.yml`은 함께 유지해야 하는 Kotlin 플러그인과 BOM을 minor·patch 그룹으로
 묶고 Gradle wrapper와 개별 라이브러리는 분리한다. GitHub Actions minor·patch는 함께
 제안하고 major 후보도 개별 pull request로 검토한다. JSON Schema 검증기 3.0.7은 테스트에
 Jackson 3.2.1 BOM을 적용해 제품과 classpath를 다르게 만들므로 정확히 이 버전만 제외한다.
@@ -181,8 +193,9 @@ Jackson 3.1.5가 일치하는 것과 저장소 전체 검증을 확인했다.
 - Gradle dependency verification metadata의 신뢰 가능한 최초 checksum 검토와
   플랫폼 간 유지 절차. 현재 wrapper 배포본 checksum과 최소 CI를 우선하고, 실제 작업
   의존성에서 생성된 대규모 metadata는 검토 없이 추가하지 않는다.
-- Kotlin Gradle plugin의 `GHSA-r937-wjx7-w2jp`는 build cache metadata 역직렬화에 영향을
-  주지만 안정 패치가 아직 없다. `main`만 쓰는 Actions 캐시 경계를 유지하고
+- Kotlin Gradle plugin의 [GHSA-r937-wjx7-w2jp](https://github.com/advisories/GHSA-r937-wjx7-w2jp)는
+  build cache metadata 역직렬화에 영향을 주며 2.4.10도 영향 범위에 있다. 안정 패치가
+  아직 없으므로 이번 갱신을 보안 경고 해소로 기록하지 않는다. `main`만 쓰는 Actions 캐시 경계를 유지하고
   `2.4.20-RC2` 같은 사전 릴리스를 경고 제거만을 위해 채택하지 않으며 안정 버전과 ADR 변경을
   함께 검토한다.
 - Spring Boot Gradle plugin이 빌드 classpath로 가져오는 Commons Lang의

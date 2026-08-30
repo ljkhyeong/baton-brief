@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-11
-- 수정일: 2026-08-29
+- 수정일: 2026-08-30
 
 ## 맥락
 
@@ -26,7 +26,10 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
 
 ### 플랫폼과 저장 기술
 
-- Kotlin/JVM 2.3.21을 사용한다.
+- Kotlin/JVM 2.4.10을 사용한다. 같은 버전의 Kotlin BOM을 모든 Kotlin 모듈에 Gradle
+  표준 `platform`으로 적용해 `kotlin-stdlib`과 `kotlin-reflect`를 정렬한다. BOM과 플러그인은
+  version catalog의 같은 Kotlin 버전을 참조하며 개별 라이브러리 강제 버전이나 별도
+  의존성 관리 플러그인을 추가하지 않는다.
 - Java 21 툴체인을 사용하고 Kotlin 바이트코드 대상을 JVM 21로 고정한다. BRIEF 실행 환경도
   JDK 21을 사용한다.
 - Spring Boot와 Spring Boot BOM은 4.1.1을 사용한다.
@@ -54,8 +57,17 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   `HealthIndicator`와 DB 확인 SQL을 만들지 않는다.
 
 CAL의 미병합 MVP 작업에서 당시 진행 중이던 Kotlin/JVM과 Spring Boot 4.1 계열 기준은
-참고하되 JDK 25나 Gradle 9.6.1까지 복제하지 않는다. Kotlin 2.3.21이 공식적으로 지원하는 Gradle 범위는
-9.3까지이므로 BRIEF는 호환 범위 안의 9.2.1을 의도적으로 유지한다.
+참고하되 JDK 25나 Gradle 버전까지 복제하지 않는다. Kotlin 2.4.10은
+[공식 Gradle 호환표](https://kotlinlang.org/docs/gradle-configure-project.html)에서
+Gradle 7.6.3~9.5.0을 완전 지원한다. BRIEF는 기존에 검증한 Gradle 9.2.1을 유지하며
+자동 제안된 9.7.1은 CI 성공만으로 채택하지 않는다.
+
+Kotlin 2.4.10은 안정 버전이며 Kotlin 2.4 JVM 표준 라이브러리는
+[공식 보안 지원 기간](https://kotlinlang.org/docs/releases.html#standard-library-security-support)을
+제공한다. 2.3.21에서 컴파일러와 런타임을 함께 갱신하되 Java 21·Spring Boot 4.1.1과
+제품 계약은 유지한다. Spring Boot BOM만 사용하면 플러그인이 추가하는 `kotlin-stdlib`과
+BOM의 `kotlin-reflect` 버전이 달라지므로 Kotlin BOM으로 정렬한다. 이 결정은 Kotlin
+Gradle plugin의 build cache 보안 경고가 해결됐다는 뜻이 아니다.
 
 ### 모듈과 의존 방향
 
@@ -145,8 +157,8 @@ Java 25 뼈대에서의 과거 성공 결과를 Kotlin/JDK 21 산출물의 성�
   재검토한다.
 - 단일 Spring Boot 모듈: 초기 파일 수는 적지만 도메인·애플리케이션 경계를 빌드 수준에서
   보호하지 못해 채택하지 않았다.
-- Gradle 9.6.1: CAL의 미병합 MVP 작업과 래퍼 버전까지 같아지는 장점은 있지만 Kotlin
-  2.3.21의 공식 지원 범위인 Gradle 9.3을 넘으므로 채택하지 않았다.
+- Gradle 9.6.1·9.7.1: 각각 CAL의 당시 기준과 Dependabot 자동 제안이지만 Kotlin 2.4.10의
+  완전 지원 상한인 Gradle 9.5.0을 넘으므로 채택하지 않는다.
 - 메시지 브로커와 외부 연동 어댑터를 함께 선택: 이벤트 봉투, 전달과 운영 계약이
   아직 없으므로 기술 스택 결정에 포함하지 않았다.
 

@@ -30,11 +30,14 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 ## 채택한 사실에 따라 변경한다
 
 1. 요청을 소유하는 서비스, PRD 동작과 장기 ADR 결정에 연결한다.
-2. ADR-0002를 정확히 적용한다. Kotlin/JVM 2.3.21, Java 21 도구 체인과 JVM 21 바이트코드 대상,
-   JDK 21 실행 환경, Spring Boot/BOM 4.1.1, Kotlin DSL을 사용하는 Gradle wrapper 9.2.1,
+2. ADR-0002를 정확히 적용한다. Kotlin/JVM·Kotlin BOM 2.4.10, Java 21 도구 체인과
+   JVM 21 바이트코드 대상, JDK 21 실행 환경, Spring Boot/BOM 4.1.1,
+   Kotlin DSL을 사용하는 Gradle wrapper 9.2.1,
    PostgreSQL 18.6, Spring JDBC `JdbcClient`와 Flyway를 사용하고 JPA는 사용하지 않는다.
    Java 25 호환성은 검증했지만 기능 필요성과 고정된 CI/실행 이미지 기준이 생길 때까지
    보류한다.
+   Kotlin 플러그인 갱신 때는 공식 Gradle 호환 범위와 `kotlin-stdlib`·`kotlin-reflect`의
+   실제 해석 버전을 함께 확인한다. Kotlin BOM은 플러그인과 같은 version catalog 값을 사용한다.
 3. `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap` 다섯
    모듈을 유지한다. 의존은 `bootstrap`/어댑터에서 `application`, 다시 `domain`으로
    향하게 한다. 어댑터끼리 의존하지 않고 내부 모듈은 외부 모듈에 의존하지 않는다.
