@@ -11,7 +11,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern
 import org.springframework.security.web.util.matcher.OrRequestMatcher
 import org.springframework.security.web.util.matcher.RequestMatcher
 
@@ -80,7 +80,7 @@ class BriefServiceApiSecurityConfiguration {
         properties: BriefServiceApiSecurityProperties,
     ): SecurityFilterChain {
         http
-            .securityMatcher(PathPatternRequestMatcher.pathPattern("/api/v1/**"))
+            .securityMatcher(pathPattern("/api/v1/**"))
             .csrf { it.disable() }
             .requestCache { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
@@ -97,18 +97,15 @@ class BriefServiceApiSecurityConfiguration {
 
     private companion object {
         val SERVICE_API: RequestMatcher = OrRequestMatcher(
-            path(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items"),
-            path(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current"),
-            path(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions"),
-            path(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions"),
-            path(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest"),
-            path(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest"),
-            path(HttpMethod.GET, "/api/v1/editions/{editionId}"),
-            path(HttpMethod.GET, "/api/v1/editions/{targetEditionId}/changes"),
-            path(HttpMethod.POST, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions"),
+            pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items"),
+            pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current"),
+            pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions"),
+            pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions"),
+            pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest"),
+            pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest"),
+            pathPattern(HttpMethod.GET, "/api/v1/editions/{editionId}"),
+            pathPattern(HttpMethod.GET, "/api/v1/editions/{targetEditionId}/changes"),
+            pathPattern(HttpMethod.POST, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions"),
         )
-
-        fun path(method: HttpMethod, pattern: String): RequestMatcher =
-            PathPatternRequestMatcher.pathPattern(method, pattern)
     }
 }
