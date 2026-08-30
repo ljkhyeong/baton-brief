@@ -15,6 +15,7 @@ import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
 import java.time.DayOfWeek
 import java.time.Instant
@@ -27,16 +28,23 @@ import java.util.Locale
 import java.util.UUID
 import org.hibernate.validator.constraints.CodePointLength
 
+private const val UUID_PATTERN =
+    "(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+
 data class SourceEventRequest(
-    val eventId: UUID,
+    @field:Pattern(regexp = UUID_PATTERN)
+    val eventId: String,
     val eventType: SourceEventType,
     @field:Positive
     val eventVersion: Int,
     val sourceSeverity: SourceEventSeverity? = null,
-    val workspaceId: UUID,
-    val seasonId: UUID,
+    @field:Pattern(regexp = UUID_PATTERN)
+    val workspaceId: String,
+    @field:Pattern(regexp = UUID_PATTERN)
+    val seasonId: String,
     @field:NotBlank
     @field:CodePointLength(max = 128)
+    @field:Pattern(regexp = "[^\\u0000]*")
     val sourceReference: String,
     @field:Positive
     val aggregateRevision: Long,
@@ -57,11 +65,11 @@ data class SourceEventRequest(
             SourceEvent.isReceivable(eventVersion, eventType, sourceSeverity)
 
     fun toDomain(): SourceEvent = SourceEvent(
-        eventId = eventId,
+        eventId = UUID.fromString(eventId),
         eventType = eventType,
         eventVersion = eventVersion,
-        workspaceId = workspaceId,
-        seasonId = seasonId,
+        workspaceId = UUID.fromString(workspaceId),
+        seasonId = UUID.fromString(seasonId),
         sourceReference = sourceReference,
         aggregateRevision = aggregateRevision,
         occurredAt = checkNotNull(occurredAtInstant),
