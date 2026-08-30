@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.core.io.ClassPathResource
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver
 import tools.jackson.databind.json.JsonMapper
+import tools.jackson.databind.node.ObjectNode
 
 class BriefEventContractTest {
 
@@ -28,39 +29,26 @@ class BriefEventContractTest {
 
     @Test
     fun `aggregateRevision은 부호 있는 64비트 양수 범위만 허용한다`() {
-        val template = EXAMPLES.first()
-            .getContentAsString(Charsets.UTF_8)
-            .replaceFirst(
-                Regex("\"aggregateRevision\"\\s*:\\s*\\d+"),
-                "\"aggregateRevision\": %s",
-            )
+        val validExample = EXAMPLE_DOCUMENT.deepCopy().put("aggregateRevision", Long.MAX_VALUE)
+        val invalidExample = EXAMPLE_DOCUMENT.deepCopy()
+            .put("aggregateRevision", "9223372036854775808".toBigInteger())
 
-        assertThat(SCHEMA.validate(template.format(Long.MAX_VALUE), InputFormat.JSON))
+        assertThat(SCHEMA.validate(JSON.writeValueAsString(validExample), InputFormat.JSON))
             .isEmpty()
-        assertThat(SCHEMA.validate(template.format("9223372036854775808"), InputFormat.JSON))
+        assertThat(SCHEMA.validate(JSON.writeValueAsString(invalidExample), InputFormat.JSON))
             .isNotEmpty()
     }
 
     @Test
     fun `UUID와 시점 format을 실제 제약으로 검증한다`() {
-        val template = EXAMPLES.first().getContentAsString(Charsets.UTF_8)
-        val invalidExamples = listOf(
-            template.replaceFirst(
-                Regex("\"eventId\"\\s*:\\s*\"[^\"]+\""),
-                "\"eventId\": \"not-a-uuid\"",
-            ),
-            template.replaceFirst(
-                Regex("\"eventId\"\\s*:\\s*\"[^\"]+\""),
-                "\"eventId\": \"AAAAAAAAAAAAAAAAAAAAAA\"",
-            ),
-            template.replaceFirst(
-                Regex("\"occurredAt\"\\s*:\\s*\"[^\"]+\""),
-                "\"occurredAt\": \"2026-02-30T09:00:00Z\"",
-            ),
-        )
-
-        invalidExamples.forEach { example ->
-            assertThat(SCHEMA.validate(example, InputFormat.JSON)).isNotEmpty()
+        listOf(
+            "eventId" to "not-a-uuid",
+            "eventId" to "AAAAAAAAAAAAAAAAAAAAAA",
+            "occurredAt" to "2026-02-30T09:00:00Z",
+        ).forEach { (field, value) ->
+            val invalidExample = EXAMPLE_DOCUMENT.deepCopy().put(field, value)
+            assertThat(SCHEMA.validate(JSON.writeValueAsString(invalidExample), InputFormat.JSON))
+                .isNotEmpty()
         }
     }
 
@@ -85,19 +73,18 @@ class BriefEventContractTest {
     }
 
     @Test
-    fun `sourceReference는 U+0000을 허용하지 않는다`() {
-        val template = EXAMPLES.first().getContentAsString(Charsets.UTF_8)
-        listOf("\\u0000", "valid\\u0000suffix").forEach { sourceReference ->
-            val sourceReferenceField = checkNotNull(Regex(
-                "\"sourceReference\"\\s*:\\s*\"[^\"]+\"",
-            ).find(template))
-            val invalidExample = template.replaceRange(
-                sourceReferenceField.range,
-                "\"sourceReference\": \"$sourceReference\"",
-            )
-
-            assertThat(SCHEMA.validate(invalidExample, InputFormat.JSON)).isNotEmpty()
+    fun `sourceReference는 원문을 보존할 수 있는 문자와 같은 공백 기준을 사용한다`() {
+        listOf("\u00a0", "\nreference", "😀".repeat(128)).forEach { sourceReference ->
+            val validExample = EXAMPLE_DOCUMENT.deepCopy().put("sourceReference", sourceReference)
+            assertThat(SCHEMA.validate(JSON.writeValueAsString(validExample), InputFormat.JSON))
+                .isEmpty()
         }
+        listOf("", " \t\n", "\u2003", "\u0000", "valid\u0000suffix", "\uD800", "\uDC00")
+            .forEach { sourceReference ->
+                val invalidExample = EXAMPLE_DOCUMENT.deepCopy().put("sourceReference", sourceReference)
+                assertThat(SCHEMA.validate(JSON.writeValueAsString(invalidExample), InputFormat.JSON))
+                    .isNotEmpty()
+            }
     }
 
     companion object {
@@ -119,5 +106,6 @@ class BriefEventContractTest {
         private val EXAMPLES = PathMatchingResourcePatternResolver()
             .getResources("classpath*:contracts/examples/*.json")
             .sortedBy { it.filename }
+        private val EXAMPLE_DOCUMENT = EXAMPLES.first().inputStream.use(JSON::readTree) as ObjectNode
     }
 }

@@ -91,7 +91,7 @@ jobs:
             trap - EXIT
             set +e
             "${compose[@]}" down --volumes --remove-orphans || cleanup_status=$?
-            docker network rm "$service_network" >/dev/null 2>&1 || true
+            docker network rm "$service_network" >/dev/null || cleanup_status=$?
             rm -rf "$staging_dir" || cleanup_status=$?
             if ((original_status != 0)); then
               exit "$original_status"
@@ -172,7 +172,10 @@ jobs:
           docker inspect "$service_api_id" | jq --exit-status \
             '.[0].HostConfig.ReadonlyRootfs == true
              and .[0].HostConfig.CapDrop == ["ALL"]
-             and ((.[0].HostConfig.CapAdd // []) | length == 0)'
+             and ((.[0].HostConfig.CapAdd // []) | length == 0)
+             and .[0].HostConfig.LogConfig.Type == "json-file"
+             and .[0].HostConfig.LogConfig.Config["max-size"] == "10m"
+             and .[0].HostConfig.LogConfig.Config["max-file"] == "3"'
           test "$(
             docker inspect "$service_api_id" \
               | jq '.[0].NetworkSettings.Networks | length'
@@ -196,7 +199,7 @@ jobs:
           test -s "$staging_dir/root.crt"
 
           unauthenticated_status="$(
-            curl --silent --show-error \
+            curl --silent --show-error --connect-timeout 5 --max-time 10 \
               --cacert "$staging_dir/root.crt" \
               --resolve 'localhost:38443:127.0.0.1' \
               --header 'Content-Type: application/json' \
@@ -208,7 +211,7 @@ jobs:
           test "$unauthenticated_status" = "401"
 
           authenticated_status="$(
-            curl --silent --show-error \
+            curl --silent --show-error --connect-timeout 5 --max-time 10 \
               --cacert "$staging_dir/root.crt" \
               --resolve 'localhost:38443:127.0.0.1' \
               --header 'Content-Type: application/json' \
@@ -222,7 +225,7 @@ jobs:
           jq --exit-status '.status == "APPLIED"' "$staging_dir/event-response.json"
 
           health_status="$(
-            curl --silent --show-error \
+            curl --silent --show-error --connect-timeout 5 --max-time 10 \
               --cacert "$staging_dir/root.crt" \
               --resolve 'localhost:38443:127.0.0.1' \
               --output /dev/null \
@@ -268,19 +271,24 @@ jobs:
           )"
           test "$service_health_status" = "404"
 
-          if docker logs "$brief_id" 2>&1 | grep --fixed-strings --quiet "$event_token"; then
+          # 로그 수집 실패는 즉시 중단하고 grep의 조기 종료와 분리한다.
+          brief_logs="$(docker logs "$brief_id" 2>&1)"
+          https_logs="$(docker logs "$https_id" 2>&1)"
+          service_api_logs="$(docker logs "$service_api_id" 2>&1)"
+
+          if grep --fixed-strings --quiet "$event_token" <<< "$brief_logs"; then
             echo "BRIEF 로그에 Bearer token이 노출됐습니다." >&2
             exit 1
           fi
-          if docker logs "$https_id" 2>&1 | grep --fixed-strings --quiet "$event_token"; then
+          if grep --fixed-strings --quiet "$event_token" <<< "$https_logs"; then
             echo "Caddy 로그에 Bearer token이 노출됐습니다." >&2
             exit 1
           fi
-          if docker logs "$brief_id" 2>&1 | grep --fixed-strings --quiet "$service_token"; then
+          if grep --fixed-strings --quiet "$service_token" <<< "$brief_logs"; then
             echo "BRIEF 로그에 서비스 API Bearer token이 노출됐습니다." >&2
             exit 1
           fi
-          if docker logs "$service_api_id" 2>&1 | grep --fixed-strings --quiet "$service_token"; then
+          if grep --fixed-strings --quiet "$service_token" <<< "$service_api_logs"; then
             echo "서비스 Caddy 로그에 Bearer token이 노출됐습니다." >&2
             exit 1
           fi

@@ -11,6 +11,7 @@ Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.6 기반의 로컬 MVP를 구현
 - 현재 관심 항목 투영, 상태별 키셋 조회, 상태 전이 증거와 원자적 전체 재구축
 - 월요일 시작 IANA 시간대 주간의 불변 에디션 생성·조회·이력·비교·조건부 조회
 - RFC 9457 `ProblemDetail`, Spring Boot Actuator aggregate health
+- 이벤트 수신 결과별 프로세스 내 지표. 외부 수집·경보는 미연결
 - BATON 전용 Bearer와 파일 기반 비밀을 사용하는 스테이징 컨테이너
 - 이벤트 수신 한 경로만 허용하는 선택적 Caddy HTTPS 앞단
 - BATON 백엔드 조회·생성을 위한 별도 Bearer와 호스트 포트 없는 서비스 Caddy HTTPS 앞단
@@ -114,7 +115,7 @@ BRIEF가 소유하지 않는다.
 
 [ADR-0002](docs/ADR/0002_technology-stack/adr.md)를 기술 기준으로 사용한다.
 
-- Kotlin/JVM 2.3.21, Java 21 도구 체인과 JDK 21 실행 환경
+- Kotlin/JVM·Kotlin BOM 2.4.10, Java 21 도구 체인과 JDK 21 실행 환경
 - Spring Boot/BOM 4.1.1, Gradle wrapper 9.2.1과 Kotlin DSL
 - PostgreSQL 18.6, Spring JDBC `JdbcClient`, Flyway, JPA 미사용
 - `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap`의 다섯
@@ -153,8 +154,10 @@ BATON 백엔드 경유 조회·생성 연결은 이벤트 token을 재사용하�
 연결할 때도 서비스 전용 HTTPS를 사용한다. 운영자는 내부 네트워크를 한 번 만들고
 `BRIEF_SERVICE_HOST`를 SAN으로 포함한 인증서·private key 경로를 설정한 뒤 서비스 API
 override를 함께 적용한다. 해당 파일은 호스트의 다른 사용자가 쓸 수 없어야 하고 컨테이너
-UID/GID `10001`이 읽을 수 있어야 한다. 일반 Linux Compose 배포에서는 인증서는 `0444`,
-private key는 소유자를 `10001:10001`로 둔 `0400`을 권장하며 비밀 디렉터리 접근도 제한한다.
+UID/GID `10001`이 읽을 수 있어야 한다. 사용자 네임스페이스 재매핑을 사용하지 않는
+rootful Linux Docker에서는 인증서는 `0444`, private key는 소유자를 `10001:10001`로 둔
+`0400`을 권장한다. 비밀 디렉터리 접근과 다른 실행 환경의 소유자 매핑은 아래 스테이징
+실행의 파일 권한 안내를 따른다.
 
 ```shell
 docker network create --internal baton-brief-private
@@ -175,6 +178,18 @@ docker compose --env-file .env.staging \
 `.env.staging.example`을 추적되지 않는 `.env.staging`으로 복사하고 데이터베이스·Bearer
 파일의 실제 절대 경로를 지정한다.
 
+데이터베이스 비밀번호와 이벤트 수신·서비스 API의 현재·직전 Bearer 파일은 컨테이너
+UID/GID `10001`이 읽을 수 있어야 한다. 평상시 비워 두는 직전 token 파일에도 같은 조건을
+적용한다. 사용자 네임스페이스 재매핑을 사용하지 않는 rootful Linux Docker에서는 파일
+소유자 `10001:10001`, 권한 `0400`을 권장하며 비밀 디렉터리 접근도 제한한다. 이 환경에서
+`root:root 0600`으로 만들면 BRIEF가 파일을 읽지 못해 기동에 실패할 수 있다.
+
+파일 기반 Compose secrets는 bind mount이므로 `uid`·`gid`·`mode` 속성으로 호스트 파일
+권한을 바꿀 수 없다. 자세한 제약은 [Docker secrets 문서](https://docs.docker.com/reference/compose-file/services/#secrets)를
+따른다. rootless Docker나 사용자 네임스페이스 재매핑을 사용한다면 호스트와 컨테이너의
+UID/GID 매핑에 맞춰 소유자를 정하고, Docker가 원본 경로에 접근할 수 있도록 디렉터리
+권한도 맞춘다.
+
 ```shell
 docker compose --env-file .env.staging -f compose.staging.yml config --quiet
 docker compose --env-file .env.staging -f compose.staging.yml up --build -d --wait
@@ -192,6 +207,9 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 
 이 조립은 실제 DNS·방화벽, 공인 인증서 발급, 백업·복구, 이미지 registry와 BATON 원격
 전달을 대신하지 않는다.
+
+수동 백업과 빈 DB 복원은 [PostgreSQL 백업·복원 절차](docs/operations/postgresql-backup-restore.md)를
+따른다. 자동 백업·보관소와 운영 DB 전환은 포함하지 않는다.
 
 ## 문서
 

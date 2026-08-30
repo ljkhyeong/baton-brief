@@ -15,6 +15,10 @@ allprojects {
 
 subprojects {
     pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+        dependencies {
+            add("implementation", platform(libs.kotlin.bom))
+        }
+
         extensions.configure<KotlinJvmProjectExtension> {
             jvmToolchain(21)
         }
@@ -41,7 +45,13 @@ tasks.register<Zip>("contractsZip") {
     from(layout.projectDirectory.dir("contracts")) {
         into("contracts")
     }
-    from(layout.projectDirectory.file("docs/PRD/0019_baton-continuity-event-v2/spec.md")) {
-        into("docs/PRD/0019_baton-continuity-event-v2")
+    from(layout.projectDirectory.dir("docs/PRD")) {
+        include(
+            "0002_mvp-contract/spec.md",
+            "0007_event-receipt-query/spec.md",
+            "0018_baton-producer-compatibility/spec.md",
+            "0019_baton-continuity-event-v2/spec.md",
+        )
+        into("docs/PRD")
     }
 }

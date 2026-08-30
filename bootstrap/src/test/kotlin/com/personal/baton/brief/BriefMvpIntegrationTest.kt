@@ -11,6 +11,7 @@ import com.personal.baton.brief.domain.ProjectionDecision
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
+import io.micrometer.core.instrument.MeterRegistry
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.awaitility.Awaitility.await
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
 import org.hamcrest.Matchers.contains
@@ -50,6 +52,10 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.core.json.JsonWriteFeature
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.databind.node.ObjectNode
+import tools.jackson.databind.util.RawValue
 
 @Testcontainers
 @SpringBootTest(
@@ -66,6 +72,7 @@ class BriefMvpIntegrationTest(
     private val jdbc: JdbcClient,
     private val persistence: BriefPersistencePort,
     private val dataSource: DataSource,
+    private val meterRegistry: MeterRegistry,
 ) {
     @BeforeEach
     fun clearDatabase() {
@@ -94,10 +101,12 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isNotFound)
         mockMvc.perform(get("/actuator/health/liveness"))
             .andExpect(status().isNotFound)
+        mockMvc.perform(get("/actuator/metrics"))
+            .andExpect(status().isNotFound)
     }
 
     @Test
-    fun `migrations preserve representative V2 data through latest migration`() {
+    fun `V2와 V7 대표 데이터를 최신 마이그레이션까지 보존한다`() {
         val schema = "brief_migration_upgrade"
         jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         jdbc.sql("CREATE SCHEMA $schema").update()
@@ -108,16 +117,21 @@ class BriefMvpIntegrationTest(
                 .defaultSchema(schema)
                 .schemas(schema)
 
-            flywayConfiguration.target("2").load().migrate()
-            dataSource.connection.use { connection ->
-                val originalSchema = connection.schema
-                try {
-                    connection.schema = schema
-                    ResourceDatabasePopulator(
-                        ClassPathResource("fixtures/representative_v2_data.sql"),
-                    ).populate(connection)
-                } finally {
-                    connection.schema = originalSchema
+            listOf(
+                "2" to "representative_v2_data.sql",
+                "7" to "representative_v7_data.sql",
+            ).forEach { (version, fixture) ->
+                flywayConfiguration.target(version).load().migrate()
+                dataSource.connection.use { connection ->
+                    val originalSchema = connection.schema
+                    try {
+                        connection.schema = schema
+                        ResourceDatabasePopulator(
+                            ClassPathResource("fixtures/$fixture"),
+                        ).populate(connection)
+                    } finally {
+                        connection.schema = originalSchema
+                    }
                 }
             }
             flywayConfiguration.target(MigrationVersion.LATEST).load().migrate()
@@ -178,10 +192,30 @@ class BriefMvpIntegrationTest(
             }.isInstanceOf(DataIntegrityViolationException::class.java)
             assertThat(
                 jdbc.sql(
-                    "SELECT source_severity FROM $schema.source_event_receipt",
-                ).query(String::class.java)
-                    .optional(),
-            ).isEmpty()
+                    """
+                    SELECT COUNT(*) FROM $schema.source_event_receipt
+                     WHERE (event_version = 1 OR processing_outcome = 'UNSUPPORTED')
+                       AND source_severity IS NULL
+                    """.trimIndent(),
+                ).query(Long::class.java).single(),
+            ).isEqualTo(2)
+            assertThat(
+                jdbc.sql(
+                    """
+                    SELECT source_severity FROM $schema.source_event_receipt
+                     WHERE event_version = 2 AND processing_outcome = 'APPLIED'
+                    """.trimIndent(),
+                ).query(String::class.java).single(),
+            ).isEqualTo("CRITICAL")
+            assertThatThrownBy {
+                jdbc.sql(
+                    """
+                    UPDATE $schema.source_event_receipt SET source_severity = NULL
+                     WHERE event_version = 2 AND processing_outcome = 'APPLIED'
+                    """.trimIndent(),
+                ).update()
+            }.isInstanceOf(DataIntegrityViolationException::class.java)
+                .hasMessageContaining("source_event_receipt_supported_contract")
         } finally {
             jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         }
@@ -189,6 +223,9 @@ class BriefMvpIntegrationTest(
 
     @Test
     fun `ingestion distinguishes duplicate conflict unsupported stale and gap`() {
+        val countsBefore = IngestStatus.entries.associateWith { outcome ->
+            meterRegistry.find("brief.events.received").tag("outcome", outcome.name).counter()?.count() ?: 0.0
+        }
         val workspaceId = "10000000-0000-0000-0000-000000000001"
         val seasonId = "20000000-0000-0000-0000-000000000001"
         val eventId = "30000000-0000-0000-0000-000000000001"
@@ -303,6 +340,19 @@ class BriefMvpIntegrationTest(
         postEvent(unsupported)
             .andExpect(status().isUnprocessableContent)
             .andExpect(jsonPath("$.status").value("UNSUPPORTED"))
+        mapOf(
+            IngestStatus.APPLIED to 1.0,
+            IngestStatus.APPLIED_WITH_GAP to 1.0,
+            IngestStatus.DUPLICATE to 1.0,
+            IngestStatus.STALE to 1.0,
+            IngestStatus.CONFLICT to 2.0,
+            IngestStatus.UNSUPPORTED to 2.0,
+        ).forEach { (outcome, count) ->
+            assertThat(
+                meterRegistry.get("brief.events.received").tag("outcome", outcome.name).counter().count() -
+                    countsBefore.getValue(outcome),
+            ).describedAs("%s 수신 응답 수", outcome).isEqualTo(count)
+        }
         assertThat(
             jdbc.sql(
                 "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
@@ -610,10 +660,11 @@ class BriefMvpIntegrationTest(
                 .query(String::class.java)
                 .single(),
         ).isEqualTo("69bf5f24726545fd73fba11ae22261f7ec1c7d9279f3e12543c03061344b5c55")
-        postEvent(
-            contractEvent("role-unassigned.active-r1-critical.json")
-                .replace("\"sourceSeverity\": \"CRITICAL\"", "\"sourceSeverity\": \"WARNING\""),
-        ).andExpect(status().isConflict)
+        val conflictingEvent = JSON.readTree(
+            contractEvent("role-unassigned.active-r1-critical.json"),
+        ) as ObjectNode
+        postEvent(conflictingEvent.put("sourceSeverity", "WARNING"))
+            .andExpect(status().isConflict)
 
         mockMvc.perform(get("/api/v1/events/$firstEventId/receipt"))
             .andExpect(status().isOk)
@@ -1087,11 +1138,14 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000003"
         val seasonId = "20000000-0000-0000-0000-000000000003"
         val eventId = "30000000-0000-0000-0000-000000000010"
+        val unauthorizedBody = JSON.writeValueAsString(
+            eventJson(eventId, workspaceId, seasonId, "unauthorized", 1),
+        )
 
         mockMvc.perform(
             post("/api/v1/events")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(eventJson(eventId, workspaceId, seasonId, "unauthorized", 1)),
+                .content(unauthorizedBody),
         ).andExpect(status().isUnauthorized)
             .andExpect(
                 header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")),
@@ -1101,7 +1155,7 @@ class BriefMvpIntegrationTest(
             post("/api/v1/events")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer wrong-token-000000000000000000000")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(eventJson(eventId, workspaceId, seasonId, "unauthorized", 1)),
+                .content(unauthorizedBody),
         ).andExpect(status().isUnauthorized)
 
         mockMvc.perform(
@@ -1109,12 +1163,14 @@ class BriefMvpIntegrationTest(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $PREVIOUS_EVENT_BEARER_TOKEN")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    eventJson(
-                        "30000000-0000-0000-0000-000000000011",
-                        workspaceId,
-                        seasonId,
-                        "rotation-overlap",
-                        1,
+                    JSON.writeValueAsString(
+                        eventJson(
+                            "30000000-0000-0000-0000-000000000011",
+                            workspaceId,
+                            seasonId,
+                            "rotation-overlap",
+                            1,
+                        ),
                     ),
                 ),
         ).andExpect(status().isAccepted)
@@ -1140,11 +1196,11 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.status").value("UNSUPPORTED"))
 
         val numericInstant = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"occurredAt\": \"2026-08-12T09:00:00Z\"", "\"occurredAt\": 1786525200")
+            .put("occurredAt", 1786525200)
         postEvent(numericInstant).andExpect(status().isBadRequest)
 
         val fractionalRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 1.5")
+            .put("aggregateRevision", 1.5)
         postEvent(fractionalRevision).andExpect(status().isBadRequest)
 
         val decimalVersion = eventJson(
@@ -1156,19 +1212,19 @@ class BriefMvpIntegrationTest(
             type = "ROLE_UNASSIGNED",
             eventVersion = 2,
             sourceSeverity = "CRITICAL",
-        ).replace("\"eventVersion\": 2", "\"eventVersion\": 2.0")
+        ).putRawValue("eventVersion", RawValue("2.0"))
         postEvent(decimalVersion).andExpect(status().isBadRequest)
 
         val decimalRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 1.0")
+            .putRawValue("aggregateRevision", RawValue("1.0"))
         postEvent(decimalRevision).andExpect(status().isBadRequest)
 
         val overflowingRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"aggregateRevision\": 1", "\"aggregateRevision\": 9223372036854775808")
+            .put("aggregateRevision", "9223372036854775808".toBigInteger())
         postEvent(overflowingRevision).andExpect(status().isBadRequest)
 
         val unknownField = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .replace("\"state\": \"ACTIVE\"", "\"state\": \"ACTIVE\", \"unexpected\": true")
+            .put("unexpected", true)
         postEvent(unknownField).andExpect(status().isBadRequest)
 
         listOf(
@@ -1180,7 +1236,7 @@ class BriefMvpIntegrationTest(
             ).andExpect(status().isBadRequest)
         }
 
-        listOf("\\u0000", "valid\\u0000suffix").forEach { sourceReference ->
+        listOf("\u0000", "valid\u0000suffix").forEach { sourceReference ->
             postEvent(
                 eventJson(eventId, workspaceId, seasonId, sourceReference, 1),
             ).andExpect(status().isBadRequest)
@@ -1276,6 +1332,181 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `네 자리 연도 경계의 시각과 주간 에디션을 재구축 전후 보존한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000010"
+        val seasonId = "20000000-0000-0000-0000-000000000010"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+
+        listOf("0000-01-03", "9999-12-27").forEachIndexed { index, weekStart ->
+            val eventId = "30000000-0000-0000-0000-00000000010${index + 1}"
+            val sourceReference = "time-boundary:$weekStart"
+            val occurredAt = "${weekStart}T00:00:00Z"
+            postEvent(
+                eventJson(eventId, workspaceId, seasonId, sourceReference, 1, occurredAt = occurredAt),
+            ).andExpect(status().isAccepted)
+                .andExpect(jsonPath("$.item.observedAt").value(occurredAt))
+            mockMvc.perform(get("/api/v1/events/$eventId/receipt"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.occurredAt").value(occurredAt))
+            val attentionPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+            mockMvc.perform(
+                get("$attentionPath/current")
+                    .param("eventType", "HANDOFF_BLOCKED")
+                    .param("sourceReference", sourceReference),
+            ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.observedAt").value(occurredAt))
+            mockMvc.perform(
+                get("$attentionPath/transitions")
+                    .param("eventType", "HANDOFF_BLOCKED")
+                    .param("sourceReference", sourceReference),
+            ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.transitions[0].observedAt").value(occurredAt))
+
+            val request = JSON.writeValueAsString(
+                JSON.createObjectNode().put("weekStart", weekStart).put("zoneId", "UTC"),
+            )
+            val editionId = JsonPath.read<String>(
+                postEdition(path, request)
+                    .andExpect(status().isCreated)
+                    .andExpect(jsonPath("$.items.length()").value(1))
+                    .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
+                    .andReturn().response.contentAsString,
+                "$.editionId",
+            )
+            mockMvc.perform(
+                get("$path/weekly/latest")
+                    .param("weekStart", weekStart)
+                    .param("zoneId", "UTC"),
+            ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.editionId").value(editionId))
+                .andExpect(jsonPath("$.weekStart").value(weekStart))
+                .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
+
+            mockMvc.perform(post("/api/v1/projections/rebuild"))
+                .andExpect(status().isOk)
+            postEdition(path, request)
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.editionId").value(editionId))
+                .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
+        }
+
+        listOf("-5000-01-06", "+10000-01-03", "+6000000-01-03", "+999999999-12-27")
+            .forEach { weekStart ->
+                val request = JSON.writeValueAsString(
+                    JSON.createObjectNode().put("weekStart", weekStart).put("zoneId", "UTC"),
+                )
+                postEdition(path, request)
+                    .andExpect(status().isBadRequest)
+                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                mockMvc.perform(
+                    get("$path/weekly/latest")
+                        .param("weekStart", weekStart)
+                        .param("zoneId", "UTC"),
+                ).andExpect(status().isBadRequest)
+                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            }
+    }
+
+    @Test
+    fun `원본 참조의 정상 문자는 보존하고 저장할 수 없는 문자는 거부한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000009"
+        val seasonId = "20000000-0000-0000-0000-000000000009"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        val sourceReference = "handoff:\"quoted\"\\path"
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000091",
+                workspaceId,
+                seasonId,
+                sourceReference,
+                1,
+            ),
+        ).andExpect(status().isAccepted)
+        mockMvc.perform(
+            get("$path/current")
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", sourceReference),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.sourceReference").value(sourceReference))
+
+        val validEvent = eventJson(
+            "30000000-0000-0000-0000-000000000092",
+            workspaceId,
+            seasonId,
+            "review:?",
+            1,
+            type = "ROLE_UNASSIGNED",
+            eventVersion = 2,
+            sourceSeverity = "CRITICAL",
+        )
+        val escapedJson = JSON.writer().with(JsonWriteFeature.ESCAPE_NON_ASCII)
+        listOf("review:\uD800", "review:\uDC00").forEach { invalidReference ->
+            postEvent(
+                escapedJson.writeValueAsString(validEvent.deepCopy().put("sourceReference", invalidReference)),
+            )
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+        postEvent(validEvent).andExpect(status().isAccepted)
+
+        listOf(
+            get("$path/current")
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "invalid\u0000reference"),
+            get("$path/transitions")
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "invalid\u0000reference"),
+            get(path)
+                .param("afterEventType", "HANDOFF_BLOCKED")
+                .param("afterSourceReference", "invalid\u0000reference"),
+        ).forEach { request ->
+            mockMvc.perform(request)
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+    }
+
+    @Test
+    fun `수신한 NBSP 원본 참조로 다음 페이지를 조회한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000011"
+        val seasonId = "20000000-0000-0000-0000-000000000011"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000111",
+                workspaceId,
+                seasonId,
+                "\u00a0",
+                1,
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000112",
+                workspaceId,
+                seasonId,
+                "next-item",
+                1,
+                type = "ROUTINE_MISSED",
+            ),
+        ).andExpect(status().isAccepted)
+
+        val firstPage = mockMvc.perform(get(path).param("limit", "1"))
+            .andExpect(status().isOk)
+            .andReturn().response.contentAsByteArray
+        val cursor = JSON.readTree(firstPage).path("nextCursor")
+        assertThat(cursor.path("sourceReference").stringValue()).isEqualTo("\u00a0")
+        mockMvc.perform(
+            get(path)
+                .param("limit", "1")
+                .param("afterEventType", cursor.path("eventType").stringValue())
+                .param("afterSourceReference", cursor.path("sourceReference").stringValue()),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[0].sourceReference").value("next-item"))
+            .andExpect(jsonPath("$.nextCursor").doesNotExist())
+    }
+
+    @Test
     fun `serializes concurrent duplicate ingestion edition generation and rebuild`() {
         val workspaceId = "10000000-0000-0000-0000-000000000004"
         val seasonId = "20000000-0000-0000-0000-000000000004"
@@ -1314,7 +1545,8 @@ class BriefMvpIntegrationTest(
             state = SourceEventState.ACTIVE,
         )
 
-        Executors.newFixedThreadPool(2).use { executor ->
+        val executor = Executors.newFixedThreadPool(2)
+        try {
             val rebuild = executor.submit<RebuildResult> {
                 persistence.rebuild { receivedEvent, current ->
                     rebuildStarted.countDown()
@@ -1322,23 +1554,24 @@ class BriefMvpIntegrationTest(
                     AttentionProjector.project(receivedEvent, current)
                 }
             }
-            try {
-                assertThat(rebuildStarted.await(10, TimeUnit.SECONDS)).isTrue()
-                val ingest = executor.submit<IngestResult> {
-                    persistence.processEvent(
-                        event = supportedEvent,
-                        fingerprint = "a".repeat(64),
-                        receivedAt = receivedAt,
-                        conflictDetectedAt = { receivedAt },
-                    ) { current ->
-                        AttentionProjector.project(supportedEvent, current)
-                    }
+            assertThat(rebuildStarted.await(10, TimeUnit.SECONDS)).isTrue()
+            val ingest = executor.submit<IngestResult> {
+                persistence.processEvent(
+                    event = supportedEvent,
+                    fingerprint = "a".repeat(64),
+                    receivedAt = receivedAt,
+                    conflictDetectedAt = { receivedAt },
+                ) { current ->
+                    AttentionProjector.project(supportedEvent, current)
                 }
+            }
 
-                val waitDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
-                var sharedLockWaitObserved: Boolean
-                do {
-                    sharedLockWaitObserved = jdbc.sql(
+            await()
+                .pollDelay(0, TimeUnit.MILLISECONDS)
+                .pollInterval(10, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until {
+                    jdbc.sql(
                         """
                         SELECT EXISTS (
                             SELECT 1
@@ -1354,18 +1587,15 @@ class BriefMvpIntegrationTest(
                         )
                         """.trimIndent(),
                     ).query(Boolean::class.java).single()
-                    if (!sharedLockWaitObserved) {
-                        TimeUnit.MILLISECONDS.sleep(10)
-                    }
-                } while (!sharedLockWaitObserved && System.nanoTime() < waitDeadline)
-                assertThat(sharedLockWaitObserved).isTrue()
-                releaseRebuild.countDown()
+                }
+            releaseRebuild.countDown()
 
-                rebuild.get(10, TimeUnit.SECONDS)
-                assertThat(ingest.get(10, TimeUnit.SECONDS).status).isEqualTo(IngestStatus.APPLIED)
-            } finally {
-                releaseRebuild.countDown()
-            }
+            rebuild.get(10, TimeUnit.SECONDS)
+            assertThat(ingest.get(10, TimeUnit.SECONDS).status).isEqualTo(IngestStatus.APPLIED)
+        } finally {
+            releaseRebuild.countDown()
+            executor.shutdownNow()
+            executor.awaitTermination(10, TimeUnit.SECONDS)
         }
         assertThat(
             jdbc.sql(
@@ -1375,6 +1605,8 @@ class BriefMvpIntegrationTest(
                 .single(),
         ).isEqualTo(1)
     }
+
+    private fun postEvent(event: ObjectNode) = postEvent(JSON.writeValueAsString(event))
 
     private fun postEvent(json: String) = mockMvc.perform(
         post("/api/v1/events")
@@ -1392,8 +1624,9 @@ class BriefMvpIntegrationTest(
             .content(json),
     )
 
-    private fun concurrentStatuses(request: () -> Int): List<Int> =
-        Executors.newFixedThreadPool(2).use { executor ->
+    private fun concurrentStatuses(request: () -> Int): List<Int> {
+        val executor = Executors.newFixedThreadPool(2)
+        return try {
             val barrier = CyclicBarrier(2)
             List(2) {
                 executor.submit<Int> {
@@ -1401,7 +1634,11 @@ class BriefMvpIntegrationTest(
                     request()
                 }
             }.map { it.get(10, TimeUnit.SECONDS) }.sorted()
+        } finally {
+            executor.shutdownNow()
+            executor.awaitTermination(10, TimeUnit.SECONDS)
         }
+    }
 
     private fun contractEvent(fileName: String): String =
         ClassPathResource("contracts/examples/$fileName")
@@ -1418,21 +1655,21 @@ class BriefMvpIntegrationTest(
         occurredAt: String = "2026-08-12T09:00:00Z",
         eventVersion: Int = 1,
         sourceSeverity: String? = null,
-    ): String = """
-        {
-          "eventId": "$eventId",
-          "eventType": "$type",
-          "eventVersion": $eventVersion${sourceSeverity?.let { ",\n          \"sourceSeverity\": \"$it\"" }.orEmpty()},
-          "workspaceId": "$workspaceId",
-          "seasonId": "$seasonId",
-          "sourceReference": "$sourceReference",
-          "aggregateRevision": $revision,
-          "occurredAt": "$occurredAt",
-          "state": "$state"
-        }
-    """.trimIndent()
+    ): ObjectNode = JSON.createObjectNode()
+        .put("eventId", eventId)
+        .put("eventType", type)
+        .put("eventVersion", eventVersion)
+        .put("workspaceId", workspaceId)
+        .put("seasonId", seasonId)
+        .put("sourceReference", sourceReference)
+        .put("aggregateRevision", revision)
+        .put("occurredAt", occurredAt)
+        .put("state", state)
+        .apply { sourceSeverity?.let { put("sourceSeverity", it) } }
 
     companion object {
+        private val JSON = JsonMapper.builder().build()
+
         @Container
         @ServiceConnection
         val postgres = PostgreSQLContainer("postgres:18.6-alpine")

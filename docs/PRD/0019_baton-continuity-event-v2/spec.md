@@ -54,6 +54,11 @@ v2의 `reasonCode`는 수신한 다섯 `eventType` 중 하나이며 v1과 동일
 - 수신 기록, 현재 관심 항목과 불변 에디션 항목의 이벤트 종류 제약은 v1·v2 여덟 타입을
   허용한다.
 - 기존 행의 `source_severity`는 `null`로 유지하며 값을 추정하거나 채우지 않는다.
+- Flyway V8은 V7의 `source_event_receipt_supported_contract`를 교체해 지원 v2 기록의
+  `source_severity IS NOT NULL`을 명시한다. v1과 `UNSUPPORTED` 기록의 `null` 허용은 유지한다.
+  이 변경은 기존 HTTP 요청·JSON Schema·fingerprint 계약을 바꾸지 않는다.
+- V7 데이터에 필수 심각도가 누락된 지원 v2 기록이 있으면 V8 적용은 실패한다. 원본 근거를
+  확인하기 전 임의의 심각도를 채우거나 해당 수신 기록을 삭제하지 않는다.
 - 현재 투영과 에디션의 `severity` 저장 값은 계속 `HIGH`·`MEDIUM`만 사용한다.
 - 새 테이블, 인덱스, API 경로, 브로커와 생산자 전용 adapter를 추가하지 않는다.
 
@@ -73,15 +78,18 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - Draft 2020-12 검증기는 UUID와 시점 `format-assertion`을 활성화한다. JSON Schema가 숫자
   token의 소수점·지수 표기를 구분하지 못하는 한계는 PRD-0002의 정수 표현 계약과 실제
   소비자 수신 검증으로 보완한다.
-- 세 UUID는 36자 하이픈 표기를 사용하고 `sourceReference`는 `U+0000`을 포함하지 않는다.
-  JSON Schema와 실제 소비자 수신 검증은 이 형식 경계를 함께 확인한다.
+- 세 UUID는 36자 하이픈 표기를 사용하고 `sourceReference`는 PRD-0002의 문자·공백 규칙을
+  따른다. JSON Schema와 실제 소비자 수신 검증은 이 형식 경계를 함께 확인한다.
+- 문자열 패턴은 JDK 21 공백 문자를 명시하고 정상 surrogate 쌍을 허용하는 ECMAScript
+  표현을 사용한다. Java 전용 문자 클래스나 엔진마다 다른 기본 공백 분류에 의존하지 않는다.
+  NBSP·이모지·줄바꿈 뒤의 정상 문자는 허용하고 `U+0000`·짝이 없는 surrogate는 거부한다.
 - `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
 - 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 생산자는 그 값을 고정해 실제
   serializer와 송신 경계를 검증해야 한다.
-- Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD를
-  `baton-brief-contracts-<VERSION>.zip`으로 묶는다. JVM DTO JAR, 별도 계약 서비스와
-  배포 플러그인은 만들지 않는다.
+- Gradle 표준 `contractsZip` 작업은 `contracts/**`와 이 PRD, 직접 참조하는 PRD-0002·0007·0018을
+  `baton-brief-contracts-<VERSION>.zip`으로 묶는다. 문서의 원래 경로를 유지해 ZIP 안에서
+  상대 링크를 열 수 있게 한다. JVM DTO JAR, 별도 계약 서비스와 배포 플러그인은 만들지 않는다.
 - BRIEF의 기존 v2 PostgreSQL 통합 시나리오는 계약 예시를 직접 요청 본문으로 사용한다.
   예시를 위한 별도 제품 시나리오를 복제하지 않는다.
 
@@ -111,9 +119,13 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - 재구축 뒤 v1·v2 현재 투영이 실시간 처리 결과와 같다.
 - 대표 기존 행에 마이그레이션을 적용했을 때 새 열은 `null`이고 기존 현재 투영·에디션
   항목을 보존한다.
+- 대표 V2 데이터와 V7의 지원 v1·v2 수신 기록을 둔 업그레이드에서 V8까지 적용된다.
+  v1·미지원 기록의 `null`과 지원 v2의 심각도를 보존하고, 지원 v2 심각도를 `null`로 바꾸는
+  SQL은 기존 이름의 저장 제약으로 거부한다.
 - 이벤트 v2 계약 예시가 JSON Schema와 일치하고 같은 예시가 실제 BRIEF 수신·재구축
   시나리오에서 처리된다.
-- `contracts/VERSION`에서 이름을 정한 계약 팩 ZIP에 스키마·예시와 이 PRD가 포함된다.
+- `contracts/VERSION`에서 이름을 정한 계약 팩 ZIP에 스키마·예시와 이 PRD 및 직접 참조하는
+  PRD-0002·0007·0018이 포함되며, 포함 문서의 상대 링크 대상이 ZIP 안에 존재한다.
 - 전체 테스트와 실행 JAR 생성이 성공한다.
 
 ## 명시적 비목표

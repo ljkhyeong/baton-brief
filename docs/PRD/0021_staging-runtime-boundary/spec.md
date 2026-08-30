@@ -25,6 +25,9 @@ HTTP만 제공하고 PRD-0022의 명시적인 profile로 호스트의 이벤트 
   데이터베이스 상태를 확인한다.
 - 선택적인 `https` profile은 Caddy만 `proxy`와 외부 송신용 `egress` 네트워크에 연결하며
   외부에는 PRD-0022의 이벤트 수신 한 경로만 제공한다.
+- 컨테이너 표준 출력·오류 로그는 Docker `json-file`의 `max-size: 10m`, `max-file: 3`으로
+  회전한다. PRD-0025의 서비스 Caddy에도 같은 설정을 적용한다. 이는 실행 로그 제한이며
+  데이터베이스 수신 기록·충돌 증거의 `retain-all` 계약을 바꾸지 않는다.
 
 ## 설정과 비밀
 
@@ -68,7 +71,7 @@ profile이나 PRD-0025의 비공개 서비스 Caddy를 통해서만 제공한다
 ## 수용 기준
 
 - 고정한 Java 21 이미지에서 실행 JAR을 빌드하고 컨테이너가 health 상태가 된다.
-- PostgreSQL은 호스트 포트 없이 기동하고 Flyway V1~V7을 적용한다.
+- PostgreSQL은 호스트 포트 없이 기동하고 Flyway V1~V8을 적용한다.
 - BRIEF도 호스트 포트를 게시하지 않고 내부 `data`·`proxy` 네트워크에만 참여한다.
 - BRIEF 실행 컨테이너는 UID/GID `10001`과 읽기 전용 루트 파일시스템을 사용한다.
 - Bearer 없는 `POST /api/v1/events`는 `401`이고 파일에서 주입한 현재 Bearer로 기존 v2

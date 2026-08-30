@@ -1,8 +1,9 @@
 [versions]
-kotlin = "2.3.21"
+kotlin = "2.4.10"
 spring-boot = "4.1.1"
 
 [libraries]
+kotlin-bom = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "kotlin" }
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 
 [plugins]

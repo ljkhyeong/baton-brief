@@ -3,30 +3,15 @@ package com.personal.baton.brief.domain
 import java.time.Instant
 import java.util.UUID
 
-enum class SourceEventType {
-    HANDOFF_BLOCKED,
-    ROUTINE_MISSED,
-    DECISION_FOLLOW_UP_OVERDUE,
-    ROLE_UNASSIGNED,
-    ROLE_SUCCESSOR_MISSING,
-    ROLE_PREPARATION_INCOMPLETE,
-    ROUTINE_REPEATEDLY_OVERDUE,
-    HANDOFF_INCOMPLETE,
-    ;
-
-    val contractVersion: Int
-        get() = when (this) {
-            HANDOFF_BLOCKED,
-            ROUTINE_MISSED,
-            DECISION_FOLLOW_UP_OVERDUE,
-            -> 1
-            ROLE_UNASSIGNED,
-            ROLE_SUCCESSOR_MISSING,
-            ROLE_PREPARATION_INCOMPLETE,
-            ROUTINE_REPEATEDLY_OVERDUE,
-            HANDOFF_INCOMPLETE,
-            -> 2
-        }
+enum class SourceEventType(val contractVersion: Int) {
+    HANDOFF_BLOCKED(1),
+    ROUTINE_MISSED(1),
+    DECISION_FOLLOW_UP_OVERDUE(1),
+    ROLE_UNASSIGNED(2),
+    ROLE_SUCCESSOR_MISSING(2),
+    ROLE_PREPARATION_INCOMPLETE(2),
+    ROUTINE_REPEATEDLY_OVERDUE(2),
+    HANDOFF_INCOMPLETE(2),
 }
 
 enum class SourceEventSeverity {

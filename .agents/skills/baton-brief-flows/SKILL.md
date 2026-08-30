@@ -30,11 +30,14 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 ## 채택한 사실에 따라 변경한다
 
 1. 요청을 소유하는 서비스, PRD 동작과 장기 ADR 결정에 연결한다.
-2. ADR-0002를 정확히 적용한다. Kotlin/JVM 2.3.21, Java 21 도구 체인과 JVM 21 바이트코드 대상,
-   JDK 21 실행 환경, Spring Boot/BOM 4.1.1, Kotlin DSL을 사용하는 Gradle wrapper 9.2.1,
+2. ADR-0002를 정확히 적용한다. Kotlin/JVM·Kotlin BOM 2.4.10, Java 21 도구 체인과
+   JVM 21 바이트코드 대상, JDK 21 실행 환경, Spring Boot/BOM 4.1.1,
+   Kotlin DSL을 사용하는 Gradle wrapper 9.2.1,
    PostgreSQL 18.6, Spring JDBC `JdbcClient`와 Flyway를 사용하고 JPA는 사용하지 않는다.
    Java 25 호환성은 검증했지만 기능 필요성과 고정된 CI/실행 이미지 기준이 생길 때까지
    보류한다.
+   Kotlin 플러그인 갱신 때는 공식 Gradle 호환 범위와 `kotlin-stdlib`·`kotlin-reflect`의
+   실제 해석 버전을 함께 확인한다. Kotlin BOM은 플러그인과 같은 version catalog 값을 사용한다.
 3. `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap` 다섯
    모듈을 유지한다. 의존은 `bootstrap`/어댑터에서 `application`, 다시 `domain`으로
    향하게 한다. 어댑터끼리 의존하지 않고 내부 모듈은 외부 모듈에 의존하지 않는다.
@@ -63,6 +66,9 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
 - 입력 형태는 웹 DTO, 도메인 불변식은 도메인, 저장 무결성은 PostgreSQL에서 소유한다.
   같은 소유자가 같은 실패 시점에 반복하는 검증만 제거하고, 서로 다른 신뢰 경계의 방어는
   유지한다.
+- PostgreSQL 시각 열은 JDBC 4.2 `OffsetDateTime`으로 읽고 `Instant`로 변환한다. 표준 행 매퍼를
+  사용해도 구형 `Timestamp` 경유로 허용된 과거 시각이 달라지지 않는지 확인하며, 변환 보완은
+  시각 열에 한정하고 생성자·필드 매핑을 다시 구현하지 않는다.
 - 생성과 주간 범위 최신 조회의 `weekStart`·`zoneId` HTTP 표현 규칙은 같은 웹 DTO 검증을
   재사용한다. 주간 조회는 기존 저장 스냅샷을 읽으며 별도 검증 도우미, 스키마·마이그레이션
   또는 현재 투영 재조합을 추가하지 않는다.
@@ -123,7 +129,8 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   비루트 Caddy를 채택하기 전에는 이름 있는 인증서 볼륨의 소유권 계획 없이 init 컨테이너나
   권한 변경 스크립트를 만들지 않는다.
 - 이벤트 v2 계약 팩은 `contracts/VERSION`을 단일 버전 기준으로 삼고 JSON Schema·예시와
-  PRD-0019만 Gradle 표준 `Zip`으로 묶는다. 공유 JVM DTO, 계약 서비스, 별도 배포 플러그인과
+  PRD-0019 및 직접 참조하는 PRD-0002·0007·0018을 Gradle 표준 `Zip`으로 묶는다. 상대 링크가
+  유지되도록 문서의 원래 경로를 보존한다. 공유 JVM DTO, 계약 서비스, 별도 배포 플러그인과
   예시 전용 제품 시나리오를 추가하지 않는다.
 - 한 번 쓰는 식을 이름만 바꾸는 도우미, 단일 변형을 위한 전략·팩터리, 한 필드만 감싸는
   전달용 래퍼를 만들지 않는다. 책임·실패 경계·안정적인 의미 중복이 있을 때만 추출한다.

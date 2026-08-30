@@ -30,11 +30,14 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 | 이름 | 필수 | 형식과 제약 | 의미 |
 |---|---|---|---|
 | `eventType` | 예 | PRD-0002의 지원 이벤트 종류 | 투영 정체성의 이벤트 종류 |
-| `sourceReference` | 예 | 비어 있지 않은 문자열, 최대 128자 | 길이가 제한된 불투명 원본 참조 |
+| `sourceReference` | 예 | PRD-0002의 문자·공백 규칙, Unicode code point 기준 최대 128자 | 길이가 제한된 불투명 원본 참조 |
 
 경로의 `workspaceId`와 `seasonId`는 UUID다. 잘못된 UUID·열거형, 누락되거나 비어 있는
-`sourceReference`, 128자를 넘는 참조는 `400 Bad Request`와 PRD-0004의 표준
-`ProblemDetail`로 거부한다.
+`sourceReference`, PRD-0002의 문자·공백 규칙을 어기거나 Unicode code point 기준 128자를
+넘는 참조는 `400 Bad Request`와 PRD-0004의 표준 `ProblemDetail`로 거부한다.
+
+수신과 같은 공용 입력 규칙을 사용한다. NBSP는 보존하고 `U+0000`과 짝이 없는 surrogate는
+거부하며 별도 공백 판정이나 문자열 정규화를 추가하지 않는다.
 
 ## 현재 상태 의미
 
