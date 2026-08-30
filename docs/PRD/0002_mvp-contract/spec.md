@@ -75,19 +75,22 @@ v2로 수신·재생하는 계약을 추가한다.
 
 | 필드 | 형식 | 제약 |
 |---|---|---|
-| `eventId` | UUID | 이벤트 식별자 |
+| `eventId` | 36자 하이픈 UUID | 이벤트 식별자 |
 | `eventType` | 열거형 | 아래 버전별 종류 중 하나 |
 | `eventVersion` | 정수 | `1..2147483647`, 소비자가 지원하는 값은 `1`과 `2` |
 | `sourceSeverity` | 열거형 또는 `null` | v1은 생략·`null`, v2는 `CRITICAL` 또는 `WARNING` 필수 |
-| `workspaceId` | UUID | 불투명 원본 참조 범위 |
-| `seasonId` | UUID | 불투명 원본 참조 범위 |
-| `sourceReference` | 문자열 | 비어 있지 않은 불투명 식별자, Unicode code point 기준 최대 128자 |
+| `workspaceId` | 36자 하이픈 UUID | 불투명 원본 참조 범위 |
+| `seasonId` | 36자 하이픈 UUID | 불투명 원본 참조 범위 |
+| `sourceReference` | 문자열 | 비어 있지 않고 `U+0000`이 없는 불투명 식별자, Unicode code point 기준 최대 128자 |
 | `aggregateRevision` | 정수 | `1`부터 `9223372036854775807`까지 |
 | `occurredAt` | JSON 문자열의 ISO-8601 시점 | 초가 필수인 offset 시각, 소수초는 1~9자리 |
 | `state` | 열거형 | `ACTIVE` 또는 `RESOLVED` |
 
 정수 필드는 소수점·지수 표기가 없는 JSON 정수 token만 허용하고 소수를 정수로 바꾸지
 않으며, 계약에 없는 JSON 필드는 무시하지 않는다.
+UUID 필드는 ASCII 16진수의 `8-4-4-4-12` 하이픈 표기만 허용하며 Base64·Base64URL 같은
+동일 값의 별칭을 받지 않는다. `sourceReference`에는 PostgreSQL 문자열로 보존할 수 없는
+`U+0000`을 허용하지 않는다.
 `occurredAt`의 `24:00:00`과 윤초는 실제 다른 시각으로 정규화하지 않고 `400 Bad Request`로
 거부한다.
 
@@ -131,9 +134,9 @@ PostgreSQL `TIMESTAMPTZ`와 저장·응답 스냅샷의 정밀도를 맞추기 �
 - `STALE`: 이미 적용한 현재 리비전 이하의 이벤트다. 수신 기록에는 결과를 남기지만
   투영을 변경하지 않는다.
 
-문법적으로 잘못된 UUID·시점·열거형, 빈 `sourceReference`, 128자를 넘는
-`sourceReference`, 32비트 양의 정수 범위를 벗어난 이벤트 버전 또는 양수가 아닌 리비전은
-유효한 이벤트 수신 기록이나 투영 효과를 만들지 않는다.
+36자 하이픈 표기가 아닌 UUID, 문법적으로 잘못된 시점·열거형, 비어 있거나 `U+0000`을
+포함하거나 128자를 넘는 `sourceReference`, 32비트 양의 정수 범위를 벗어난 이벤트 버전
+또는 양수가 아닌 리비전은 유효한 이벤트 수신 기록이나 투영 효과를 만들지 않는다.
 
 HTTP 상태와 응답 본문은 다음과 같다.
 

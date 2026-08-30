@@ -29,6 +29,8 @@ BATON 사용자 계정이나 멤버십을 복제하지 않는다.
 - BRIEF는 현재 token과 선택적인 직전 token 한 건만 받아 순차 배포 교체 구간을 지원한다.
 - BATON은 현재 token 한 건만 보내며 이벤트 송신용 `baton.brief.bearer-token`을 재사용하지
   않는다.
+- 이벤트 수신과 서비스 API 인증을 함께 켠 환경에서는 양쪽의 현재·직전 token 집합이 서로
+  겹치면 BRIEF가 원문 비밀을 노출하지 않고 기동을 거부한다.
 - 인증이 필요한 경로의 token 누락·중복·불일치는 본문을 업무 처리하기 전에 표준 Bearer
   `401`로 끝낸다.
 - token 원문은 설정·로그·응답·메트릭·영속 데이터에 남기지 않는다.
@@ -46,7 +48,8 @@ BRIEF 서비스 전용 Caddy만 연결한다.
 - BATON `app`은 `https://<BRIEF_SERVICE_HOST>:8443` origin만 사용하고 운영자가 제공한
   truststore로 서버 인증서를 검증한다.
 - 서비스 Caddy는 `BRIEF_SERVICE_HOST`를 SAN으로 포함한 인증서와 private key를 파일 기반
-  Compose secret으로 받는다. 호스트 포트는 게시하지 않는다.
+  Compose secret으로 받는다. 두 파일은 다른 호스트 사용자가 쓸 수 없고 컨테이너 UID/GID
+  `10001`이 읽을 수 있어야 한다. 호스트 포트는 게시하지 않는다.
 - 서비스 Caddy 이미지는 digest로 고정한 Caddy에서 불필요한 실행 파일 file capability를
   제거하고 UID/GID `10001`로 실행한다. 런타임 capability는 모두 제거한다.
 - 서비스 Caddy는 기존 내부 `proxy` 네트워크에서 BRIEF `8080`으로 전달하며 정확한 조회·
@@ -71,6 +74,8 @@ BRIEF 서비스 전용 Caddy만 연결한다.
 ## 수용 기준
 
 - 이벤트 token으로 서비스 API를 호출할 수 없고 서비스 token으로 이벤트를 수신할 수 없다.
+- 이벤트 수신과 서비스 API의 현재·직전 token이 하나라도 같으면 애플리케이션이 기동하지
+  않는다.
 - 허용한 조회와 생성만 서비스 token으로 접근할 수 있다.
 - 수신 증거·재구축·health는 같은 token으로도 서비스 API 경계를 통과하지 못한다.
 - BATON 애플리케이션과 서비스 전용 Caddy만 같은 `Internal=true` 네트워크에 연결된다.

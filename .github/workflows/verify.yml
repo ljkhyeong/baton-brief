@@ -25,7 +25,9 @@ jobs:
           java-version: "21"
 
       - name: Gradle 설정과 wrapper 검증
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
 
       - name: Gradle 검증
         run: ./gradlew --no-daemon test :bootstrap:bootJar contractsZip
@@ -79,14 +81,17 @@ jobs:
             --project-name baton-brief-ci
             --env-file .env.staging.example
             -f compose.staging.yml
+            -f compose.service-api.yml
             --profile https
           )
+          service_network="baton-brief-ci-service"
           cleanup() {
             local original_status=$?
             local cleanup_status=0
             trap - EXIT
             set +e
             "${compose[@]}" down --volumes --remove-orphans || cleanup_status=$?
+            docker network rm "$service_network" >/dev/null 2>&1 || true
             rm -rf "$staging_dir" || cleanup_status=$?
             if ((original_status != 0)); then
               exit "$original_status"
@@ -96,26 +101,50 @@ jobs:
           trap cleanup EXIT
 
           event_token="ci-event-token-000000000000000000000000"
+          service_token="ci-service-token-0000000000000000000000"
+          curl_image="curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6"
           printf '%s' "ci-database-password" > "$staging_dir/database-password"
           printf '%s' "$event_token" > "$staging_dir/event-bearer-token"
           : > "$staging_dir/event-previous-bearer-token"
+          printf '%s' "$service_token" > "$staging_dir/service-bearer-token"
+          : > "$staging_dir/service-previous-bearer-token"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj '/CN=brief-service' \
+            -addext 'subjectAltName=DNS:brief-service' \
+            -keyout "$staging_dir/service-tls-key.pem" \
+            -out "$staging_dir/service-tls-cert.pem" \
+            >/dev/null 2>&1
+          chmod 0444 "$staging_dir/service-tls-cert.pem" "$staging_dir/service-tls-key.pem"
+          docker network create --internal "$service_network" >/dev/null
 
           export BRIEF_STAGING_DATABASE_PASSWORD_FILE="$staging_dir/database-password"
           export BRIEF_STAGING_EVENT_RECEIVER_BEARER_TOKEN_FILE="$staging_dir/event-bearer-token"
           export BRIEF_STAGING_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN_FILE="$staging_dir/event-previous-bearer-token"
+          export BRIEF_STAGING_SERVICE_API_BEARER_TOKEN_FILE="$staging_dir/service-bearer-token"
+          export BRIEF_STAGING_SERVICE_API_PREVIOUS_BEARER_TOKEN_FILE="$staging_dir/service-previous-bearer-token"
+          export BRIEF_STAGING_SERVICE_API_TLS_CERT_FILE="$staging_dir/service-tls-cert.pem"
+          export BRIEF_STAGING_SERVICE_API_TLS_KEY_FILE="$staging_dir/service-tls-key.pem"
           export BRIEF_STAGING_IMAGE="baton-brief:ci"
+          export BRIEF_STAGING_SERVICE_CADDY_IMAGE="baton-brief-service-caddy:ci"
           export BRIEF_STAGING_HOST="localhost"
-          export BRIEF_STAGING_HTTP_PUBLISH="127.0.0.1:18080:80"
-          export BRIEF_STAGING_HTTPS_TCP_PUBLISH="127.0.0.1:18443:443"
-          export BRIEF_STAGING_HTTPS_UDP_PUBLISH="127.0.0.1:18443:443/udp"
+          export BRIEF_STAGING_HTTP_PUBLISH="127.0.0.1:38080:80"
+          export BRIEF_STAGING_HTTPS_TCP_PUBLISH="127.0.0.1:38443:443"
+          export BRIEF_STAGING_HTTPS_UDP_PUBLISH="127.0.0.1:38443:443/udp"
+          export BRIEF_SERVICE_HOST="brief-service"
+          export BATON_BRIEF_PRIVATE_NETWORK="$service_network"
 
           "${compose[@]}" up --detach --wait --wait-timeout 180 --no-build
 
           brief_id="$("${compose[@]}" ps --quiet brief)"
           https_id="$("${compose[@]}" ps --quiet https)"
+          service_api_id="$("${compose[@]}" ps --quiet service-api)"
           test -n "$brief_id"
           test -n "$https_id"
+          test -n "$service_api_id"
           test -z "$(docker port "$brief_id")"
+          test -z "$(docker port "$service_api_id")"
+          test "$(docker inspect --format '{{.State.Status}}' "$service_api_id")" = "running"
+          test "$(docker inspect --format '{{.RestartCount}}' "$service_api_id")" = "0"
           test "$(docker inspect --format '{{.State.Health.Status}}' "$brief_id")" = "healthy"
           test "$(docker exec "$brief_id" id -u)" = "10001"
           docker inspect "$brief_id" | jq --exit-status \
@@ -138,7 +167,23 @@ jobs:
              and .[0].HostConfig.CapDrop == ["ALL"]
              and (.[0].HostConfig.CapAdd | length == 1)
              and (.[0].HostConfig.CapAdd[0] | endswith("NET_BIND_SERVICE"))'
-          docker port "$https_id" 443/tcp | grep --fixed-strings --line-regexp '127.0.0.1:18443'
+          docker port "$https_id" 443/tcp | grep --fixed-strings --line-regexp '127.0.0.1:38443'
+
+          docker inspect "$service_api_id" | jq --exit-status \
+            '.[0].HostConfig.ReadonlyRootfs == true
+             and .[0].HostConfig.CapDrop == ["ALL"]
+             and ((.[0].HostConfig.CapAdd // []) | length == 0)'
+          test "$(
+            docker inspect "$service_api_id" \
+              | jq '.[0].NetworkSettings.Networks | length'
+          )" = "2"
+          service_api_networks="$(
+            docker inspect "$service_api_id" \
+              | jq --raw-output '.[0].NetworkSettings.Networks | keys[]'
+          )"
+          while IFS= read -r network; do
+            test "$(docker network inspect --format '{{.Internal}}' "$network")" = "true"
+          done <<< "$service_api_networks"
 
           for attempt in $(seq 1 30); do
             if docker cp \
@@ -153,25 +198,25 @@ jobs:
           unauthenticated_status="$(
             curl --silent --show-error \
               --cacert "$staging_dir/root.crt" \
-              --resolve 'localhost:18443:127.0.0.1' \
+              --resolve 'localhost:38443:127.0.0.1' \
               --header 'Content-Type: application/json' \
               --data-binary '@contracts/examples/role-unassigned.active-r1-critical.json' \
               --output /dev/null \
               --write-out '%{http_code}' \
-              https://localhost:18443/api/v1/events
+              https://localhost:38443/api/v1/events
           )"
           test "$unauthenticated_status" = "401"
 
           authenticated_status="$(
             curl --silent --show-error \
               --cacert "$staging_dir/root.crt" \
-              --resolve 'localhost:18443:127.0.0.1' \
+              --resolve 'localhost:38443:127.0.0.1' \
               --header 'Content-Type: application/json' \
               --header "Authorization: Bearer $event_token" \
               --data-binary '@contracts/examples/role-unassigned.active-r1-critical.json' \
               --output "$staging_dir/event-response.json" \
               --write-out '%{http_code}' \
-              https://localhost:18443/api/v1/events
+              https://localhost:38443/api/v1/events
           )"
           test "$authenticated_status" = "202"
           jq --exit-status '.status == "APPLIED"' "$staging_dir/event-response.json"
@@ -179,12 +224,49 @@ jobs:
           health_status="$(
             curl --silent --show-error \
               --cacert "$staging_dir/root.crt" \
-              --resolve 'localhost:18443:127.0.0.1' \
+              --resolve 'localhost:38443:127.0.0.1' \
               --output /dev/null \
               --write-out '%{http_code}' \
-              https://localhost:18443/actuator/health
+              https://localhost:38443/actuator/health
           )"
           test "$health_status" = "404"
+
+          service_response="$(
+            docker run --rm --network "container:$service_api_id" \
+              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
+              "$curl_image" \
+              --silent --show-error --fail --connect-timeout 5 --max-time 10 \
+              --cacert /tmp/service-tls-cert.pem \
+              --resolve 'brief-service:8443:127.0.0.1' \
+              --header="Authorization: Bearer $service_token" \
+              'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
+          )"
+          jq --exit-status '.items | length == 1' <<< "$service_response"
+
+          service_unauthenticated_status="$(
+            docker run --rm --network "container:$service_api_id" \
+              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
+              "$curl_image" \
+              --silent --show-error --connect-timeout 5 --max-time 10 \
+              --cacert /tmp/service-tls-cert.pem \
+              --resolve 'brief-service:8443:127.0.0.1' \
+              --output /dev/null --write-out '%{http_code}' \
+              'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
+          )"
+          test "$service_unauthenticated_status" = "401"
+
+          service_health_status="$(
+            docker run --rm --network "container:$service_api_id" \
+              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
+              "$curl_image" \
+              --silent --show-error --connect-timeout 5 --max-time 10 \
+              --cacert /tmp/service-tls-cert.pem \
+              --resolve 'brief-service:8443:127.0.0.1' \
+              --header="Authorization: Bearer $service_token" \
+              --output /dev/null --write-out '%{http_code}' \
+              'https://brief-service:8443/actuator/health'
+          )"
+          test "$service_health_status" = "404"
 
           if docker logs "$brief_id" 2>&1 | grep --fixed-strings --quiet "$event_token"; then
             echo "BRIEF 로그에 Bearer token이 노출됐습니다." >&2
@@ -192,5 +274,13 @@ jobs:
           fi
           if docker logs "$https_id" 2>&1 | grep --fixed-strings --quiet "$event_token"; then
             echo "Caddy 로그에 Bearer token이 노출됐습니다." >&2
+            exit 1
+          fi
+          if docker logs "$brief_id" 2>&1 | grep --fixed-strings --quiet "$service_token"; then
+            echo "BRIEF 로그에 서비스 API Bearer token이 노출됐습니다." >&2
+            exit 1
+          fi
+          if docker logs "$service_api_id" 2>&1 | grep --fixed-strings --quiet "$service_token"; then
+            echo "서비스 Caddy 로그에 Bearer token이 노출됐습니다." >&2
             exit 1
           fi

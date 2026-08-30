@@ -11,12 +11,18 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      gradle-minor-and-patch:
+      kotlin-plugins:
         patterns:
-          - "*"
+          - "org.jetbrains.kotlin.jvm"
+          - "org.jetbrains.kotlin.plugin.spring"
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # 3.0.7은 제품과 다른 Jackson 3.2.1 BOM을 테스트에 적용한다.
+      - dependency-name: "com.networknt:json-schema-validator"
+        versions:
+          - "3.0.7"
 
   - package-ecosystem: "docker"
     directory: "/"

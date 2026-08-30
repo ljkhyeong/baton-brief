@@ -4,10 +4,14 @@ import com.networknt.schema.InputFormat
 import com.networknt.schema.SchemaRegistry
 import com.networknt.schema.SchemaRegistryConfig
 import com.networknt.schema.SpecificationVersion
+import com.personal.baton.brief.domain.SourceEvent
+import com.personal.baton.brief.domain.SourceEventSeverity
+import com.personal.baton.brief.domain.SourceEventType
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.core.io.ClassPathResource
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver
+import tools.jackson.databind.json.JsonMapper
 
 class BriefEventContractTest {
 
@@ -46,6 +50,10 @@ class BriefEventContractTest {
                 "\"eventId\": \"not-a-uuid\"",
             ),
             template.replaceFirst(
+                Regex("\"eventId\"\\s*:\\s*\"[^\"]+\""),
+                "\"eventId\": \"AAAAAAAAAAAAAAAAAAAAAA\"",
+            ),
+            template.replaceFirst(
                 Regex("\"occurredAt\"\\s*:\\s*\"[^\"]+\""),
                 "\"occurredAt\": \"2026-02-30T09:00:00Z\"",
             ),
@@ -56,7 +64,46 @@ class BriefEventContractTest {
         }
     }
 
+    @Test
+    fun `이벤트 v2 종류는 도메인과 Schema와 예시에 모두 일치한다`() {
+        val domainEventTypes = SourceEventType.entries
+            .filter { SourceEvent.isReceivable(2, it, SourceEventSeverity.CRITICAL) }
+            .mapTo(mutableSetOf(), SourceEventType::name)
+        val schemaEventTypes = SCHEMA_DOCUMENT
+            .path("properties")
+            .path("eventType")
+            .path("enum")
+            .mapTo(mutableSetOf()) { it.stringValue() }
+        val exampleEventTypes = EXAMPLES.mapTo(mutableSetOf()) { resource ->
+            JSON.readTree(resource.getContentAsString(Charsets.UTF_8))
+                .path("eventType")
+                .stringValue()
+        }
+
+        assertThat(schemaEventTypes).isEqualTo(domainEventTypes)
+        assertThat(exampleEventTypes).containsAll(domainEventTypes)
+    }
+
+    @Test
+    fun `sourceReference는 U+0000을 허용하지 않는다`() {
+        val template = EXAMPLES.first().getContentAsString(Charsets.UTF_8)
+        listOf("\\u0000", "valid\\u0000suffix").forEach { sourceReference ->
+            val sourceReferenceField = checkNotNull(Regex(
+                "\"sourceReference\"\\s*:\\s*\"[^\"]+\"",
+            ).find(template))
+            val invalidExample = template.replaceRange(
+                sourceReferenceField.range,
+                "\"sourceReference\": \"$sourceReference\"",
+            )
+
+            assertThat(SCHEMA.validate(invalidExample, InputFormat.JSON)).isNotEmpty()
+        }
+    }
+
     companion object {
+        private val JSON = JsonMapper.builder().build()
+        private val SCHEMA_RESOURCE = ClassPathResource("contracts/schemas/source-event.v2.schema.json")
+        private val SCHEMA_DOCUMENT = SCHEMA_RESOURCE.inputStream.use(JSON::readTree)
         private val SCHEMA_REGISTRY = SchemaRegistry.withDefaultDialect(
             SpecificationVersion.DRAFT_2020_12,
         ) { builder ->
@@ -66,7 +113,7 @@ class BriefEventContractTest {
                     .build(),
             )
         }
-        private val SCHEMA = ClassPathResource("contracts/schemas/source-event.v2.schema.json")
+        private val SCHEMA = SCHEMA_RESOURCE
             .inputStream
             .use(SCHEMA_REGISTRY::getSchema)
         private val EXAMPLES = PathMatchingResourcePatternResolver()

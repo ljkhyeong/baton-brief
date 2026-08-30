@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":adapter-out-persistence"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("com.networknt:json-schema-validator:3.0.6") {

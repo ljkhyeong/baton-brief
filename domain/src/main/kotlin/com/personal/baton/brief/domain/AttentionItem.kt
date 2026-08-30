@@ -46,7 +46,12 @@ object AttentionProjector {
                 SourceEventType.ROUTINE_MISSED,
                 SourceEventType.DECISION_FOLLOW_UP_OVERDUE,
                 -> Severity.MEDIUM
-                else -> error("unsupported event type for version 1")
+                SourceEventType.ROLE_UNASSIGNED,
+                SourceEventType.ROLE_SUCCESSOR_MISSING,
+                SourceEventType.ROLE_PREPARATION_INCOMPLETE,
+                SourceEventType.ROUTINE_REPEATEDLY_OVERDUE,
+                SourceEventType.HANDOFF_INCOMPLETE,
+                -> error("unsupported event type for version 1")
             }
 
             2 -> when (checkNotNull(event.sourceSeverity)) {

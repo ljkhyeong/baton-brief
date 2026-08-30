@@ -36,6 +36,7 @@ class BriefServiceApiSecurityConfiguration {
     fun serviceApiSecurityFilterChain(
         http: HttpSecurity,
         properties: BriefServiceApiSecurityProperties,
+        eventProperties: BriefEventReceiverSecurityProperties,
     ): SecurityFilterChain {
         http
             .securityMatcher(SERVICE_API)
@@ -50,8 +51,16 @@ class BriefServiceApiSecurityConfiguration {
                 .build()
         }
 
+        val serviceApiTokens = properties.acceptedBearerTokens()
+        if (eventProperties.authenticationRequired) {
+            val eventTokens = eventProperties.acceptedBearerTokens()
+            require(serviceApiTokens.none(eventTokens::contains)) {
+                "BRIEF 이벤트 수신과 서비스 API bearer token은 서로 달라야 합니다"
+            }
+        }
+
         val authenticationManager = staticBearerAuthenticationManager(
-            properties.acceptedBearerTokens(),
+            serviceApiTokens,
             "baton-backend",
             "BRIEF 서비스 API 인증 정보가 올바르지 않습니다",
         )
@@ -103,4 +112,3 @@ class BriefServiceApiSecurityConfiguration {
             PathPatternRequestMatcher.pathPattern(method, pattern)
     }
 }
-

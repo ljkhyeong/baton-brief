@@ -14,6 +14,8 @@ BATON은 사용자 권한을 확인한 뒤 BRIEF의 읽기 모델을 조회하�
 - 조회·생성 허용 목록은 이벤트 수신과 다른 Spring Security stateless filter chain과
   전용 opaque Bearer를 사용한다.
 - BRIEF는 현재·직전 token 한 건의 순차 교체만 지원하고 BATON은 현재 token 한 건만 보낸다.
+- 이벤트 수신과 서비스 API 인증을 함께 켜면 두 경계의 현재·직전 token 집합은 서로 달라야
+  하며, 겹치는 설정은 기동 시 거부한다.
 - 두 저장소는 연결 전용 Compose override에서 운영자가 `--internal`로 만든 외부 Docker
   네트워크를 공유한다.
 - BATON `app`과 BRIEF 서비스 전용 Caddy만 이 네트워크에 연결한다. BRIEF 애플리케이션·
