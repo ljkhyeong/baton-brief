@@ -181,10 +181,11 @@ jobs:
           while IFS= read -r network; do
             test "$(docker network inspect --format '{{.Internal}}' "$network")" = "true"
           done <<< "$service_api_networks"
+          service_api_full_id="$(docker inspect --format '{{.Id}}' "$service_api_id")"
           service_api_ip="$(
-            docker inspect "$service_api_id" \
-              | jq --raw-output --arg network "$service_network" \
-                '.[0].NetworkSettings.Networks[$network].IPAddress'
+            docker network inspect "$service_network" \
+              | jq --raw-output --arg container "$service_api_full_id" \
+                '.[0].Containers[$container].IPv4Address | split("/")[0]'
           )"
           test -n "$service_api_ip"
 
