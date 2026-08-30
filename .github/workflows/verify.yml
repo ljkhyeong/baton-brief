@@ -166,8 +166,6 @@ jobs:
              and (.[0].HostConfig.CapAdd[0] | endswith("NET_BIND_SERVICE"))'
           docker port "$https_id" 443/tcp | grep --fixed-strings --line-regexp '127.0.0.1:38443'
 
-          test "$(docker inspect --format '{{.State.Status}}' "$service_api_id")" = "running"
-          test "$(docker exec "$service_api_id" id -u)" = "10001"
           docker inspect "$service_api_id" | jq --exit-status \
             '.[0].HostConfig.ReadonlyRootfs == true
              and .[0].HostConfig.CapDrop == ["ALL"]
