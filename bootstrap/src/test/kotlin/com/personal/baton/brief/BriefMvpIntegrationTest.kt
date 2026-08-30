@@ -1152,6 +1152,21 @@ class BriefMvpIntegrationTest(
         postEvent(unknownField).andExpect(status().isBadRequest)
 
         listOf(
+            "AAAAAAAAAAAAAAAAAAAAAA",
+            "AAAAAAAAAAAAAAAAAAAAAA==",
+        ).forEach { nonCanonicalEventId ->
+            postEvent(
+                eventJson(nonCanonicalEventId, workspaceId, seasonId, "invalid", 1),
+            ).andExpect(status().isBadRequest)
+        }
+
+        listOf("\\u0000", "valid\\u0000suffix").forEach { sourceReference ->
+            postEvent(
+                eventJson(eventId, workspaceId, seasonId, sourceReference, 1),
+            ).andExpect(status().isBadRequest)
+        }
+
+        listOf(
             "2026-08-12T24:00:00Z",
             "2026-08-12T23:59:60Z",
         ).forEach { occurredAt ->
