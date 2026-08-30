@@ -18,8 +18,8 @@
 
 다음 Spring MVC 요청 오류는 `application/problem+json`으로 응답한다.
 
-- Bean Validation 요청 본문 실패
-- 요청 매개변수의 `@Positive`, `@Min`, `@Max` 검증 실패
+- 요청 본문·모델 속성의 Bean Validation 검증 실패
+- 요청 매개변수의 Bean Validation 검증 실패
 - JSON, enum과 타입 역직렬화 실패. 소수를 정수로 바꾸지 않는다.
 - 대상 요청 DTO에 선언하지 않은 JSON 필드
 - UUID·숫자 경로 또는 요청 매개변수 변환 실패

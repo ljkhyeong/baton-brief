@@ -82,11 +82,19 @@ Spring `SimplePropertyRowMapper`로 바꾸고, 주간 구간을 포함한 에디
 표준 매퍼 인스턴스를 재사용한다. 재구축 저장은 `NamedParameterJdbcOperations.batchUpdate`로
 묶었으며 기존 트랜잭션·잠금과 실패 롤백, 이전 에디션의 리비전 근거 `null` 호환성을 확인했다.
 
-계약 테스트의 JSON 값 변경은 Jackson `ObjectNode`로 처리하고, HTTP의 원문 JSON token
-검증은 유지했다. 이벤트 token 검증 결과는 비공개 Kotlin `lazy` 값으로 재사용한다.
+계약·통합 테스트의 JSON 값 변경은 Jackson `ObjectNode`로 처리한다. `1.0`·`2.0` 표기는
+Jackson `RawValue`로 유지하고, 계약 예시의 기본 수신 시나리오는 원문을 그대로 사용한다.
+이벤트 token 검증 결과는 비공개 Kotlin `lazy` 값으로 재사용한다.
 인증 비활성일 때 token 없이 기동하고 활성일 때 필수 token 누락으로 실패하는 경계와
-이벤트·서비스 token 분리와 현재·직전 token 수락의 기존 테스트를 확인했다. 변경 없는 도메인 테스트와 계약
-ZIP은 Gradle의 기존 성공 산출물을 재사용했으며 새 테스트 도구나 의존성은 추가하지 않았다.
+이벤트·서비스 token 분리와 현재·직전 token 수락의 기존 테스트를 확인했다.
+
+조회 입력을 추가로 정리한 뒤에도 위 전체 검증이 성공했다. 현재 단건·전이 이력의
+`sourceReference`와 목록의 `afterSourceReference`에 이벤트 수신과 같은 `@Pattern`을 적용해
+`U+0000`을 표준 `ProblemDetail`의 `400`으로 거부한다. PostgreSQL 통합 테스트에서 세 조회의
+거부와 따옴표·역슬래시가 있는 정상 참조의 수신·단건 조회를 확인했다. 이벤트 종류별 계약
+버전은 enum 생성자 속성으로 옮겼으며 이름·버전 값·v1·v2 재생 계약은 유지했다. 새 검증기,
+예외 처리기, 테스트 도구나 의존성은 추가하지 않았다. 변경 없는 계약 ZIP은 Gradle의 기존
+성공 산출물을 재사용했다.
 
 주요 통합 증거는 다음 계약을 포함한다.
 

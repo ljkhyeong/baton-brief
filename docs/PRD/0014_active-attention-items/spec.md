@@ -34,11 +34,12 @@ PRD-0013은 정체성을 이미 아는 호출자가 현재 관심 항목 한 건
 | 이름 | 필수 | 형식과 제약 | 의미 |
 |---|---|---|---|
 | `afterEventType` | 아니요 | PRD-0002의 지원 이벤트 종류 | 이 이벤트 종류 뒤에서 조회 재개 |
-| `afterSourceReference` | 아니요 | 비어 있지 않은 문자열, 최대 128자 | 같은 커서의 원본 참조 |
+| `afterSourceReference` | 아니요 | 공백만 있는 값과 `U+0000` 금지, Unicode code point 기준 최대 128자 | 같은 커서의 원본 참조 |
 | `limit` | 아니요 | `1..100`, 기본값 `20` | 한 응답에 포함할 최대 항목 수 |
 
 두 `after` 필드는 함께 제공하거나 함께 생략한다. 한 필드만 전달하거나 참조가 비어 있는
-경우, 잘못된 UUID·열거형과 `limit` 범위 오류는 `400 Bad Request`와 PRD-0004의 표준
+경우, 참조에 `U+0000`이 있거나 Unicode code point 기준 128자를 넘는 경우, 잘못된
+UUID·열거형과 `limit` 범위 오류는 `400 Bad Request`와 PRD-0004의 표준
 `ProblemDetail`로 거부한다.
 
 ## 선정과 정렬
