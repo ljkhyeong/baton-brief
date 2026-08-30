@@ -68,7 +68,7 @@ profile이나 PRD-0025의 비공개 서비스 Caddy를 통해서만 제공한다
 ## 수용 기준
 
 - 고정한 Java 21 이미지에서 실행 JAR을 빌드하고 컨테이너가 health 상태가 된다.
-- PostgreSQL은 호스트 포트 없이 기동하고 Flyway V1~V7을 적용한다.
+- PostgreSQL은 호스트 포트 없이 기동하고 Flyway V1~V8을 적용한다.
 - BRIEF도 호스트 포트를 게시하지 않고 내부 `data`·`proxy` 네트워크에만 참여한다.
 - BRIEF 실행 컨테이너는 UID/GID `10001`과 읽기 전용 루트 파일시스템을 사용한다.
 - Bearer 없는 `POST /api/v1/events`는 `401`이고 파일에서 주입한 현재 Bearer로 기존 v2

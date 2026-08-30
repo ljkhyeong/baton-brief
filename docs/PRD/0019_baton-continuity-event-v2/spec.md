@@ -54,6 +54,11 @@ v2의 `reasonCode`는 수신한 다섯 `eventType` 중 하나이며 v1과 동일
 - 수신 기록, 현재 관심 항목과 불변 에디션 항목의 이벤트 종류 제약은 v1·v2 여덟 타입을
   허용한다.
 - 기존 행의 `source_severity`는 `null`로 유지하며 값을 추정하거나 채우지 않는다.
+- Flyway V8은 V7의 `source_event_receipt_supported_contract`를 교체해 지원 v2 기록의
+  `source_severity IS NOT NULL`을 명시한다. v1과 `UNSUPPORTED` 기록의 `null` 허용은 유지한다.
+  이 변경은 기존 HTTP 요청·JSON Schema·fingerprint 계약을 바꾸지 않는다.
+- V7 데이터에 필수 심각도가 누락된 지원 v2 기록이 있으면 V8 적용은 실패한다. 원본 근거를
+  확인하기 전 임의의 심각도를 채우거나 해당 수신 기록을 삭제하지 않는다.
 - 현재 투영과 에디션의 `severity` 저장 값은 계속 `HIGH`·`MEDIUM`만 사용한다.
 - 새 테이블, 인덱스, API 경로, 브로커와 생산자 전용 adapter를 추가하지 않는다.
 
@@ -111,6 +116,9 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - 재구축 뒤 v1·v2 현재 투영이 실시간 처리 결과와 같다.
 - 대표 기존 행에 마이그레이션을 적용했을 때 새 열은 `null`이고 기존 현재 투영·에디션
   항목을 보존한다.
+- 대표 V2 데이터와 V7의 지원 v1·v2 수신 기록을 둔 업그레이드에서 V8까지 적용된다.
+  v1·미지원 기록의 `null`과 지원 v2의 심각도를 보존하고, 지원 v2 심각도를 `null`로 바꾸는
+  SQL은 기존 이름의 저장 제약으로 거부한다.
 - 이벤트 v2 계약 예시가 JSON Schema와 일치하고 같은 예시가 실제 BRIEF 수신·재구축
   시나리오에서 처리된다.
 - `contracts/VERSION`에서 이름을 정한 계약 팩 ZIP에 스키마·예시와 이 PRD가 포함된다.
