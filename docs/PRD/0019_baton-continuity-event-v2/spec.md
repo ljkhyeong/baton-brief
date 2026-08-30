@@ -73,6 +73,8 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 - Draft 2020-12 검증기는 UUID와 시점 `format-assertion`을 활성화한다. JSON Schema가 숫자
   token의 소수점·지수 표기를 구분하지 못하는 한계는 PRD-0002의 정수 표현 계약과 실제
   소비자 수신 검증으로 보완한다.
+- 세 UUID는 36자 하이픈 표기를 사용하고 `sourceReference`는 `U+0000`을 포함하지 않는다.
+  JSON Schema와 실제 소비자 수신 검증은 이 형식 경계를 함께 확인한다.
 - `contracts/examples/*.json`은 BATON 다섯 신호와 한 신호의 심각도 변경·해소 생명주기를
   설명한다. 예시는 새 의미를 만들지 않으며 이 PRD가 필드 간 의미와 HTTP 결과의 기준이다.
 - 계약 팩 버전의 단일 기준은 `contracts/VERSION`이다. BATON 생산자는 그 값을 고정해 실제
@@ -90,6 +92,7 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 ## 호환성과 오류 경계
 
 - v1 요청·응답·fingerprint 의미와 기존 수신 기록은 바꾸지 않는다.
+- 대표 지원 v1·v2와 기존 미지원 이벤트의 저장 fingerprint를 고정값으로 검증한다.
 - v2 지원 뒤 지원하지 않는 버전 판단은 `eventVersion`이 `1`도 `2`도 아닌 경우다.
 - 기존에 `eventVersion=2`를 `UNSUPPORTED`로 저장한 로컬 데이터가 있다면 새 배포가 그
   기록을 재투영하지 않는다. 저장된 `processingOutcome`은 불변이며 재구축도 계속 제외한다.

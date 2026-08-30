@@ -14,7 +14,7 @@ BATON BRIEF의 로컬 MVP와 최소 스테이징 실행 경계를 구현했다.
 - BRIEF 호스트 포트 비게시와 wrapper·외부 Action·Dockerfile·Caddy 실제 조립을 확인하는 CI 경계
 
 현재 데이터베이스 마이그레이션은 V7까지다. 이벤트 v2 계약 팩 버전은
-`2.0.0-rc.2`이며 원격 스테이징 호환을 완료한 안정 버전이 아니다. 계약과 구조 결정의
+`2.0.0-rc.3`이며 원격 스테이징 호환을 완료한 안정 버전이 아니다. 계약과 구조 결정의
 전체 목록은 [문서 색인](docs/README.md)을 따른다.
 
 ## BATON 애플리케이션 연결 설계
@@ -53,7 +53,7 @@ PostgreSQL 18.6은 저장소 통합 테스트와 스테이징 조립에서 별�
 BATON 프로덕션 설정에 BRIEF HTTPS origin과 파일 기반 Bearer 주입을 연결했지만 실제 두
 스테이징 호스트 사이의 공인 HTTPS 전달은 아직 검증하지 않았다. 로컬 Caddy 내부 CA
 검증을 원격 전달 완료로 해석하지 않는다. 위 생산자·소비자 교차 검증은 계약 팩
-`2.0.0-rc.1`까지의 근거다. 입력 계약을 엄격하게 한 현재 `2.0.0-rc.2`는 BATON 실제
+`2.0.0-rc.1`까지의 근거다. 입력 계약을 엄격하게 한 현재 `2.0.0-rc.3`는 BATON 실제
 serializer와 다시 검증해야 한다.
 
 ## 현재 검증 근거
@@ -70,13 +70,14 @@ serializer와 다시 검증해야 한다.
 
 주요 통합 증거는 다음 계약을 포함한다.
 
-- 수신 중복·충돌·미지원·오래된 리비전·리비전 공백, 고정 v1 지문과 최초 충돌 탐지 시각
+- 수신 중복·충돌·미지원·오래된 리비전·리비전 공백, 지원 v1·v2와 기존 미지원 수신의
+  고정 지문, 에디션 상태 고정 지문과 최초 충돌 탐지 시각
 - 현재 관심 항목 단건·상태별 키셋·적용 전이와 `ETag` 조건부 조회
 - 에디션 멱등성·불변성·`A → B → A` 새 세대, 이력·비교·주간 최신과 `ETag`
 - 소수 정수·알 수 없는 필드·`24:00`·윤초를 거부하는 엄격한 이벤트 입력과 대표
   `400`·`404` `ProblemDetail`
-- 소수점 표기의 정수 token 거부, Unicode code point 기준 `sourceReference` 128자 수락과
-  129자 거부
+- 36자 하이픈 UUID 외 별칭과 소수점 표기의 정수 token 거부, Unicode code point 기준
+  `sourceReference` 128자 수락·129자와 `U+0000` 거부
 - 32비트 양의 미래 `eventVersion`을 문법 오류가 아니라 `UNSUPPORTED`로 보존하는 경계
 - 재구축 강제 실패의 원자적 롤백과 재구축·지원 이벤트 수신 잠금 직렬화
 - V3 이전 에디션 근거의 `null` 유지, V4 복합 기본 키와 V5·V6 열 제거 업그레이드
@@ -127,9 +128,11 @@ wrapper JAR을 검증하고 `basic` cache provider로 캐시를 구성한다. �
 이미지 pull, 실제 Dockerfile 빌드와 Caddy 설정 유효성을 검증한다. HTTPS profile도 실제로
 기동해 BRIEF 호스트 포트 비게시, 내부 네트워크, 비루트·읽기 전용 실행, Caddy capability,
 신뢰한 내부 CA의 무인증 `401`·정상 Bearer `202 APPLIED`, 외부 health `404`와 로그의 token
-비노출을 확인한다. Dockerfile frontend도 digest로 고정한다. 전체 작업은 30분, Compose
-기동은 180초로 제한하고 실패하면 원래 종료 상태를 보존한 채 임시 컨테이너·네트워크·볼륨을
-제거한다.
+비노출을 확인한다. 같은 조립에서 호스트 포트가 없는 서비스 Caddy도 기동해 내부 네트워크,
+비루트·읽기 전용·capability 제거, 인증서를 검증한 서비스 Bearer 조회 `200`, 무인증 `401`,
+허용하지 않은 health `404`와 로그의 서비스 token 비노출을 확인한다. Dockerfile frontend와
+검증용 curl 이미지도 digest로 고정한다. 전체 작업은 30분, Compose 기동은 180초로 제한하고
+실패하면 원래 종료 상태를 보존한 채 임시 컨테이너·네트워크·볼륨을 제거한다.
 
 `.github/workflows/dependency-submission.yml`은 `main` push에서 Gradle 직접·전이 의존성
 그래프 생성과 제출을 두 작업으로 분리한다. 소스를 체크아웃하고 Gradle을 실행하는 생성
@@ -145,6 +148,11 @@ GitHub 저장소의 Dependabot 취약점 알림과 보안 업데이트는 2026-0
 제안하고 major 후보도 개별 pull request로 검토한다. JSON Schema 검증기 3.0.7은 테스트에
 Jackson 3.2.1 BOM을 적용해 제품과 classpath를 다르게 만들므로 정확히 이 버전만 제외한다.
 Dockerfile·Compose 이미지는 하나의 주간 pull request로 묶고 major 자동 후보는 제외한다.
+
+`main` 브랜치 보호는 최신 `main` 기준의 엄격한 `빌드와 설정 검증` 성공을 필수로 하고,
+관리자에게도 같은 규칙을 적용한다. pull request 경유를 요구하되 승인 인원은 현재 0명이며,
+force push와 브랜치 삭제는 허용하지 않는다. 이 설명보다 GitHub의 실제 보호 규칙 조회
+결과를 운영 판단의 기준으로 사용한다.
 
 2026-08-29 PR #4 병합 뒤 기존 v4.4.3 구성의
 [저장소 검증](https://github.com/ljkhyeong/baton-brief/actions/runs/33262434555)과
@@ -183,7 +191,7 @@ Jackson 3.1.5가 일치하는 것과 저장소 전체 검증을 확인했다. v6
 승격하지 않는다.
 
 1. 공인 DNS와 ACME 인증서를 사용하고 인증서 검증을 끄지 않는다.
-2. BATON 실제 serializer의 `2.0.0-rc.2` 본문이 Caddy를 거쳐 BRIEF에 저장된다.
+2. BATON 실제 serializer의 `2.0.0-rc.3` 본문이 Caddy를 거쳐 BRIEF에 저장된다.
 3. 현재 Bearer 성공, 잘못된 Bearer `401`, 동일 이벤트 재전달 `200`을 확인한다.
 4. Caddy 로그와 BRIEF 로그에 Authorization·token·원문 비밀이 남지 않는다.
 5. 실패 시 BATON 원본 트랜잭션은 유지되고 outbox가 재시도 가능한 상태를 보존한다.
