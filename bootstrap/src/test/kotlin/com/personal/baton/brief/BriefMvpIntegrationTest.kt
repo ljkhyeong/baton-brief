@@ -1311,18 +1311,44 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `주간 날짜는 네 자리 연도만 받고 양 끝 주간을 저장 조회한다`() {
+    fun `네 자리 연도 경계의 시각과 주간 에디션을 재구축 전후 보존한다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000010"
         val seasonId = "20000000-0000-0000-0000-000000000010"
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
 
-        listOf("0000-01-03", "9999-12-27").forEach { weekStart ->
+        listOf("0000-01-03", "9999-12-27").forEachIndexed { index, weekStart ->
+            val eventId = "30000000-0000-0000-0000-00000000010${index + 1}"
+            val sourceReference = "time-boundary:$weekStart"
+            val occurredAt = "${weekStart}T00:00:00Z"
+            postEvent(
+                eventJson(eventId, workspaceId, seasonId, sourceReference, 1, occurredAt = occurredAt),
+            ).andExpect(status().isAccepted)
+                .andExpect(jsonPath("$.item.observedAt").value(occurredAt))
+            mockMvc.perform(get("/api/v1/events/$eventId/receipt"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.occurredAt").value(occurredAt))
+            val attentionPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+            mockMvc.perform(
+                get("$attentionPath/current")
+                    .param("eventType", "HANDOFF_BLOCKED")
+                    .param("sourceReference", sourceReference),
+            ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.observedAt").value(occurredAt))
+            mockMvc.perform(
+                get("$attentionPath/transitions")
+                    .param("eventType", "HANDOFF_BLOCKED")
+                    .param("sourceReference", sourceReference),
+            ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.transitions[0].observedAt").value(occurredAt))
+
             val request = JSON.writeValueAsString(
                 JSON.createObjectNode().put("weekStart", weekStart).put("zoneId", "UTC"),
             )
             val editionId = JsonPath.read<String>(
                 postEdition(path, request)
                     .andExpect(status().isCreated)
+                    .andExpect(jsonPath("$.items.length()").value(1))
+                    .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
                     .andReturn().response.contentAsString,
                 "$.editionId",
             )
@@ -1333,6 +1359,14 @@ class BriefMvpIntegrationTest(
             ).andExpect(status().isOk)
                 .andExpect(jsonPath("$.editionId").value(editionId))
                 .andExpect(jsonPath("$.weekStart").value(weekStart))
+                .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
+
+            mockMvc.perform(post("/api/v1/projections/rebuild"))
+                .andExpect(status().isOk)
+            postEdition(path, request)
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.editionId").value(editionId))
+                .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
         }
 
         listOf("-5000-01-06", "+10000-01-03", "+6000000-01-03", "+999999999-12-27")
