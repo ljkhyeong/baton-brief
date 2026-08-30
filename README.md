@@ -154,8 +154,10 @@ BATON 백엔드 경유 조회·생성 연결은 이벤트 token을 재사용하�
 연결할 때도 서비스 전용 HTTPS를 사용한다. 운영자는 내부 네트워크를 한 번 만들고
 `BRIEF_SERVICE_HOST`를 SAN으로 포함한 인증서·private key 경로를 설정한 뒤 서비스 API
 override를 함께 적용한다. 해당 파일은 호스트의 다른 사용자가 쓸 수 없어야 하고 컨테이너
-UID/GID `10001`이 읽을 수 있어야 한다. 일반 Linux Compose 배포에서는 인증서는 `0444`,
-private key는 소유자를 `10001:10001`로 둔 `0400`을 권장하며 비밀 디렉터리 접근도 제한한다.
+UID/GID `10001`이 읽을 수 있어야 한다. 사용자 네임스페이스 재매핑을 사용하지 않는
+rootful Linux Docker에서는 인증서는 `0444`, private key는 소유자를 `10001:10001`로 둔
+`0400`을 권장한다. 비밀 디렉터리 접근과 다른 실행 환경의 소유자 매핑은 아래 스테이징
+실행의 파일 권한 안내를 따른다.
 
 ```shell
 docker network create --internal baton-brief-private
@@ -175,6 +177,18 @@ docker compose --env-file .env.staging \
 
 `.env.staging.example`을 추적되지 않는 `.env.staging`으로 복사하고 데이터베이스·Bearer
 파일의 실제 절대 경로를 지정한다.
+
+데이터베이스 비밀번호와 이벤트 수신·서비스 API의 현재·직전 Bearer 파일은 컨테이너
+UID/GID `10001`이 읽을 수 있어야 한다. 평상시 비워 두는 직전 token 파일에도 같은 조건을
+적용한다. 사용자 네임스페이스 재매핑을 사용하지 않는 rootful Linux Docker에서는 파일
+소유자 `10001:10001`, 권한 `0400`을 권장하며 비밀 디렉터리 접근도 제한한다. 이 환경에서
+`root:root 0600`으로 만들면 BRIEF가 파일을 읽지 못해 기동에 실패할 수 있다.
+
+파일 기반 Compose secrets는 bind mount이므로 `uid`·`gid`·`mode` 속성으로 호스트 파일
+권한을 바꿀 수 없다. 자세한 제약은 [Docker secrets 문서](https://docs.docker.com/reference/compose-file/services/#secrets)를
+따른다. rootless Docker나 사용자 네임스페이스 재매핑을 사용한다면 호스트와 컨테이너의
+UID/GID 매핑에 맞춰 소유자를 정하고, Docker가 원본 경로에 접근할 수 있도록 디렉터리
+권한도 맞춘다.
 
 ```shell
 docker compose --env-file .env.staging -f compose.staging.yml config --quiet
