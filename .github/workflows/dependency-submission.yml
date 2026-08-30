@@ -6,11 +6,11 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  dependency-submission:
-    name: 의존성 그래프 생성과 제출
+  generate-dependency-graph:
+    name: 의존성 그래프 생성
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -23,7 +23,24 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Gradle 의존성 그래프 제출
-        uses: gradle/actions/dependency-submission@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      - name: Gradle 의존성 그래프 생성
+        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          dependency-graph: generate-and-submit
+          dependency-graph: generate-and-upload
+          cache-provider: basic
+          validate-wrappers: true
+
+  submit-dependency-graph:
+    name: 의존성 그래프 제출
+    needs: generate-dependency-graph
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Gradle 의존성 그래프 제출
+        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          dependency-graph: download-and-submit
+          cache-disabled: true
