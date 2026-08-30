@@ -114,6 +114,7 @@ jobs:
             -keyout "$staging_dir/service-tls-key.pem" \
             -out "$staging_dir/service-tls-cert.pem" \
             >/dev/null 2>&1
+          chmod 0444 "$staging_dir/service-tls-cert.pem" "$staging_dir/service-tls-key.pem"
           docker network create --internal "$service_network" >/dev/null
 
           export BRIEF_STAGING_DATABASE_PASSWORD_FILE="$staging_dir/database-password"
@@ -142,6 +143,8 @@ jobs:
           test -n "$service_api_id"
           test -z "$(docker port "$brief_id")"
           test -z "$(docker port "$service_api_id")"
+          test "$(docker inspect --format '{{.State.Status}}' "$service_api_id")" = "running"
+          test "$(docker inspect --format '{{.RestartCount}}' "$service_api_id")" = "0"
           test "$(docker inspect --format '{{.State.Health.Status}}' "$brief_id")" = "healthy"
           test "$(docker exec "$brief_id" id -u)" = "10001"
           docker inspect "$brief_id" | jq --exit-status \
