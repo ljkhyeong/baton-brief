@@ -46,6 +46,10 @@ PostgreSQL 18.4를 함께 기동한 선택 실행 테스트에서 다음 흐름�
 - 원본 심각도 변경과 `RESOLVED` 수렴
 - 현재·직전 Bearer 중첩 교체 구간
 
+두 교차 서비스 검증은 당시 PostgreSQL 18.4에서 수행했다. 현재 BRIEF의 채택 기준인
+PostgreSQL 18.6은 저장소 통합 테스트와 스테이징 조립에서 별도로 확인했으며, 같은 BATON
+교차 서비스 시나리오를 18.6 조합으로 다시 실행한 근거는 아니다.
+
 BATON 프로덕션 설정에 BRIEF HTTPS origin과 파일 기반 Bearer 주입을 연결했지만 실제 두
 스테이징 호스트 사이의 공인 HTTPS 전달은 아직 검증하지 않았다. 로컬 Caddy 내부 CA
 검증을 원격 전달 완료로 해석하지 않는다. 위 생산자·소비자 교차 검증은 계약 팩
@@ -118,24 +122,36 @@ serializer와 다시 검증해야 한다.
 
 `.github/workflows/verify.yml`은 pull request와 `main` push에서 Java 21을 사용한다.
 외부 Action은 전체 commit SHA로 고정했고 `gradle/actions/setup-gradle`이 Gradle 실행 전에
-wrapper JAR을 검증하고 캐시를 구성한다. 이어 `test :bootstrap:bootJar contractsZip`, 로컬·
-HTTPS profile의 Compose 구문, 고정 PostgreSQL 이미지 pull, 실제 Dockerfile 빌드와 Caddy
-설정 유효성을 검증한다. HTTPS profile도 실제로 기동해 BRIEF 호스트 포트 비게시, 내부
-네트워크, 비루트·읽기 전용 실행, Caddy capability, 신뢰한 내부 CA의 무인증 `401`·정상
-Bearer `202 APPLIED`, 외부 health `404`와 로그의 token 비노출을 확인한다. Dockerfile
-frontend도 digest로 고정한다. 전체 작업은 30분, Compose 기동은 180초로 제한하고
-실패하면 원래 종료 상태를 보존한 채 임시 컨테이너·네트워크·볼륨을 제거한다.
+wrapper JAR을 검증하고 `basic` cache provider로 캐시를 구성한다. 이어
+`test :bootstrap:bootJar contractsZip`, 로컬·HTTPS profile의 Compose 구문, 고정 PostgreSQL
+이미지 pull, 실제 Dockerfile 빌드와 Caddy 설정 유효성을 검증한다. HTTPS profile도 실제로
+기동해 BRIEF 호스트 포트 비게시, 내부 네트워크, 비루트·읽기 전용 실행, Caddy capability,
+신뢰한 내부 CA의 무인증 `401`·정상 Bearer `202 APPLIED`, 외부 health `404`와 로그의 token
+비노출을 확인한다. Dockerfile frontend도 digest로 고정한다. 전체 작업은 30분, Compose
+기동은 180초로 제한하고 실패하면 원래 종료 상태를 보존한 채 임시 컨테이너·네트워크·볼륨을
+제거한다.
 
 `.github/workflows/dependency-submission.yml`은 `main` push에서 Gradle 직접·전이 의존성
-그래프를 GitHub에 제출한다. 기존에 검증한 `gradle/actions` v4.4.3 commit SHA를
-사용하고 이 workflow에만 `contents: write`를 부여한다. GitHub 저장소의 Dependabot
-취약점 알림과 보안 업데이트는 2026-08-29에 활성화했다. `.github/dependabot.yml`은
-Gradle·GitHub Actions의 minor·patch를 생태계별로 묶고 major는 개별 후보로 남긴다.
-Dockerfile·Compose 이미지는 하나의 주간 pull request로 묶되 major 자동 후보는 제외한다.
+그래프 생성과 제출을 두 작업으로 분리한다. 소스를 체크아웃하고 Gradle을 실행하는 생성
+작업은 `contents: read`만 사용하고 wrapper를 검증한 뒤 그래프를 업로드한다. 생성 작업이
+성공하면 소스를 체크아웃하지 않는 제출 작업만 `actions: read`와 `contents: write`로 그래프를
+내려받아 제출한다. 두 Gradle workflow는 Node.js 24를 사용하는 `gradle/actions` v6.3.0의
+같은 commit SHA로 고정하고, MIT 허가의 `basic` cache provider를 명시해 별도 캐시
+구성요소를 사용하지 않는다.
 
-2026-08-28 PR #1의 최초 GitHub Actions 원격 실행에서 이전 검증 구성이 통과했다.
-보강한 검증 workflow와 의존성 그래프 최초 제출은 새 pull request와 `main` 병합 후
-원격 실행으로 확인해야 한다.
+GitHub 저장소의 Dependabot 취약점 알림과 보안 업데이트는 2026-08-29에 활성화했다.
+`.github/dependabot.yml`은 함께 유지해야 하는 Kotlin 플러그인만 minor·patch 그룹으로
+묶고 Gradle wrapper와 개별 라이브러리는 분리한다. GitHub Actions minor·patch는 함께
+제안하고 major 후보도 개별 pull request로 검토한다. JSON Schema 검증기 3.0.7은 테스트에
+Jackson 3.2.1 BOM을 적용해 제품과 classpath를 다르게 만들므로 정확히 이 버전만 제외한다.
+Dockerfile·Compose 이미지는 하나의 주간 pull request로 묶고 major 자동 후보는 제외한다.
+
+2026-08-29 PR #4 병합 뒤 기존 v4.4.3 구성의
+[저장소 검증](https://github.com/ljkhyeong/baton-brief/actions/runs/33262434555)과
+[의존성 그래프 최초 제출](https://github.com/ljkhyeong/baton-brief/actions/runs/33262434669)이
+성공했다. JSON Schema 검증기는 3.0.6을 유지하고 Spring Boot BOM으로 제품과 테스트의
+Jackson 3.1.5가 일치하는 것과 저장소 전체 검증을 확인했다. v6.3.0 Action과 분리 제출은 이
+변경의 첫 pull request와 `main` 실행 전이므로 원격 성공으로 기록하지 않는다.
 
 ## 미검증·미결정 범위
 
@@ -150,8 +166,14 @@ Dockerfile·Compose 이미지는 하나의 주간 pull request로 묶되 major �
 - Gradle dependency verification metadata의 신뢰 가능한 최초 checksum 검토와
   플랫폼 간 유지 절차. 현재 wrapper 배포본 checksum과 최소 CI를 우선하고, 실제 작업
   의존성에서 생성된 대규모 metadata는 검토 없이 추가하지 않는다.
-- `gradle/actions` v6의 별도 캐시 구성요소 이용약관 검토와 major 전환. 이 결정 전에는
-  현재 검증한 v4.4.3 commit SHA를 유지한다.
+- Kotlin Gradle plugin의 `GHSA-r937-wjx7-w2jp`는 build cache metadata 역직렬화에 영향을
+  주지만 안정 패치가 아직 없다. `main`만 쓰는 Actions 캐시 경계를 유지하고
+  `2.4.20-RC2` 같은 사전 릴리스를 경고 제거만을 위해 채택하지 않으며 안정 버전과 ADR 변경을
+  함께 검토한다.
+- Spring Boot Gradle plugin이 빌드 classpath로 가져오는 Commons Lang의
+  `GHSA-j288-q9x7-2f5v`는 제품 실행 의존성이 아니다. 현재 고정 입력의 Gradle 스크립트가
+  취약 메서드에 외부 입력을 전달하지 않으므로 임의 강제 버전을 추가하지 않고 Spring Boot
+  후속 패치나 검증된 build classpath 제약을 따로 검토한다.
 - 라이선스
 
 ## 다음 진입점
