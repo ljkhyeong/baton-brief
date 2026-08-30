@@ -181,13 +181,6 @@ jobs:
           while IFS= read -r network; do
             test "$(docker network inspect --format '{{.Internal}}' "$network")" = "true"
           done <<< "$service_api_networks"
-          service_api_full_id="$(docker inspect --format '{{.Id}}' "$service_api_id")"
-          service_api_ip="$(
-            docker network inspect "$service_network" \
-              | jq --raw-output --arg container "$service_api_full_id" \
-                '.[0].Containers[$container].IPv4Address | split("/")[0]'
-          )"
-          test -n "$service_api_ip"
 
           for attempt in $(seq 1 30); do
             if docker cp \
@@ -236,36 +229,36 @@ jobs:
           test "$health_status" = "404"
 
           service_response="$(
-            docker run --rm --network "$service_network" \
+            docker run --rm --network "container:$service_api_id" \
               --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
               "$curl_image" \
-              --silent --show-error --fail \
+              --silent --show-error --fail --connect-timeout 5 --max-time 10 \
               --cacert /tmp/service-tls-cert.pem \
-              --resolve "brief-service:8443:$service_api_ip" \
+              --resolve 'brief-service:8443:127.0.0.1' \
               --header="Authorization: Bearer $service_token" \
               'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
           )"
           jq --exit-status '.items | length == 1' <<< "$service_response"
 
           service_unauthenticated_status="$(
-            docker run --rm --network "$service_network" \
+            docker run --rm --network "container:$service_api_id" \
               --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
               "$curl_image" \
-              --silent --show-error \
+              --silent --show-error --connect-timeout 5 --max-time 10 \
               --cacert /tmp/service-tls-cert.pem \
-              --resolve "brief-service:8443:$service_api_ip" \
+              --resolve 'brief-service:8443:127.0.0.1' \
               --output /dev/null --write-out '%{http_code}' \
               'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
           )"
           test "$service_unauthenticated_status" = "401"
 
           service_health_status="$(
-            docker run --rm --network "$service_network" \
+            docker run --rm --network "container:$service_api_id" \
               --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
               "$curl_image" \
-              --silent --show-error \
+              --silent --show-error --connect-timeout 5 --max-time 10 \
               --cacert /tmp/service-tls-cert.pem \
-              --resolve "brief-service:8443:$service_api_ip" \
+              --resolve 'brief-service:8443:127.0.0.1' \
               --header="Authorization: Bearer $service_token" \
               --output /dev/null --write-out '%{http_code}' \
               'https://brief-service:8443/actuator/health'
