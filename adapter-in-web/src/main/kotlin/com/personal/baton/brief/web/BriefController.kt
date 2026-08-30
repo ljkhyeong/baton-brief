@@ -11,6 +11,7 @@ import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.SourceEventType
+import io.micrometer.core.instrument.MeterRegistry
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
@@ -35,12 +36,14 @@ import org.springframework.web.server.ResponseStatusException
 @RequestMapping("/api/v1")
 class BriefController(
     private val brief: BriefUseCases,
+    private val meterRegistry: MeterRegistry,
 ) {
     @PostMapping("/events")
     fun ingest(
         @Valid @RequestBody request: SourceEventRequest,
     ): ResponseEntity<IngestResponse> {
         val result = brief.ingest(request.toDomain())
+        meterRegistry.counter("brief.events.received", "outcome", result.status.name).increment()
         val status = when (result.status) {
             IngestStatus.APPLIED,
             IngestStatus.APPLIED_WITH_GAP,
