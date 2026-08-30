@@ -71,10 +71,22 @@ serializer와 다시 검증해야 한다.
 
 `bootstrap`의 `runtimeClasspath`와 `testRuntimeClasspath`에서 `kotlin-stdlib`·
 `kotlin-reflect`가 모두 2.4.10으로 해석되며 실행 JAR에도 두 라이브러리의 2.4.10이 포함된다.
-Kotlin 플러그인과 BOM은 같은 version catalog 값을 사용한다. 제품 코드·검증 코드를
-추가하지 않았고 Spring Boot 4.1.1·Jackson 3.1.5·PostgreSQL 18.6과 계약 팩 버전은 유지했다.
+Kotlin 플러그인과 BOM은 같은 version catalog 값을 사용한다. Kotlin 갱신에서는 제품 코드·
+검증 코드를 추가하지 않았고 Spring Boot 4.1.1·Jackson 3.1.5·PostgreSQL 18.6과 계약 팩 버전은 유지했다.
 Gradle 9.7.1 자동 제안은 Kotlin 2.4.10의 완전 지원 상한인 9.5.0을 넘으므로 보류했다.
 기술 선택의 근거는 [ADR-0002](docs/ADR/0002_technology-stack/adr.md)를 따른다.
+
+같은 날 표준 API 정리 뒤에도 위 저장소 전체 검증이 성공했다. 단순 JDBC 행 매핑 6종은
+Spring `SimplePropertyRowMapper`로 바꾸고, 주간 구간을 포함한 에디션 조립은 유지했다.
+`query(Class)`의 nullable 행 반환 선언에 맞추기 위해 검증이나 강제 캐스팅을 추가하지 않고
+표준 매퍼 인스턴스를 재사용한다. 재구축 저장은 `NamedParameterJdbcOperations.batchUpdate`로
+묶었으며 기존 트랜잭션·잠금과 실패 롤백, 이전 에디션의 리비전 근거 `null` 호환성을 확인했다.
+
+계약 테스트의 JSON 값 변경은 Jackson `ObjectNode`로 처리하고, HTTP의 원문 JSON token
+검증은 유지했다. 이벤트 token 검증 결과는 비공개 Kotlin `lazy` 값으로 재사용한다.
+인증 비활성일 때 token 없이 기동하고 활성일 때 필수 token 누락으로 실패하는 경계와
+이벤트·서비스 token 분리와 현재·직전 token 수락의 기존 테스트를 확인했다. 변경 없는 도메인 테스트와 계약
+ZIP은 Gradle의 기존 성공 산출물을 재사용했으며 새 테스트 도구나 의존성은 추가하지 않았다.
 
 주요 통합 증거는 다음 계약을 포함한다.
 
