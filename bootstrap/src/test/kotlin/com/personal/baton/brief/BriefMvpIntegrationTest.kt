@@ -1525,7 +1525,8 @@ class BriefMvpIntegrationTest(
             state = SourceEventState.ACTIVE,
         )
 
-        Executors.newFixedThreadPool(2).use { executor ->
+        val executor = Executors.newFixedThreadPool(2)
+        try {
             val rebuild = executor.submit<RebuildResult> {
                 persistence.rebuild { receivedEvent, current ->
                     rebuildStarted.countDown()
@@ -1533,48 +1534,48 @@ class BriefMvpIntegrationTest(
                     AttentionProjector.project(receivedEvent, current)
                 }
             }
-            try {
-                assertThat(rebuildStarted.await(10, TimeUnit.SECONDS)).isTrue()
-                val ingest = executor.submit<IngestResult> {
-                    persistence.processEvent(
-                        event = supportedEvent,
-                        fingerprint = "a".repeat(64),
-                        receivedAt = receivedAt,
-                        conflictDetectedAt = { receivedAt },
-                    ) { current ->
-                        AttentionProjector.project(supportedEvent, current)
-                    }
+            assertThat(rebuildStarted.await(10, TimeUnit.SECONDS)).isTrue()
+            val ingest = executor.submit<IngestResult> {
+                persistence.processEvent(
+                    event = supportedEvent,
+                    fingerprint = "a".repeat(64),
+                    receivedAt = receivedAt,
+                    conflictDetectedAt = { receivedAt },
+                ) { current ->
+                    AttentionProjector.project(supportedEvent, current)
                 }
-
-                await()
-                    .pollDelay(0, TimeUnit.MILLISECONDS)
-                    .pollInterval(10, TimeUnit.MILLISECONDS)
-                    .atMost(10, TimeUnit.SECONDS)
-                    .until {
-                        jdbc.sql(
-                            """
-                            SELECT EXISTS (
-                                SELECT 1
-                                  FROM pg_locks
-                                 WHERE database = (
-                                           SELECT oid
-                                             FROM pg_database
-                                            WHERE datname = current_database()
-                                       )
-                                   AND locktype = 'advisory'
-                                   AND mode = 'ShareLock'
-                                   AND NOT granted
-                            )
-                            """.trimIndent(),
-                        ).query(Boolean::class.java).single()
-                    }
-                releaseRebuild.countDown()
-
-                rebuild.get(10, TimeUnit.SECONDS)
-                assertThat(ingest.get(10, TimeUnit.SECONDS).status).isEqualTo(IngestStatus.APPLIED)
-            } finally {
-                releaseRebuild.countDown()
             }
+
+            await()
+                .pollDelay(0, TimeUnit.MILLISECONDS)
+                .pollInterval(10, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until {
+                    jdbc.sql(
+                        """
+                        SELECT EXISTS (
+                            SELECT 1
+                              FROM pg_locks
+                             WHERE database = (
+                                       SELECT oid
+                                         FROM pg_database
+                                        WHERE datname = current_database()
+                                   )
+                               AND locktype = 'advisory'
+                               AND mode = 'ShareLock'
+                               AND NOT granted
+                        )
+                        """.trimIndent(),
+                    ).query(Boolean::class.java).single()
+                }
+            releaseRebuild.countDown()
+
+            rebuild.get(10, TimeUnit.SECONDS)
+            assertThat(ingest.get(10, TimeUnit.SECONDS).status).isEqualTo(IngestStatus.APPLIED)
+        } finally {
+            releaseRebuild.countDown()
+            executor.shutdownNow()
+            executor.awaitTermination(10, TimeUnit.SECONDS)
         }
         assertThat(
             jdbc.sql(
@@ -1603,8 +1604,9 @@ class BriefMvpIntegrationTest(
             .content(json),
     )
 
-    private fun concurrentStatuses(request: () -> Int): List<Int> =
-        Executors.newFixedThreadPool(2).use { executor ->
+    private fun concurrentStatuses(request: () -> Int): List<Int> {
+        val executor = Executors.newFixedThreadPool(2)
+        return try {
             val barrier = CyclicBarrier(2)
             List(2) {
                 executor.submit<Int> {
@@ -1612,7 +1614,11 @@ class BriefMvpIntegrationTest(
                     request()
                 }
             }.map { it.get(10, TimeUnit.SECONDS) }.sorted()
+        } finally {
+            executor.shutdownNow()
+            executor.awaitTermination(10, TimeUnit.SECONDS)
         }
+    }
 
     private fun contractEvent(fileName: String): String =
         ClassPathResource("contracts/examples/$fileName")
