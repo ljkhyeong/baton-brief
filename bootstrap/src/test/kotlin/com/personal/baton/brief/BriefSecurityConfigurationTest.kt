@@ -22,6 +22,22 @@ class BriefSecurityConfigurationTest {
         )
 
     @Test
+    fun `이벤트 인증을 켠 경우에만 필수 토큰을 검증한다`() {
+        contextRunner.run { context ->
+            assertThat(context).hasNotFailed()
+        }
+        contextRunner
+            .withPropertyValues("brief.event-receiver.authentication-required=true")
+            .run { context ->
+                assertThat(context).hasFailed()
+                assertThat(context.startupFailure)
+                    .hasRootCauseMessage(
+                        "BRIEF 이벤트 수신 현재 bearer token은 32~200자의 URL-safe ASCII여야 합니다",
+                    )
+            }
+    }
+
+    @Test
     fun `이벤트와 서비스 API 토큰이 겹치면 기동하지 않는다`() {
         contextRunner
             .withPropertyValues(
