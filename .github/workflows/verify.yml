@@ -91,7 +91,7 @@ jobs:
             trap - EXIT
             set +e
             "${compose[@]}" down --volumes --remove-orphans || cleanup_status=$?
-            docker network rm "$service_network" >/dev/null 2>&1 || true
+            docker network rm "$service_network" >/dev/null || cleanup_status=$?
             rm -rf "$staging_dir" || cleanup_status=$?
             if ((original_status != 0)); then
               exit "$original_status"
