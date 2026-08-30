@@ -48,7 +48,8 @@ BRIEF 서비스 전용 Caddy만 연결한다.
 - BATON `app`은 `https://<BRIEF_SERVICE_HOST>:8443` origin만 사용하고 운영자가 제공한
   truststore로 서버 인증서를 검증한다.
 - 서비스 Caddy는 `BRIEF_SERVICE_HOST`를 SAN으로 포함한 인증서와 private key를 파일 기반
-  Compose secret으로 받는다. 호스트 포트는 게시하지 않는다.
+  Compose secret으로 받는다. 두 파일은 다른 호스트 사용자가 쓸 수 없고 컨테이너 UID/GID
+  `10001`이 읽을 수 있어야 한다. 호스트 포트는 게시하지 않는다.
 - 서비스 Caddy 이미지는 digest로 고정한 Caddy에서 불필요한 실행 파일 file capability를
   제거하고 UID/GID `10001`로 실행한다. 런타임 capability는 모두 제거한다.
 - 서비스 Caddy는 기존 내부 `proxy` 네트워크에서 BRIEF `8080`으로 전달하며 정확한 조회·

@@ -152,7 +152,9 @@ BRIEF_EVENT_RECEIVER_BEARER_TOKEN=<32~200자의 URL-safe ASCII 값>
 BATON 백엔드 경유 조회·생성 연결은 이벤트 token을 재사용하지 않는다. 같은 호스트에서
 연결할 때도 서비스 전용 HTTPS를 사용한다. 운영자는 내부 네트워크를 한 번 만들고
 `BRIEF_SERVICE_HOST`를 SAN으로 포함한 인증서·private key 경로를 설정한 뒤 서비스 API
-override를 함께 적용한다.
+override를 함께 적용한다. 해당 파일은 호스트의 다른 사용자가 쓸 수 없어야 하고 컨테이너
+UID/GID `10001`이 읽을 수 있어야 한다. 일반 Linux Compose 배포에서는 인증서는 `0444`,
+private key는 소유자를 `10001:10001`로 둔 `0400`을 권장하며 비밀 디렉터리 접근도 제한한다.
 
 ```shell
 docker network create --internal baton-brief-private
