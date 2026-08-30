@@ -25,6 +25,7 @@
 | [PRD-0004 표준 요청 오류](PRD/0004_problem-detail/spec.md) | 채택됨 | RFC 9457 `ProblemDetail` 적용 범위와 비노출 경계 |
 | [PRD-0006 최소 상태 확인](PRD/0006_minimum-health/spec.md) | 채택됨 | Spring Boot aggregate health와 DB contributor |
 | [PRD-0008 보존·재구축 경계](PRD/0008_retention-rebuild-boundary/spec.md) | 채택됨 | `retain-all`, 원자적 재구축과 동시성 경계 |
+| [PRD-0026 이벤트 수신 결과 계측](PRD/0026_event-ingestion-metrics/spec.md) | 채택됨 | 결과별 프로세스 내 카운터와 지표 비노출 경계 |
 
 ## 수신 이벤트와 증거
 
@@ -85,6 +86,7 @@
 
 ## 다른 기준 자료
 
+- [PostgreSQL 수동 백업·격리 복원](operations/postgresql-backup-restore.md)
 - [이벤트 v2 계약 팩](../contracts/README.md)
 - [현재 검증과 다음 작업](../HANDOFF.md)
 - [개발 작업 규칙](../AGENTS.md)

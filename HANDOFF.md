@@ -76,6 +76,29 @@ BATON 프로덕션 설정에 BRIEF HTTPS origin과 파일 기반 Bearer 주입�
 
 ## 현재 검증 근거
 
+### 수신 계측과 수동 백업·복원
+
+PRD-0026에 따라 웹 어댑터가 Micrometer `brief.events.received`에 수신 결과별 요청 수를
+기록한다. 기존 Actuator 자동 구성을 사용하고 `outcome` 외 식별자 태그는 넣지 않는다.
+외부 수집·경보와 지표 HTTP 노출은 활성화하지 않았다.
+
+2026-08-30 기존 수신·health 대상 테스트에서 여섯 결과의 증가량과 `/actuator/metrics`의
+비노출을 확인한 뒤 `./gradlew --no-daemon test :bootstrap:bootJar`가 성공했다. 변경 없는
+도메인 테스트는 Gradle의 기존 성공 결과를 재사용했다. 계약 팩·스키마·Compose와 Caddy는
+바꾸지 않아 ZIP 생성과 컨테이너 이미지·HTTPS 조립은 반복하지 않았다.
+
+같은 실행 JAR과 Java 21, 고정 PostgreSQL 18.6 이미지의 별도 검증 DB 두 개로 `pg_dump`
+custom 백업과 빈 DB의 `pg_restore --no-owner --no-privileges --single-transaction`을
+확인했다. 수신·최초 충돌·현재 투영·에디션·항목·Flyway 이력 여섯 테이블의 전체 행이 같았고,
+복원 DB에 연결한 JAR에서 중복 재전달·재구축·기존 에디션과 `ETag` 보존, 수신 순서 `4→5`와
+에디션 세대 `2→3`의 연속성을 확인했다. 백업은 `0600`으로 생성했고 검증 뒤 두 DB 컨테이너와
+임시 덤프를 제거했다. 기존 사용자 컨테이너와 데이터는 변경하지 않았다.
+
+이 검증은 소량의 계약 예시 데이터와 loopback HTTP·로컬 인증 비활성 설정을 사용했다.
+운영 비밀·HTTPS·대용량·원격 보관소·백업 이후 BATON 재전달과 운영 DB 전환은 검증하지 않았다.
+[수동 백업·격리 복원 절차](docs/operations/postgresql-backup-restore.md)는 자동 백업 정책이나
+운영 RPO·RTO를 채택하지 않는다.
+
 ### 저장소 전체
 
 ```shell
@@ -280,7 +303,8 @@ Jackson 3.1.5가 일치하는 것과 저장소 전체 검증을 확인했다.
 - 실제 TCP 응답 절단이나 프로세스 중단 뒤 BATON 생성 실행 재시도
 - WATCH·RELAY·GO 생산자 연동과 브로커
 - 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관과 숫자 보존 기간
-- 재구축 SLO·잠금 제한 시간, 체크포인트, 백업·복구와 RPO·RTO
+- 재구축 SLO·잠금 제한 시간, 체크포인트, 운영 백업 보관 정책·복구 전환과 RPO·RTO
+- 수신 지표의 비공개 수집 경로·인증·수집 시스템과 경보
 - Caddy 인증서 볼륨 소유권을 포함한 비루트 전환과 다중 인스턴스 고가용성
 - 이미지 registry와 릴리스 정책
 - Gradle dependency verification metadata의 신뢰 가능한 최초 checksum 검토와
