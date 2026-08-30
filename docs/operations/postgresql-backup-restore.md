@@ -85,10 +85,50 @@ DB를 지우지 않는다. `--single-transaction`은 오류 시 종료하고 복
 전역 역할·비밀번호, Compose 비밀, TLS 인증서와 애플리케이션 이미지를 보관하지 않는다.
 필요한 실행 환경과 비밀 복구는 별도 운영 절차로 준비한다.
 
+## 검증 전용 애플리케이션 실행
+
+서비스 API 인증을 켠 인스턴스에서는 수신 증거·재구축 경로가 차단된다. 복원 확인에는
+백업 시점과 맞는 실행 JAR을 사용하는 별도 로컬 프로세스를 띄운다. 운영 프로세스·Compose
+설정을 바꾸거나 Caddy·BATON 공유 네트워크에 검증 인스턴스를 연결하지 않는다.
+
+- 접근이 통제된 검증 호스트에서 Java 21을 사용한다. 운영용 Spring 설정·프로필·JVM 옵션을
+  주입하지 않은 별도 Bash 세션에서 실행한다.
+- 복원 DB 컨테이너의 `5432`를 호스트의 `127.0.0.1`에만 게시한다. `docker port
+  "$brief_restore_container" 5432/tcp` 출력의 주소와 포트를 확인하고 아래 값에 반영한다.
+  원본 DB의 포트·역할·비밀번호는 재사용하지 않는다.
+- `brief_restore_secrets`는 복원 검증 전용 비밀 디렉터리의 실제 절대 경로다. 복원 역할의
+  비밀번호를 `spring.datasource.password` 파일로 준비하고 디렉터리는 `0700`, 파일은
+  `0600`으로 제한한다. 운영 비밀 파일이나 Bearer를 복사하지 않고 DB 비밀번호 인증을
+  유지한다.
+
+아래 값은 실제 검증 대상 값으로 바꾼다. DB 이름과 역할은 앞 단계에서 복원한 대상과
+일치해야 한다.
+
+```bash
+brief_restore_jar=/absolute/backup-matched/bootstrap.jar
+brief_restore_secrets=/absolute/restore-only/secrets
+brief_restore_db_port=15432
+brief_restore_db=brief_restore
+brief_restore_role=brief_restore_owner
+
+java -jar "$brief_restore_jar" \
+  --spring.config.location=classpath:/application.yml \
+  "--spring.config.import=configtree:$brief_restore_secrets/" \
+  "--spring.datasource.url=jdbc:postgresql://127.0.0.1:$brief_restore_db_port/$brief_restore_db" \
+  "--spring.datasource.username=$brief_restore_role" \
+  --server.address=127.0.0.1 \
+  --server.port=0 \
+  --brief.event-receiver.authentication-required=false \
+  --brief.service-api.authentication-required=false
+```
+
+설정 파일은 JAR 내부 기본값과 지정한 비밀 디렉터리만 읽는다. 인증 비활성은 이 검증
+프로세스에만 적용하며 운영 인증은 유지한다. 기동 로그에서 자동 할당된 HTTP 포트를 확인해
+같은 호스트의 별도 터미널에서 `http://127.0.0.1:<할당된 포트>`로만 호출한다.
+
 ## 복원 확인
 
-백업 시점과 맞는 애플리케이션 산출물을 복원 DB에 연결한다. 원본 DB 연결 설정을 재사용하지
-말고 검증 인스턴스의 대상 DB를 먼저 확인한다. 다음 내용을 한 번 확인한다.
+앞 단계의 검증 전용 애플리케이션에서 다음 내용을 한 번 확인한다.
 
 1. Flyway 이력과 기대한 스키마로 애플리케이션이 기동하고 aggregate health가 정상이다.
 2. 대표 수신 기록·최초 충돌·기존 에디션과 고정 항목이 백업 전과 같다. `UNSUPPORTED`도

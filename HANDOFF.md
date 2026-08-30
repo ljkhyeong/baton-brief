@@ -94,6 +94,11 @@ custom 백업과 빈 DB의 `pg_restore --no-owner --no-privileges --single-trans
 에디션 세대 `2→3`의 연속성을 확인했다. 백업은 `0600`으로 생성했고 검증 뒤 두 DB 컨테이너와
 임시 덤프를 제거했다. 기존 사용자 컨테이너와 데이터는 변경하지 않았다.
 
+복원 절차에 추가한 검증 전용 JAR 명령도 같은 산출물과 별도 PostgreSQL 18.6 DB로 기동했다.
+config tree 비밀번호 연결, DB·HTTP의 loopback 바인딩, aggregate health와 로컬 무인증
+수신·증거 조회·재구축을 확인하고 임시 자원을 정리했다. 이 추가 확인은 실행 설정만
+검증했으며 백업·복원 전체 시나리오와 전체 테스트·빌드는 반복하지 않았다.
+
 이 검증은 소량의 계약 예시 데이터와 loopback HTTP·로컬 인증 비활성 설정을 사용했다.
 운영 비밀·HTTPS·대용량·원격 보관소·백업 이후 BATON 재전달과 운영 DB 전환은 검증하지 않았다.
 [수동 백업·격리 복원 절차](docs/operations/postgresql-backup-restore.md)는 자동 백업 정책이나
