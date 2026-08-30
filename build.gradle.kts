@@ -15,6 +15,10 @@ allprojects {
 
 subprojects {
     pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+        dependencies {
+            add("implementation", platform(libs.kotlin.bom))
+        }
+
         extensions.configure<KotlinJvmProjectExtension> {
             jvmToolchain(21)
         }
