@@ -271,19 +271,24 @@ jobs:
           )"
           test "$service_health_status" = "404"
 
-          if docker logs "$brief_id" 2>&1 | grep --fixed-strings --quiet "$event_token"; then
+          # 로그 수집 실패는 즉시 중단하고 grep의 조기 종료와 분리한다.
+          brief_logs="$(docker logs "$brief_id" 2>&1)"
+          https_logs="$(docker logs "$https_id" 2>&1)"
+          service_api_logs="$(docker logs "$service_api_id" 2>&1)"
+
+          if grep --fixed-strings --quiet "$event_token" <<< "$brief_logs"; then
             echo "BRIEF 로그에 Bearer token이 노출됐습니다." >&2
             exit 1
           fi
-          if docker logs "$https_id" 2>&1 | grep --fixed-strings --quiet "$event_token"; then
+          if grep --fixed-strings --quiet "$event_token" <<< "$https_logs"; then
             echo "Caddy 로그에 Bearer token이 노출됐습니다." >&2
             exit 1
           fi
-          if docker logs "$brief_id" 2>&1 | grep --fixed-strings --quiet "$service_token"; then
+          if grep --fixed-strings --quiet "$service_token" <<< "$brief_logs"; then
             echo "BRIEF 로그에 서비스 API Bearer token이 노출됐습니다." >&2
             exit 1
           fi
-          if docker logs "$service_api_id" 2>&1 | grep --fixed-strings --quiet "$service_token"; then
+          if grep --fixed-strings --quiet "$service_token" <<< "$service_api_logs"; then
             echo "서비스 Caddy 로그에 Bearer token이 노출됐습니다." >&2
             exit 1
           fi
