@@ -12,9 +12,9 @@ BATON 사용자 계정이나 멤버십을 복제하지 않는다.
 
 ## 허용 경로
 
-서비스 자격 증명은 다음 기존 경로와 메서드에만 권한을 준다.
+서비스 자격 증명은 다음 경로와 메서드에만 권한을 준다.
 
-- 현재 관심 항목 단건·상태별 목록·전이 이력 `GET`
+- 현재 관심 항목 단건·상태별 목록·전이 이력과 PRD-0027의 활성 요약 `GET`
 - 에디션 전역 최신·주간 최신·단건·이력·비교 `GET`
 - `POST /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions`
 
@@ -96,6 +96,7 @@ BRIEF 서비스 전용 Caddy만 연결한다.
 ## 관련 문서
 
 - [BATON 백엔드 경유 조회](../0023_baton-mediated-brief-query/spec.md)
+- [현재 활성 관심 항목 요약](../0027_attention-item-summary/spec.md)
 - [BATON 주도 에디션 생성](../0024_baton-driven-edition-generation/spec.md)
 - [이벤트 수신 인증](../0020_baton-event-authentication/spec.md)
 - [서비스 API 인증 결정](../../ADR/0007_baton-service-api-security/adr.md)

@@ -51,6 +51,8 @@ BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운�
 
 - `(workspaceId, seasonId, eventType, sourceReference)`를 복합 정체성으로 사용한다.
 - 현재 단건과 `ACTIVE`·`RESOLVED` 상태별 키셋 목록을 조회한다.
+- 작업공간·시즌별 활성 `HIGH`·`MEDIUM` 개수와 리비전 공백이 기록된 활성 항목 수를
+  [요약 API](docs/PRD/0027_attention-item-summary/spec.md)로 조회한다.
 - 실제 적용된 상태 전이를 집계 리비전 역순으로 조회하고 전이 시점의 공백 탐지와 현재의
   누적 공백을 구분한다.
 - 단건 응답은 현재 규칙 버전과 마지막 적용 리비전에 결합한 `ETag`를 제공한다.
