@@ -21,6 +21,7 @@ import com.personal.baton.brief.domain.AttentionProjector
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.ProjectionDecision
+import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
@@ -188,26 +189,32 @@ class JdbcBriefPersistenceAdapter(
         workspaceId: UUID,
         seasonId: UUID,
         status: SourceEventState,
+        severity: Severity?,
+        revisionGap: Boolean?,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage {
-        val afterClause = if (after == null) {
-            ""
-        } else {
-            """
-            AND (event_type, source_reference) > (:afterEventType, :afterSourceReference)
-            """.trimIndent()
-        }
         val parameters = mutableMapOf<String, Any>(
             "workspaceId" to workspaceId,
             "seasonId" to seasonId,
             "status" to status.name,
             "fetchLimit" to limit + 1,
         )
-        if (after != null) {
-            parameters["afterEventType"] = after.eventType.name
-            parameters["afterSourceReference"] = after.sourceReference
-        }
+        val additionalConditions = buildList {
+            if (after != null) {
+                add("AND (event_type, source_reference) > (:afterEventType, :afterSourceReference)")
+                parameters["afterEventType"] = after.eventType.name
+                parameters["afterSourceReference"] = after.sourceReference
+            }
+            severity?.let {
+                add("AND severity = :severity")
+                parameters["severity"] = it.name
+            }
+            revisionGap?.let {
+                add("AND revision_gap = :revisionGap")
+                parameters["revisionGap"] = it
+            }
+        }.joinToString("\n")
 
         val fetched = jdbc.sql(
             """
@@ -215,7 +222,7 @@ class JdbcBriefPersistenceAdapter(
              WHERE workspace_id = :workspaceId
                AND season_id = :seasonId
                AND item_status = :status
-               $afterClause
+               $additionalConditions
              ORDER BY event_type, source_reference
              LIMIT :fetchLimit
             """.trimIndent(),

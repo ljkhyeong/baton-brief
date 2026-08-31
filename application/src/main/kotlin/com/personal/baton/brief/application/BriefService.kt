@@ -4,6 +4,7 @@ import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.AttentionProjector
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
+import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
@@ -65,12 +66,16 @@ class BriefService(
         workspaceId: UUID,
         seasonId: UUID,
         status: SourceEventState,
+        severity: Severity?,
+        revisionGap: Boolean?,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage = persistence.findAttentionItems(
         workspaceId,
         seasonId,
         status,
+        severity,
+        revisionGap,
         after,
         limit,
     )

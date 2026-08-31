@@ -108,6 +108,8 @@ class BriefController(
             workspaceId,
             seasonId,
             request.status,
+            request.severity,
+            request.revisionGap,
             request.toCursor(),
             limit,
         ),

@@ -128,6 +128,8 @@ data class EditionWeekRequest(
 
 data class CurrentAttentionItemPageRequest(
     val status: SourceEventState = SourceEventState.ACTIVE,
+    val severity: Severity? = null,
+    val revisionGap: Boolean? = null,
     val afterEventType: SourceEventType? = null,
     @field:CodePointLength(max = 128)
     @field:Pattern(regexp = SOURCE_REFERENCE_PATTERN)
