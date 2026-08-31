@@ -47,6 +47,7 @@
 | [PRD-0016 상태 전이 증거](PRD/0016_attention-item-transitions/spec.md) | 채택됨 | 실제 적용 전이의 집계 리비전 키셋 조회 |
 | [PRD-0017 현재 단건 조건부 조회](PRD/0017_current-attention-item-etag/spec.md) | 채택됨 | 현재 표현의 `ETag`와 `If-None-Match` |
 | [PRD-0027 현재 활성 항목 요약](PRD/0027_attention-item-summary/spec.md) | 채택됨 | 활성 심각도별 개수와 리비전 공백 항목 수 |
+| [PRD-0028 심각도·공백 필터](PRD/0028_attention-item-filters/spec.md) | 채택됨 | 기존 현재 목록의 선택 필터와 키셋 조건 유지 |
 
 ## 불변 에디션
 

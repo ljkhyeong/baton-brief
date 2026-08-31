@@ -34,6 +34,9 @@ GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary
 리비전 공백 개수는 심각도별 개수와 겹친다. 세 값을 더해 전체 개수로 사용하지 않는다.
 `highCount + mediumCount`가 해당 범위의 현재 활성 항목 수다.
 
+해당 항목의 목록은 [PRD-0028](../0028_attention-item-filters/spec.md)의 기존 목록 필터로
+조회한다. 요약에는 필터 매개변수를 추가하지 않는다.
+
 활성 항목이 없는 범위는 세 값 모두 `0`으로 반환한다. BRIEF는 작업공간·시즌의 원본 존재나
 사용자 권한을 판정하지 않으므로 빈 요약을 `404`로 바꾸지 않는다. 잘못된 UUID는 기존
 Spring MVC 변환과 PRD-0004의 `400 Bad Request`·`ProblemDetail`을 따른다.

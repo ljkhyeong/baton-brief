@@ -50,7 +50,8 @@ BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운�
 ### 현재 관심 항목
 
 - `(workspaceId, seasonId, eventType, sourceReference)`를 복합 정체성으로 사용한다.
-- 현재 단건과 `ACTIVE`·`RESOLVED` 상태별 키셋 목록을 조회한다.
+- 현재 단건과 `ACTIVE`·`RESOLVED` 상태별 키셋 목록을 조회하고,
+  [심각도·리비전 공백 필터](docs/PRD/0028_attention-item-filters/spec.md)로 목록을 좁힌다.
 - 작업공간·시즌별 활성 `HIGH`·`MEDIUM` 개수와 리비전 공백이 기록된 활성 항목 수를
   [요약 API](docs/PRD/0027_attention-item-summary/spec.md)로 조회한다.
 - 실제 적용된 상태 전이를 집계 리비전 역순으로 조회하고 전이 시점의 공백 탐지와 현재의
