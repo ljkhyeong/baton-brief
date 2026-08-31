@@ -61,6 +61,12 @@ data class CurrentAttentionItemPage(
     val nextCursor: AttentionItemCursor?,
 )
 
+data class CurrentAttentionItemSummary(
+    val highCount: Long,
+    val mediumCount: Long,
+    val revisionGapCount: Long,
+)
+
 data class AttentionItemTransition(
     val eventId: UUID,
     val aggregateRevision: Long,
@@ -175,6 +181,8 @@ interface BriefUseCases {
         limit: Int,
     ): CurrentAttentionItemPage
 
+    fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary
+
     fun findAttentionItemTransitions(
         workspaceId: UUID,
         seasonId: UUID,
@@ -249,6 +257,8 @@ interface BriefPersistencePort {
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage
+
+    fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary
 
     fun findAttentionItemTransitions(
         workspaceId: UUID,

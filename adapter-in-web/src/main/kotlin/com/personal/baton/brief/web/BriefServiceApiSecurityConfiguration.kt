@@ -99,6 +99,7 @@ class BriefServiceApiSecurityConfiguration {
         val SERVICE_API: RequestMatcher = OrRequestMatcher(
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current"),
+            pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest"),

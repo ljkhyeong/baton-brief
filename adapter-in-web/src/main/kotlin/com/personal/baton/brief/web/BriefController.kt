@@ -2,6 +2,7 @@ package com.personal.baton.brief.web
 
 import com.personal.baton.brief.application.AttentionItemTransitionHistory
 import com.personal.baton.brief.application.BriefUseCases
+import com.personal.baton.brief.application.CurrentAttentionItemSummary
 import com.personal.baton.brief.application.EditionComparison
 import com.personal.baton.brief.application.EditionComparisonResult
 import com.personal.baton.brief.application.EditionHistoryResult
@@ -111,6 +112,12 @@ class BriefController(
             limit,
         ),
     )
+
+    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary")
+    fun findAttentionItemSummary(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+    ): CurrentAttentionItemSummary = brief.findAttentionItemSummary(workspaceId, seasonId)
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions")
     fun findAttentionItemTransitions(

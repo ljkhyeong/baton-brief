@@ -75,6 +75,9 @@ class BriefService(
         limit,
     )
 
+    override fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary =
+        persistence.findAttentionItemSummary(workspaceId, seasonId)
+
     override fun findAttentionItemTransitions(
         workspaceId: UUID,
         seasonId: UUID,

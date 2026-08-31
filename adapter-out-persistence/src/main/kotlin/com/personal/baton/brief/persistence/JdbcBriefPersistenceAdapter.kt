@@ -5,6 +5,7 @@ import com.personal.baton.brief.application.AttentionItemTransition
 import com.personal.baton.brief.application.AttentionItemTransitionHistory
 import com.personal.baton.brief.application.BriefPersistencePort
 import com.personal.baton.brief.application.CurrentAttentionItemPage
+import com.personal.baton.brief.application.CurrentAttentionItemSummary
 import com.personal.baton.brief.application.EditionContent
 import com.personal.baton.brief.application.EditionHistoryResult
 import com.personal.baton.brief.application.EditionResult
@@ -231,6 +232,21 @@ class JdbcBriefPersistenceAdapter(
             },
         )
     }
+
+    override fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary = jdbc.sql(
+        """
+        SELECT COUNT(*) FILTER (WHERE severity = 'HIGH') AS high_count,
+               COUNT(*) FILTER (WHERE severity = 'MEDIUM') AS medium_count,
+               COUNT(*) FILTER (WHERE revision_gap) AS revision_gap_count
+          FROM attention_item
+         WHERE workspace_id = :workspaceId
+           AND season_id = :seasonId
+           AND item_status = 'ACTIVE'
+        """.trimIndent(),
+    ).param("workspaceId", workspaceId)
+        .param("seasonId", seasonId)
+        .query(ATTENTION_ITEM_SUMMARY_MAPPER)
+        .single()
 
     override fun findAttentionItemTransitions(
         workspaceId: UUID,
@@ -753,6 +769,7 @@ class JdbcBriefPersistenceAdapter(
         private val SOURCE_EVENT_RECEIPT_MAPPER = PostgresDataClassRowMapper(SourceEventReceipt::class.java)
         private val SOURCE_EVENT_MAPPER = PostgresDataClassRowMapper(SourceEvent::class.java)
         private val ATTENTION_ITEM_MAPPER = PostgresDataClassRowMapper(AttentionItem::class.java)
+        private val ATTENTION_ITEM_SUMMARY_MAPPER = DataClassRowMapper(CurrentAttentionItemSummary::class.java)
         private val ATTENTION_ITEM_TRANSITION_MAPPER = PostgresDataClassRowMapper(AttentionItemTransition::class.java)
         private val EDITION_SUMMARY_MAPPER = PostgresDataClassRowMapper(EditionSummary::class.java)
         private val EDITION_ITEM_MAPPER = PostgresDataClassRowMapper(BriefEditionItem::class.java)
