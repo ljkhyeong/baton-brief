@@ -27,6 +27,7 @@ import org.awaitility.Awaitility.await
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
 import org.hamcrest.Matchers.contains
+import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.nullValue
 import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.BeforeEach
@@ -427,7 +428,14 @@ class BriefMvpIntegrationTest(
             ),
         )
 
-        val summaryPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/summary"
+        val attentionItemsPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        val summaryPath = "$attentionItemsPath/summary"
+        val highItemsBeforeRebuild = mockMvc.perform(get(attentionItemsPath).param("severity", "HIGH"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("handoff:1")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+            .andReturn().response.contentAsString
+
         val summaryBeforeRebuild = mockMvc.perform(get(summaryPath))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.highCount").value(1))
@@ -455,6 +463,11 @@ class BriefMvpIntegrationTest(
             .andReturn().response.contentAsString
         assertThat(summaryAfterRebuild).isEqualTo(summaryBeforeRebuild)
 
+        val highItemsAfterRebuild = mockMvc.perform(get(attentionItemsPath).param("severity", "HIGH"))
+            .andExpect(status().isOk)
+            .andReturn().response.contentAsString
+        assertThat(highItemsAfterRebuild).isEqualTo(highItemsBeforeRebuild)
+
         val rebuiltReceipt = mockMvc.perform(get(receiptPath))
             .andExpect(status().isOk)
             .andReturn()
@@ -481,8 +494,6 @@ class BriefMvpIntegrationTest(
                 .header(HttpHeaders.IF_NONE_MATCH, currentAttentionEtag),
         ).andExpect(status().isNotModified)
 
-        val attentionItemsPath =
-            "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
         mockMvc.perform(get(attentionItemsPath).param("limit", "2"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(2))
@@ -504,18 +515,49 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items[0].sourceReference").value("routine:current"))
             .andExpect(jsonPath("$.nextCursor").value(nullValue()))
 
+        mockMvc.perform(get(attentionItemsPath).param("revisionGap", "true"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("handoff:1")))
+
+        mockMvc.perform(get(attentionItemsPath).param("revisionGap", "false").param("limit", "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("decision:current")))
+            .andExpect(jsonPath("$.nextCursor.eventType").value("DECISION_FOLLOW_UP_OVERDUE"))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("decision:current"))
         mockMvc.perform(
-            get(
-                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/" +
-                    "attention-items",
-            ),
+            get(attentionItemsPath)
+                .param("revisionGap", "false")
+                .param("afterEventType", "DECISION_FOLLOW_UP_OVERDUE")
+                .param("afterSourceReference", "decision:current")
+                .param("limit", "1"),
         ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("routine:current")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+
+        mockMvc.perform(get(attentionItemsPath).param("severity", "MEDIUM").param("revisionGap", "true"))
+            .andExpect(status().isOk)
             .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+
+        listOf(
+            attentionItemsPath.replace(workspaceId, "10000000-0000-0000-0000-000000000099"),
+            attentionItemsPath.replace(seasonId, "20000000-0000-0000-0000-000000000099"),
+        ).forEach { emptyItemsPath ->
+            mockMvc.perform(get(emptyItemsPath).param("severity", "HIGH").param("revisionGap", "true"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.items").isEmpty)
+        }
 
         mockMvc.perform(
             get(attentionItemsPath)
                 .param("afterEventType", "HANDOFF_BLOCKED"),
         ).andExpect(status().isBadRequest)
+
+        mapOf("severity" to "UNKNOWN", "revisionGap" to "invalid").forEach { (name, value) ->
+            mockMvc.perform(get(attentionItemsPath).param(name, value))
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
 
         postEvent(
             eventJson(
@@ -547,8 +589,16 @@ class BriefMvpIntegrationTest(
                     .value(contains("decision:current", "routine:current")),
             )
 
-        mockMvc.perform(get(attentionItemsPath).param("status", "RESOLVED"))
+        mockMvc.perform(get(attentionItemsPath).param("revisionGap", "true"))
             .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items").isEmpty)
+
+        mockMvc.perform(
+            get(attentionItemsPath)
+                .param("status", "RESOLVED")
+                .param("severity", "HIGH")
+                .param("revisionGap", "true"),
+        ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(1))
             .andExpect(jsonPath("$.items[0].sourceReference").value("handoff:1"))
             .andExpect(jsonPath("$.items[0].status").value("RESOLVED"))
@@ -702,6 +752,13 @@ class BriefMvpIntegrationTest(
 
         postEvent(contractEvent("role-unassigned.active-r2-warning.json"))
             .andExpect(jsonPath("$.item.severity").value("MEDIUM"))
+
+        mockMvc.perform(
+            get("/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items")
+                .param("severity", "MEDIUM"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(4))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(hasItem(firstReference)))
 
         mockMvc.perform(
             get("/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/summary"),
