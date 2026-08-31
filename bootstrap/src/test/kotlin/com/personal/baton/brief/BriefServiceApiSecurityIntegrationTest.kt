@@ -37,15 +37,21 @@ class BriefServiceApiSecurityIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000051"
         val seasonId = "20000000-0000-0000-0000-000000000051"
         val editionPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val summaryPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/summary"
 
-        mockMvc.perform(get("$editionPath/latest"))
-            .andExpect(status().isUnauthorized)
-            .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
+        listOf("$editionPath/latest", summaryPath).forEach { path ->
+            mockMvc.perform(get(path))
+                .andExpect(status().isUnauthorized)
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
+
+            mockMvc.perform(
+                get(path).header(HttpHeaders.AUTHORIZATION, "Bearer $SECURITY_EVENT_TOKEN"),
+            ).andExpect(status().isUnauthorized)
+        }
 
         mockMvc.perform(
-            get("$editionPath/latest")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $SECURITY_EVENT_TOKEN"),
-        ).andExpect(status().isUnauthorized)
+            get(summaryPath).header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"),
+        ).andExpect(status().isOk)
 
         mockMvc.perform(
             post(editionPath)

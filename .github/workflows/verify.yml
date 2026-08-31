@@ -246,6 +246,29 @@ jobs:
           )"
           jq --exit-status '.items | length == 1' <<< "$service_response"
 
+          summary_path='/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items/summary'
+          summary_response="$(
+            docker run --rm --network "container:$service_api_id" \
+              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
+              "$curl_image" \
+              --silent --show-error --fail --connect-timeout 5 --max-time 10 \
+              --cacert /tmp/service-tls-cert.pem \
+              --resolve 'brief-service:8443:127.0.0.1' \
+              --header="Authorization: Bearer $service_token" \
+              "https://brief-service:8443$summary_path"
+          )"
+          jq --exit-status '.highCount == 1 and .mediumCount == 0 and .revisionGapCount == 0' <<< "$summary_response"
+
+          public_summary_status="$(
+            curl --silent --show-error --connect-timeout 5 --max-time 10 \
+              --cacert "$staging_dir/root.crt" \
+              --resolve 'localhost:38443:127.0.0.1' \
+              --header "Authorization: Bearer $service_token" \
+              --output /dev/null --write-out '%{http_code}' \
+              "https://localhost:38443$summary_path"
+          )"
+          test "$public_summary_status" = "404"
+
           service_unauthenticated_status="$(
             docker run --rm --network "container:$service_api_id" \
               --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
@@ -254,7 +277,7 @@ jobs:
               --cacert /tmp/service-tls-cert.pem \
               --resolve 'brief-service:8443:127.0.0.1' \
               --output /dev/null --write-out '%{http_code}' \
-              'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
+              "https://brief-service:8443$summary_path"
           )"
           test "$service_unauthenticated_status" = "401"
 
@@ -286,6 +309,10 @@ jobs:
           fi
           if grep --fixed-strings --quiet "$service_token" <<< "$brief_logs"; then
             echo "BRIEF 로그에 서비스 API Bearer token이 노출됐습니다." >&2
+            exit 1
+          fi
+          if grep --fixed-strings --quiet "$service_token" <<< "$https_logs"; then
+            echo "공개 Caddy 로그에 서비스 API Bearer token이 노출됐습니다." >&2
             exit 1
           fi
           if grep --fixed-strings --quiet "$service_token" <<< "$service_api_logs"; then

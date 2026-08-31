@@ -427,10 +427,34 @@ class BriefMvpIntegrationTest(
             ),
         )
 
+        val summaryPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/summary"
+        val summaryBeforeRebuild = mockMvc.perform(get(summaryPath))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.highCount").value(1))
+            .andExpect(jsonPath("$.mediumCount").value(2))
+            .andExpect(jsonPath("$.revisionGapCount").value(1))
+            .andReturn().response.contentAsString
+
+        listOf(
+            summaryPath.replace(workspaceId, "10000000-0000-0000-0000-000000000099"),
+            summaryPath.replace(seasonId, "20000000-0000-0000-0000-000000000099"),
+        ).forEach { emptySummaryPath ->
+            mockMvc.perform(get(emptySummaryPath))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.highCount").value(0))
+                .andExpect(jsonPath("$.mediumCount").value(0))
+                .andExpect(jsonPath("$.revisionGapCount").value(0))
+        }
+
         mockMvc.perform(post("/api/v1/projections/rebuild"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.receiptCount").value(5))
             .andExpect(jsonPath("$.itemCount").value(3))
+        val summaryAfterRebuild = mockMvc.perform(get(summaryPath))
+            .andExpect(status().isOk)
+            .andReturn().response.contentAsString
+        assertThat(summaryAfterRebuild).isEqualTo(summaryBeforeRebuild)
+
         val rebuiltReceipt = mockMvc.perform(get(receiptPath))
             .andExpect(status().isOk)
             .andReturn()
@@ -528,6 +552,12 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items.length()").value(1))
             .andExpect(jsonPath("$.items[0].sourceReference").value("handoff:1"))
             .andExpect(jsonPath("$.items[0].status").value("RESOLVED"))
+
+        mockMvc.perform(get(summaryPath))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.highCount").value(0))
+            .andExpect(jsonPath("$.mediumCount").value(2))
+            .andExpect(jsonPath("$.revisionGapCount").value(0))
 
         val transitionPath = "$attentionItemsPath/transitions"
         mockMvc.perform(
@@ -672,6 +702,13 @@ class BriefMvpIntegrationTest(
 
         postEvent(contractEvent("role-unassigned.active-r2-warning.json"))
             .andExpect(jsonPath("$.item.severity").value("MEDIUM"))
+
+        mockMvc.perform(
+            get("/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/summary"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.highCount").value(1))
+            .andExpect(jsonPath("$.mediumCount").value(4))
+            .andExpect(jsonPath("$.revisionGapCount").value(0))
 
         postEvent(contractEvent("role-unassigned.resolved-r3-warning.json"))
 
