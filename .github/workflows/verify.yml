@@ -141,6 +141,15 @@ jobs:
           test -n "$brief_id"
           test -n "$https_id"
           test -n "$service_api_id"
+          service_api_curl() {
+            docker run --rm --network "container:$service_api_id" \
+              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
+              "$curl_image" \
+              --silent --show-error --connect-timeout 5 --max-time 10 \
+              --cacert /tmp/service-tls-cert.pem \
+              --resolve 'brief-service:8443:127.0.0.1' \
+              "$@"
+          }
           test -z "$(docker port "$brief_id")"
           test -z "$(docker port "$service_api_id")"
           test "$(docker inspect --format '{{.State.Status}}' "$service_api_id")" = "running"
@@ -235,12 +244,7 @@ jobs:
           test "$health_status" = "404"
 
           service_response="$(
-            docker run --rm --network "container:$service_api_id" \
-              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
-              "$curl_image" \
-              --silent --show-error --fail --connect-timeout 5 --max-time 10 \
-              --cacert /tmp/service-tls-cert.pem \
-              --resolve 'brief-service:8443:127.0.0.1' \
+            service_api_curl --fail \
               --header="Authorization: Bearer $service_token" \
               'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
           )"
@@ -248,12 +252,7 @@ jobs:
 
           summary_path='/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items/summary'
           summary_response="$(
-            docker run --rm --network "container:$service_api_id" \
-              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
-              "$curl_image" \
-              --silent --show-error --fail --connect-timeout 5 --max-time 10 \
-              --cacert /tmp/service-tls-cert.pem \
-              --resolve 'brief-service:8443:127.0.0.1' \
+            service_api_curl --fail \
               --header="Authorization: Bearer $service_token" \
               "https://brief-service:8443$summary_path"
           )"
@@ -270,24 +269,14 @@ jobs:
           test "$public_summary_status" = "404"
 
           service_unauthenticated_status="$(
-            docker run --rm --network "container:$service_api_id" \
-              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
-              "$curl_image" \
-              --silent --show-error --connect-timeout 5 --max-time 10 \
-              --cacert /tmp/service-tls-cert.pem \
-              --resolve 'brief-service:8443:127.0.0.1' \
+            service_api_curl \
               --output /dev/null --write-out '%{http_code}' \
               "https://brief-service:8443$summary_path"
           )"
           test "$service_unauthenticated_status" = "401"
 
           service_health_status="$(
-            docker run --rm --network "container:$service_api_id" \
-              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
-              "$curl_image" \
-              --silent --show-error --connect-timeout 5 --max-time 10 \
-              --cacert /tmp/service-tls-cert.pem \
-              --resolve 'brief-service:8443:127.0.0.1' \
+            service_api_curl \
               --header="Authorization: Bearer $service_token" \
               --output /dev/null --write-out '%{http_code}' \
               'https://brief-service:8443/actuator/health'
