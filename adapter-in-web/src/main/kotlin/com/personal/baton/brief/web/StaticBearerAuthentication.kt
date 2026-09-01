@@ -4,6 +4,8 @@ import java.security.MessageDigest
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.config.annotation.web.builders.HttpSecurity
+import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken
 
 private val BEARER_TOKEN_PATTERN = Regex("[A-Za-z0-9._~-]{32,200}")
@@ -24,6 +26,12 @@ internal fun acceptedBearerTokens(
     }
     return listOf(currentToken, previousToken)
 }
+
+internal fun HttpSecurity.configureStatelessApi(): HttpSecurity = this
+    .csrf { it.disable() }
+    .requestCache { it.disable() }
+    .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+    .logout { it.disable() }
 
 internal fun staticBearerAuthenticationManager(
     acceptedTokens: List<String>,
@@ -46,4 +54,3 @@ internal fun staticBearerAuthenticationManager(
         UsernamePasswordAuthenticationToken.authenticated(principal, null, emptyList())
     }
 }
-
