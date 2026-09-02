@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test
 
 class AttentionProjectorTest {
     @Test
-    fun `maps a blocked handoff to a high severity item`() {
+    fun `막힌 인수인계는 HIGH 관심 항목으로 투영한다`() {
         val decision = AttentionProjector.project(event(), null) as ProjectionDecision.Applied
 
         assertThat(decision.item.severity).isEqualTo(Severity.HIGH)
@@ -15,7 +15,7 @@ class AttentionProjectorTest {
     }
 
     @Test
-    fun `ignores a stale revision and records a revision gap`() {
+    fun `오래된 리비전은 무시하고 리비전 공백은 기록한다`() {
         val first = AttentionProjector.project(event(revision = 2), null) as ProjectionDecision.Applied
         val stale = AttentionProjector.project(event(revision = 1), first.item)
 

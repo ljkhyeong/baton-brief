@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 
 class WeeklyWindowTest {
     @Test
-    fun `uses local week boundaries across daylight saving transition`() {
+    fun `DST 전환에서도 지역 주간 경계를 사용한다`() {
         val window = WeeklyWindow.startingOn(
             LocalDate.parse("2026-03-23"),
             ZoneId.of("Europe/Berlin"),
@@ -19,7 +19,7 @@ class WeeklyWindowTest {
     }
 
     @Test
-    fun `uses local week boundaries across daylight saving overlap`() {
+    fun `DST 시간이 겹쳐도 지역 주간 경계를 사용한다`() {
         val window = WeeklyWindow.startingOn(
             LocalDate.parse("2026-10-19"),
             ZoneId.of("Europe/Berlin"),

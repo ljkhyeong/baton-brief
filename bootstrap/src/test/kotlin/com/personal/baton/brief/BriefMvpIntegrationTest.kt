@@ -91,7 +91,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `health exposes aggregate status without deployment probes`() {
+    fun `상태 확인은 배포 probe 없이 aggregate 상태를 제공한다`() {
         mockMvc.perform(get("/actuator/health"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("UP"))
@@ -510,43 +510,12 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `현재 관심 항목 목록 필터와 상태 전이는 복합 커서를 지킨다`() {
+    fun `현재 관심 항목 목록은 필터와 복합 커서를 지킨다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000001"
         val seasonId = "20000000-0000-0000-0000-000000000001"
-        seedHandoffScenario(workspaceId, seasonId)
-
-        postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000006",
-                workspaceId,
-                seasonId,
-                "decision:current",
-                1,
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-            ),
-        ).andReturn()
-        postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000007",
-                workspaceId,
-                seasonId,
-                "routine:current",
-                1,
-                type = "ROUTINE_MISSED",
-            ),
-        ).andReturn()
+        seedCurrentAttentionScenario(workspaceId, seasonId)
 
         val attentionItemsPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
-        val summaryPath = "$attentionItemsPath/summary"
-        val currentAttentionPath =
-            "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
-        val currentAttention = mockMvc.perform(
-            get(currentAttentionPath)
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1"),
-        ).andExpect(status().isOk)
-            .andReturn()
-        val currentAttentionEtag = checkNotNull(currentAttention.response.getHeader(HttpHeaders.ETAG))
 
         mockMvc.perform(get(attentionItemsPath).param("limit", "2"))
             .andExpect(status().isOk)
@@ -612,6 +581,24 @@ class BriefMvpIntegrationTest(
                 .andExpect(status().isBadRequest)
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
         }
+    }
+
+    @Test
+    fun `상태 변경은 단건 목록 요약과 전이 증거에 반영된다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000001"
+        val seasonId = "20000000-0000-0000-0000-000000000001"
+        seedCurrentAttentionScenario(workspaceId, seasonId)
+
+        val attentionItemsPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        val summaryPath = "$attentionItemsPath/summary"
+        val currentAttentionPath = "$attentionItemsPath/current"
+        val currentAttention = mockMvc.perform(
+            get(currentAttentionPath)
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "handoff:1"),
+        ).andExpect(status().isOk)
+            .andReturn()
+        val currentAttentionEtag = checkNotNull(currentAttention.response.getHeader(HttpHeaders.ETAG))
 
         postEvent(
             eventJson(
@@ -702,6 +689,14 @@ class BriefMvpIntegrationTest(
                 .param("sourceReference", "handoff:1"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.transitions").isEmpty)
+    }
+
+    @Test
+    fun `현재 항목과 수신 증거 조회는 잘못된 입력과 미존재를 구분한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000001"
+        val seasonId = "20000000-0000-0000-0000-000000000001"
+        val currentAttentionPath =
+            "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
 
         mockMvc.perform(
             get(
@@ -766,7 +761,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `consumes BATON continuity event v2 and reproduces it after rebuild`() {
+    fun `BATON 연속성 이벤트 v2를 수신하고 재구축 뒤 재현한다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000008"
         val seasonId = "20000000-0000-0000-0000-000000000008"
         val signals = listOf(
@@ -1110,7 +1105,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `edition changes compare immutable snapshots and reject invalid scopes`() {
+    fun `에디션 비교는 불변 스냅샷의 변경을 반환하고 다른 범위를 거부한다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000005"
         val seasonId = "20000000-0000-0000-0000-000000000005"
         val removedReference = "handoff:removed"
@@ -1673,7 +1668,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `serializes concurrent duplicate ingestion edition generation and rebuild`() {
+    fun `동시 중복 이벤트 수신은 하나의 수신 증거만 만든다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000004"
         val seasonId = "20000000-0000-0000-0000-000000000004"
         val event = eventJson(
@@ -1688,6 +1683,21 @@ class BriefMvpIntegrationTest(
             .containsExactly(200, 202)
         assertThat(jdbc.sql("SELECT COUNT(*) FROM source_event_receipt").query(Long::class.java).single())
             .isEqualTo(1)
+    }
+
+    @Test
+    fun `동시 에디션 생성은 같은 세대를 재사용한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000004"
+        val seasonId = "20000000-0000-0000-0000-000000000004"
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000020",
+                workspaceId,
+                seasonId,
+                "handoff:concurrent",
+                1,
+            ),
+        ).andExpect(status().isAccepted)
 
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         val request = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
@@ -1695,6 +1705,21 @@ class BriefMvpIntegrationTest(
             .containsExactly(200, 201)
         assertThat(jdbc.sql("SELECT COUNT(*) FROM brief_edition").query(Long::class.java).single())
             .isEqualTo(1)
+    }
+
+    @Test
+    fun `재구축 중 지원 이벤트 수신은 잠금 뒤 적용된다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000004"
+        val seasonId = "20000000-0000-0000-0000-000000000004"
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000020",
+                workspaceId,
+                seasonId,
+                "handoff:concurrent",
+                1,
+            ),
+        ).andExpect(status().isAccepted)
 
         val rebuildStarted = CountDownLatch(1)
         val releaseRebuild = CountDownLatch(1)
@@ -1770,6 +1795,33 @@ class BriefMvpIntegrationTest(
                 .query(Long::class.java)
                 .single(),
         ).isEqualTo(1)
+    }
+
+    private fun seedCurrentAttentionScenario(
+        workspaceId: String,
+        seasonId: String,
+    ) {
+        seedHandoffScenario(workspaceId, seasonId)
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000006",
+                workspaceId,
+                seasonId,
+                "decision:current",
+                1,
+                type = "DECISION_FOLLOW_UP_OVERDUE",
+            ),
+        ).andReturn()
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000007",
+                workspaceId,
+                seasonId,
+                "routine:current",
+                1,
+                type = "ROUTINE_MISSED",
+            ),
+        ).andReturn()
     }
 
     private fun seedWeeklyEditionScenario(
