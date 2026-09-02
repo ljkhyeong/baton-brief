@@ -855,43 +855,11 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `edition is idempotent immutable generated and reproducible after rebuild`() {
+    fun `에디션 생성은 같은 상태를 재사용하고 과거 상태의 새 세대를 이력에 남긴다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000002"
         val seasonId = "20000000-0000-0000-0000-000000000002"
-        val blockedReference = "handoff:weekly"
 
-        postEvent(
-            eventJson(
-                "40000000-0000-0000-0000-000000000001",
-                workspaceId,
-                seasonId,
-                blockedReference,
-                1,
-                occurredAt = "2026-08-09T15:00:00Z",
-            ),
-        )
-        postEvent(
-            eventJson(
-                "40000000-0000-0000-0000-000000000002",
-                workspaceId,
-                seasonId,
-                "routine:weekly",
-                1,
-                type = "ROUTINE_MISSED",
-                occurredAt = "2026-08-16T14:59:59.999999999Z",
-            ),
-        ).andExpect(jsonPath("$.item.observedAt").value("2026-08-16T14:59:59.999999Z"))
-        postEvent(
-            eventJson(
-                "40000000-0000-0000-0000-000000000003",
-                workspaceId,
-                seasonId,
-                "decision:next-week",
-                1,
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-                occurredAt = "2026-08-16T15:00:00Z",
-            ),
-        )
+        seedWeeklyEditionScenario(workspaceId, seasonId)
 
         val generationPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
@@ -903,7 +871,6 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items[1].severity").value("MEDIUM"))
             .andReturn()
         val firstEditionId = JsonPath.read<String>(firstResult.response.contentAsString, "$.editionId")
-        val firstEditionEtag = checkNotNull(firstResult.response.getHeader(HttpHeaders.ETAG))
         assertThat(
             jdbc.sql("SELECT state_fingerprint FROM brief_edition WHERE edition_id = :editionId")
                 .param("editionId", UUID.fromString(firstEditionId))
@@ -979,6 +946,25 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.editions").isEmpty)
 
+        postEdition(generationPath, editionRequest)
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editionId").value(recurringStateEditionId))
+    }
+
+    @Test
+    fun `재구축 실패는 현재 투영을 롤백하고 성공 뒤에도 기존 에디션을 보존한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000002"
+        val seasonId = "20000000-0000-0000-0000-000000000002"
+
+        seedWeeklyEditionScenario(workspaceId, seasonId)
+
+        val generationPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        val firstResult = postEdition(generationPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andReturn()
+        val firstEditionId = JsonPath.read<String>(firstResult.response.contentAsString, "$.editionId")
+        val firstEditionEtag = checkNotNull(firstResult.response.getHeader(HttpHeaders.ETAG))
         val attentionCountBeforeFailedRebuild = jdbc.sql("SELECT COUNT(*) FROM attention_item")
             .query(Long::class.java)
             .single()
@@ -1001,16 +987,16 @@ class BriefMvpIntegrationTest(
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.editionId").value(recurringStateEditionId))
+            .andExpect(jsonPath("$.editionId").value(firstEditionId))
 
         mockMvc.perform(post("/api/v1/projections/rebuild"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.receiptCount").value(5))
-            .andExpect(jsonPath("$.itemCount").value(4))
+            .andExpect(jsonPath("$.receiptCount").value(3))
+            .andExpect(jsonPath("$.itemCount").value(3))
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.editionId").value(recurringStateEditionId))
+            .andExpect(jsonPath("$.editionId").value(firstEditionId))
 
         val rebuiltSnapshot = mockMvc.perform(get("/api/v1/editions/$firstEditionId"))
             .andExpect(status().isOk)
@@ -1021,17 +1007,31 @@ class BriefMvpIntegrationTest(
             get("/api/v1/editions/$firstEditionId")
                 .header(HttpHeaders.IF_NONE_MATCH, firstEditionEtag),
         ).andExpect(status().isNotModified)
+    }
+
+    @Test
+    fun `전역 최신과 주간 최신은 선택한 불변 에디션의 ETag를 제공한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000002"
+        val seasonId = "20000000-0000-0000-0000-000000000002"
+
+        seedWeeklyEditionScenario(workspaceId, seasonId)
+
+        val generationPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        postEdition(generationPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(1))
 
         val nextWeekRequest = """{"weekStart":"2026-08-17","zoneId":"Asia/Seoul"}"""
         postEdition(generationPath, nextWeekRequest)
             .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.generation").value(4))
+            .andExpect(jsonPath("$.generation").value(2))
             .andExpect(jsonPath("$.items.length()").value(1))
             .andExpect(jsonPath("$.items[0].sourceReference").value("decision:next-week"))
 
         val previousLatest = mockMvc.perform(get("$generationPath/latest"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.generation").value(4))
+            .andExpect(jsonPath("$.generation").value(2))
             .andReturn()
         val previousLatestEtag = checkNotNull(previousLatest.response.getHeader(HttpHeaders.ETAG))
 
@@ -1050,16 +1050,16 @@ class BriefMvpIntegrationTest(
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.generation").value(5))
+            .andExpect(jsonPath("$.generation").value(3))
             .andExpect(jsonPath("$.items.length()").value(1))
-            .andExpect(jsonPath("$.items[0].sourceReference").value(blockedReference))
+            .andExpect(jsonPath("$.items[0].sourceReference").value("handoff:weekly"))
 
         mockMvc.perform(
             get("$generationPath/latest")
                 .header(HttpHeaders.IF_NONE_MATCH, previousLatestEtag),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.generation").value(5))
+            .andExpect(jsonPath("$.generation").value(3))
 
         val weeklyLatestPath = "$generationPath/weekly/latest"
         val nextWeekLatest = mockMvc.perform(
@@ -1067,7 +1067,7 @@ class BriefMvpIntegrationTest(
                 .param("weekStart", "2026-08-17")
                 .param("zoneId", "Asia/Seoul"),
         ).andExpect(status().isOk)
-            .andExpect(jsonPath("$.generation").value(4))
+            .andExpect(jsonPath("$.generation").value(2))
             .andReturn()
         mockMvc.perform(
             get(weeklyLatestPath)
@@ -1084,7 +1084,7 @@ class BriefMvpIntegrationTest(
                 .param("weekStart", "2026-08-10")
                 .param("zoneId", "Asia/Seoul"),
         ).andExpect(status().isOk)
-            .andExpect(jsonPath("$.generation").value(5))
+            .andExpect(jsonPath("$.generation").value(3))
 
         mockMvc.perform(
             get(
@@ -1288,7 +1288,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `rejects representations outside the HTTP contract and reports missing editions`() {
+    fun `이벤트 수신 Bearer는 누락과 오입력을 거부하고 직전 token을 허용한다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000003"
         val seasonId = "20000000-0000-0000-0000-000000000003"
         val eventId = "30000000-0000-0000-0000-000000000010"
@@ -1328,6 +1328,13 @@ class BriefMvpIntegrationTest(
                     ),
                 ),
         ).andExpect(status().isAccepted)
+    }
+
+    @Test
+    fun `이벤트 HTTP 표현은 계약 밖의 값과 형식을 거부한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000003"
+        val seasonId = "20000000-0000-0000-0000-000000000003"
+        val eventId = "30000000-0000-0000-0000-000000000010"
 
         postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1, eventVersion = 0))
             .andExpect(status().isBadRequest)
@@ -1449,7 +1456,12 @@ class BriefMvpIntegrationTest(
                 sourceSeverity = "CRITICAL",
             ),
         ).andExpect(status().isBadRequest)
+    }
 
+    @Test
+    fun `에디션 요청 오류와 미존재 응답은 ProblemDetail 계약을 따른다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000003"
+        val seasonId = "20000000-0000-0000-0000-000000000003"
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         postEdition(path, """{"weekStart":[2026,8,10],"zoneId":"Asia/Seoul"}""")
             .andExpect(status().isBadRequest)
@@ -1758,6 +1770,44 @@ class BriefMvpIntegrationTest(
                 .query(Long::class.java)
                 .single(),
         ).isEqualTo(1)
+    }
+
+    private fun seedWeeklyEditionScenario(
+        workspaceId: String,
+        seasonId: String,
+    ) {
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000001",
+                workspaceId,
+                seasonId,
+                "handoff:weekly",
+                1,
+                occurredAt = "2026-08-09T15:00:00Z",
+            ),
+        )
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000002",
+                workspaceId,
+                seasonId,
+                "routine:weekly",
+                1,
+                type = "ROUTINE_MISSED",
+                occurredAt = "2026-08-16T14:59:59.999999999Z",
+            ),
+        ).andExpect(jsonPath("$.item.observedAt").value("2026-08-16T14:59:59.999999Z"))
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000003",
+                workspaceId,
+                seasonId,
+                "decision:next-week",
+                1,
+                type = "DECISION_FOLLOW_UP_OVERDUE",
+                occurredAt = "2026-08-16T15:00:00Z",
+            ),
+        )
     }
 
     private fun seedHandoffScenario(
