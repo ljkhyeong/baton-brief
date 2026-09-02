@@ -223,7 +223,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `ingestion distinguishes duplicate conflict unsupported stale and gap`() {
+    fun `수신은 중복 충돌 미지원 오래된 리비전과 공백을 구분한다`() {
         val countsBefore = IngestStatus.entries.associateWith { outcome ->
             meterRegistry.find("brief.events.received").tag("outcome", outcome.name).counter()?.count() ?: 0.0
         }
@@ -406,6 +406,20 @@ class BriefMvpIntegrationTest(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.receipts").isEmpty)
+    }
+
+    @Test
+    fun `현재 관심 항목 요약과 재구축은 투영 결과를 보존한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000001"
+        val seasonId = "20000000-0000-0000-0000-000000000001"
+        val eventId = "30000000-0000-0000-0000-000000000001"
+        seedHandoffScenario(workspaceId, seasonId)
+        val receiptPath = "/api/v1/events/$eventId/receipt"
+        val canonicalReceipt = mockMvc.perform(get(receiptPath))
+            .andExpect(status().isOk)
+            .andReturn()
+            .response
+            .contentAsString
 
         postEvent(
             eventJson(
@@ -493,6 +507,46 @@ class BriefMvpIntegrationTest(
                 .param("sourceReference", "handoff:1")
                 .header(HttpHeaders.IF_NONE_MATCH, currentAttentionEtag),
         ).andExpect(status().isNotModified)
+    }
+
+    @Test
+    fun `현재 관심 항목 목록 필터와 상태 전이는 복합 커서를 지킨다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000001"
+        val seasonId = "20000000-0000-0000-0000-000000000001"
+        seedHandoffScenario(workspaceId, seasonId)
+
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000006",
+                workspaceId,
+                seasonId,
+                "decision:current",
+                1,
+                type = "DECISION_FOLLOW_UP_OVERDUE",
+            ),
+        ).andReturn()
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000007",
+                workspaceId,
+                seasonId,
+                "routine:current",
+                1,
+                type = "ROUTINE_MISSED",
+            ),
+        ).andReturn()
+
+        val attentionItemsPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        val summaryPath = "$attentionItemsPath/summary"
+        val currentAttentionPath =
+            "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
+        val currentAttention = mockMvc.perform(
+            get(currentAttentionPath)
+                .param("eventType", "HANDOFF_BLOCKED")
+                .param("sourceReference", "handoff:1"),
+        ).andExpect(status().isOk)
+            .andReturn()
+        val currentAttentionEtag = checkNotNull(currentAttention.response.getHeader(HttpHeaders.ETAG))
 
         mockMvc.perform(get(attentionItemsPath).param("limit", "2"))
             .andExpect(status().isOk)
@@ -666,6 +720,12 @@ class BriefMvpIntegrationTest(
         val missingReceiptPath = "/api/v1/events/30000000-0000-0000-0000-000000000099/receipt"
         mockMvc.perform(get(missingReceiptPath))
             .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `충돌 탐지 시각은 최초 수신 시각과 분리해 기록한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000001"
+        val seasonId = "20000000-0000-0000-0000-000000000001"
 
         val receivedAt = Instant.parse("2026-08-12T09:00:01Z")
         val conflictRequestAt = Instant.parse("2026-08-12T09:00:02Z")
@@ -1698,6 +1758,47 @@ class BriefMvpIntegrationTest(
                 .query(Long::class.java)
                 .single(),
         ).isEqualTo(1)
+    }
+
+    private fun seedHandoffScenario(
+        workspaceId: String,
+        seasonId: String,
+    ) {
+        val eventId = "30000000-0000-0000-0000-000000000001"
+        postEvent(
+            eventJson(
+                eventId,
+                workspaceId,
+                seasonId,
+                "handoff:1",
+                1,
+                occurredAt = "2026-08-12t18:00:00.1+09:00",
+            ),
+        ).andReturn()
+        postEvent(eventJson(eventId, workspaceId, seasonId, "handoff:1", 1, state = "RESOLVED"))
+            .andReturn()
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000002",
+                workspaceId,
+                seasonId,
+                "handoff:1",
+                1,
+                occurredAt = "2026-08-12T09:00:00.123456789z",
+            ),
+        ).andReturn()
+        postEvent(eventJson("30000000-0000-0000-0000-000000000003", workspaceId, seasonId, "handoff:1", 3))
+            .andReturn()
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000004",
+                workspaceId,
+                seasonId,
+                "handoff:2",
+                1,
+                eventVersion = 2,
+            ),
+        ).andReturn()
     }
 
     private fun postEvent(event: ObjectNode) = postEvent(JSON.writeValueAsString(event))
