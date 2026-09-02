@@ -62,7 +62,7 @@ class BriefController(
     fun findEventReceipt(
         @PathVariable("eventId") eventId: UUID,
     ): SourceEventReceipt = brief.findEventReceipt(eventId)
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "event receipt not found")
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "이벤트 수신 증거를 찾을 수 없습니다")
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/event-receipts/anomalies")
     fun findEventReceiptAnomalies(
@@ -91,7 +91,7 @@ class BriefController(
             seasonId,
             eventType,
             sourceReference,
-        ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "attention item not found")
+        ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "현재 관심 항목을 찾을 수 없습니다")
         return ResponseEntity.ok()
             .eTag("brief-attention-item-v1-${item.ruleVersion}-${item.lastRevision}")
             .body(AttentionItemResponse.from(item))
@@ -164,7 +164,7 @@ class BriefController(
         @PathVariable("seasonId") seasonId: UUID,
     ): ResponseEntity<BriefEditionResponse> = brief.findLatestEdition(workspaceId, seasonId)
         ?.toResponse()
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "에디션을 찾을 수 없습니다")
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest")
     fun findLatestEditionForWeek(
@@ -174,7 +174,7 @@ class BriefController(
     ): ResponseEntity<BriefEditionResponse> =
         brief.findLatestEditionForWeek(request.toCommand(workspaceId, seasonId))
             ?.toResponse()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "에디션을 찾을 수 없습니다")
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions")
     fun findEditionHistory(
@@ -189,7 +189,7 @@ class BriefController(
         @PathVariable("editionId") editionId: UUID,
     ): ResponseEntity<BriefEditionResponse> = brief.findEdition(editionId)
         ?.toResponse()
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "에디션을 찾을 수 없습니다")
 
     @GetMapping("/editions/{targetEditionId}/changes")
     fun compareEditions(
@@ -197,10 +197,11 @@ class BriefController(
         @RequestParam("fromEditionId") fromEditionId: UUID,
     ): EditionComparison = when (val result = brief.compareEditions(fromEditionId, targetEditionId)) {
         is EditionComparisonResult.Found -> result.comparison
-        EditionComparisonResult.NotFound -> throw ResponseStatusException(HttpStatus.NOT_FOUND, "edition not found")
+        EditionComparisonResult.NotFound ->
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "에디션을 찾을 수 없습니다")
         EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(
             HttpStatus.BAD_REQUEST,
-            "editions must belong to the same workspace and season",
+            "에디션은 같은 작업공간과 시즌에 속해야 합니다",
         )
     }
 }

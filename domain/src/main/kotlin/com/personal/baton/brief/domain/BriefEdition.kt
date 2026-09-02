@@ -17,7 +17,7 @@ data class WeeklyWindow(
             weekStart: LocalDate,
             zoneId: ZoneId,
         ): WeeklyWindow {
-            require(weekStart.dayOfWeek == DayOfWeek.MONDAY) { "weekStart must be a Monday" }
+            require(weekStart.dayOfWeek == DayOfWeek.MONDAY) { "weekStart는 월요일이어야 합니다" }
             return WeeklyWindow(
                 weekStart = weekStart,
                 zoneId = zoneId,

@@ -16,6 +16,7 @@ import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
+import java.time.DateTimeException
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -51,15 +52,17 @@ data class SourceEventRequest(
     val occurredAt: String,
     val state: SourceEventState,
 ) {
-    private val occurredAtInstant = runCatching {
+    private val occurredAtInstant = try {
         Instant.from(OCCURRED_AT_FORMATTER.parse(occurredAt))
-    }.getOrNull()
+    } catch (_: DateTimeException) {
+        null
+    }
 
-    @get:AssertTrue(message = "occurredAt must be an ISO-8601 instant")
+    @get:AssertTrue(message = "occurredAt은 ISO-8601 시점 형식이어야 합니다")
     val validOccurredAt: Boolean
         get() = occurredAtInstant != null
 
-    @get:AssertTrue(message = "eventVersion, eventType and sourceSeverity must match")
+    @get:AssertTrue(message = "eventVersion, eventType, sourceSeverity 조합이 계약과 일치해야 합니다")
     val validVersionContract: Boolean
         get() = eventVersion <= 0 ||
             SourceEvent.isReceivable(eventVersion, eventType, sourceSeverity)
@@ -95,15 +98,17 @@ data class EditionWeekRequest(
     val weekStart: String,
     val zoneId: ZoneId,
 ) {
-    private val weekStartDate = runCatching {
+    private val weekStartDate = try {
         LocalDate.parse(weekStart, WEEK_START_FORMATTER)
-    }.getOrNull()
+    } catch (_: DateTimeException) {
+        null
+    }
 
     @get:AssertTrue(message = "weekStart는 연도 네 자리의 uuuu-MM-dd 형식이며 월요일이어야 합니다")
     val validWeekStart: Boolean
         get() = weekStartDate?.dayOfWeek == DayOfWeek.MONDAY
 
-    @get:AssertTrue(message = "zoneId must be an IANA timezone ID")
+    @get:AssertTrue(message = "zoneId는 IANA 시간대 ID여야 합니다")
     val validIanaZone: Boolean
         get() = zoneId.id in ZoneId.getAvailableZoneIds()
 

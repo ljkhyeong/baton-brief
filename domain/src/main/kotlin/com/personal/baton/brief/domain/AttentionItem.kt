@@ -51,7 +51,7 @@ object AttentionProjector {
                 SourceEventType.ROLE_PREPARATION_INCOMPLETE,
                 SourceEventType.ROUTINE_REPEATEDLY_OVERDUE,
                 SourceEventType.HANDOFF_INCOMPLETE,
-                -> error("unsupported event type for version 1")
+                -> error("이벤트 v1에서 지원하지 않는 eventType입니다")
             }
 
             2 -> when (checkNotNull(event.sourceSeverity)) {
@@ -59,7 +59,7 @@ object AttentionProjector {
                 SourceEventSeverity.WARNING -> Severity.MEDIUM
             }
 
-            else -> error("unsupported event version")
+            else -> error("지원하지 않는 eventVersion입니다")
         }
 
         return ProjectionDecision.Applied(
