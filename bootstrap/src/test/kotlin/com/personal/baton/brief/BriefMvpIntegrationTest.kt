@@ -1801,7 +1801,25 @@ class BriefMvpIntegrationTest(
         workspaceId: String,
         seasonId: String,
     ) {
-        seedHandoffScenario(workspaceId, seasonId)
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000001",
+                workspaceId,
+                seasonId,
+                "handoff:1",
+                1,
+                occurredAt = "2026-08-12t18:00:00.1+09:00",
+            ),
+        )
+        postEvent(
+            eventJson(
+                "30000000-0000-0000-0000-000000000003",
+                workspaceId,
+                seasonId,
+                "handoff:1",
+                3,
+            ),
+        )
         postEvent(
             eventJson(
                 "30000000-0000-0000-0000-000000000006",
@@ -1811,7 +1829,7 @@ class BriefMvpIntegrationTest(
                 1,
                 type = "DECISION_FOLLOW_UP_OVERDUE",
             ),
-        ).andReturn()
+        )
         postEvent(
             eventJson(
                 "30000000-0000-0000-0000-000000000007",
@@ -1821,7 +1839,7 @@ class BriefMvpIntegrationTest(
                 1,
                 type = "ROUTINE_MISSED",
             ),
-        ).andReturn()
+        )
     }
 
     private fun seedWeeklyEditionScenario(
@@ -1876,9 +1894,8 @@ class BriefMvpIntegrationTest(
                 1,
                 occurredAt = "2026-08-12t18:00:00.1+09:00",
             ),
-        ).andReturn()
+        )
         postEvent(eventJson(eventId, workspaceId, seasonId, "handoff:1", 1, state = "RESOLVED"))
-            .andReturn()
         postEvent(
             eventJson(
                 "30000000-0000-0000-0000-000000000002",
@@ -1888,9 +1905,8 @@ class BriefMvpIntegrationTest(
                 1,
                 occurredAt = "2026-08-12T09:00:00.123456789z",
             ),
-        ).andReturn()
+        )
         postEvent(eventJson("30000000-0000-0000-0000-000000000003", workspaceId, seasonId, "handoff:1", 3))
-            .andReturn()
         postEvent(
             eventJson(
                 "30000000-0000-0000-0000-000000000004",
@@ -1900,7 +1916,7 @@ class BriefMvpIntegrationTest(
                 1,
                 eventVersion = 2,
             ),
-        ).andReturn()
+        )
     }
 
     private fun postEvent(event: ObjectNode) = postEvent(JSON.writeValueAsString(event))
