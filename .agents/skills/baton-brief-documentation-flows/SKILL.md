@@ -9,8 +9,8 @@ description: BATON BRIEF의 문서·AGENTS.md·로컬 스킬을 수정할 때 �
 
 - 제품 동작·수용 기준은 `docs/PRD/`, 장기 구조·기술 결정은 `docs/ADR/`에 기록한다.
 - `README.md`는 제품 소개·실행 방법, [문서 색인](../../../docs/README.md)은 PRD·ADR 탐색을 맡는다.
-- `HANDOFF.md`에는 현재 재사용할 검증 근거·미검증 범위·다음 작업을 남긴다.
-  완료 기능의 설명과 테스트 목록을 PRD에서 복제하지 않는다.
+- `HANDOFF.md`에는 [검증 절차](../../../docs/development/verification.md)에 따라 현재 재사용할 근거·
+  미검증 범위·다음 작업을 갱신한다. 완료 기능·과거 실행 목록은 복제하지 않고 Git 이력에 보존한다.
 - `AGENTS.md`에는 공통 작업 규칙, 스킬에는 작업별 주의점과 관련 문서 경로를 둔다.
   버전·완료 이력·범용 개발 조언을 반복하지 않는다.
 - 계약 버전의 기준은 `contracts/VERSION`이다. 안내문에는 `<VERSION>`을 사용하고
