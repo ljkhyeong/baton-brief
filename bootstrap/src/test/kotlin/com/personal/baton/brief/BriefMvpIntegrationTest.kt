@@ -2052,6 +2052,70 @@ class BriefMvpIntegrationTest(
         )
     }
 
+    @Test
+    fun `주간 해소는 연속된 마지막 활성 해소 전환과 현재 상태를 사용한다`() {
+        val workspace = UUID.randomUUID()
+        val season = UUID.randomUUID()
+        val command = GenerateEditionCommand(workspace, season, LocalDate.parse("2026-08-24"), ZoneId.of("Asia/Seoul"))
+        val service = BriefService(persistence, Clock.fixed(Instant.parse("2026-08-30T12:00:00Z"), ZoneOffset.UTC))
+        fun deliver(reference: String, revision: Long, state: String, at: String = "2026-08-25T00:00:00Z"): ObjectNode {
+            val event = eventJson(UUID.randomUUID().toString(), workspace.toString(), season.toString(), reference, revision, state, occurredAt = at)
+            postEvent(event).andExpect(status().is2xxSuccessful)
+            return event
+        }
+        deliver("repeated", 1, "ACTIVE")
+        val resolved = deliver("repeated", 2, "RESOLVED", "2026-08-23T15:00:00Z")
+        postEvent(resolved).andExpect(jsonPath("$.status").value("DUPLICATE"))
+        deliver("repeated", 3, "RESOLVED", "2026-08-29T00:00:00Z")
+        deliver("initial-resolved", 1, "RESOLVED")
+        deliver("missing-transition", 1, "ACTIVE")
+        deliver("missing-transition", 3, "RESOLVED")
+        deliver("missing-transition", 2, "RESOLVED")
+        deliver("later-gap", 1, "ACTIVE")
+        deliver("later-gap", 2, "RESOLVED")
+        deliver("later-gap", 4, "RESOLVED")
+        deliver("reactivated", 1, "ACTIVE")
+        deliver("reactivated", 2, "RESOLVED")
+        deliver("reactivated", 3, "ACTIVE")
+        deliver("old-resolution", 1, "ACTIVE")
+        deliver("old-resolution", 2, "RESOLVED", "2026-08-23T14:59:59.999999Z")
+        deliver("old-resolution", 3, "RESOLVED")
+        deliver("next-week", 1, "ACTIVE")
+        deliver("next-week", 2, "RESOLVED", "2026-08-30T15:00:00Z")
+        deliver("future", 1, "ACTIVE")
+        deliver("future", 2, "RESOLVED", "2026-08-30T13:00:00Z")
+        assertThat(service.summarizeWeeklyResolutions(command).resolvedCount).isEqualTo(1)
+        service.rebuild()
+        assertThat(service.summarizeWeeklyResolutions(command).resolvedCount).isEqualTo(1)
+        deliver("reactivated", 4, "RESOLVED")
+        assertThat(service.summarizeWeeklyResolutions(command).resolvedCount).isEqualTo(2)
+        assertThat(service.summarizeWeeklyResolutions(command.copy(seasonId = UUID.randomUUID())).resolvedCount).isZero()
+        assertThat(service.summarizeWeeklyResolutions(command.copy(workspaceId = UUID.randomUUID())).resolvedCount).isZero()
+        mockMvc.perform(get("/api/v1/workspaces/$workspace/seasons/${UUID.randomUUID()}/attention-items/resolutions")
+            .param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.weekStart").value("2026-08-24"))
+            .andExpect(jsonPath("$.windowStart").value("2026-08-23T15:00:00Z"))
+            .andExpect(jsonPath("$.windowEnd").value("2026-08-30T15:00:00Z"))
+            .andExpect(jsonPath("$.resolvedCount").value(0))
+    }
+
+    @Test
+    fun `주간 해소 구간은 DST 전환 주의 실제 자정 경계를 따른다`() {
+        val workspace = UUID.randomUUID()
+        val season = UUID.randomUUID()
+        val service = BriefService(persistence, Clock.fixed(Instant.parse("2026-03-09T05:00:00Z"), ZoneOffset.UTC))
+        val command = GenerateEditionCommand(workspace, season, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York"))
+        listOf("2026-03-02T04:59:59Z", "2026-03-02T05:00:00Z", "2026-03-09T03:59:59Z", "2026-03-09T04:00:00Z").forEachIndexed { index, at ->
+            postEvent(eventJson(UUID.randomUUID().toString(), workspace.toString(), season.toString(), "dst-$index", 1))
+            postEvent(eventJson(UUID.randomUUID().toString(), workspace.toString(), season.toString(), "dst-$index", 2, "RESOLVED", occurredAt = at))
+        }
+        val summary = service.summarizeWeeklyResolutions(command)
+        assertThat(summary.windowStart).isEqualTo(Instant.parse("2026-03-02T05:00:00Z"))
+        assertThat(summary.windowEnd).isEqualTo(Instant.parse("2026-03-09T04:00:00Z"))
+        assertThat(summary.resolvedCount).isEqualTo(2)
+    }
+
     private fun postEvent(event: ObjectNode) = postEvent(JSON.writeValueAsString(event))
 
     private fun postEvent(json: String) = mockMvc.perform(
