@@ -275,6 +275,19 @@ jobs:
           )"
           test "$service_unauthenticated_status" = "401"
 
+          resolutions_path="${summary_path%/summary}/resolutions?weekStart=2026-08-24&zoneId=Asia/Seoul"
+          resolutions_response="$(
+            service_api_curl --fail --header="Authorization: Bearer $service_token" \
+              "https://brief-service:8443$resolutions_path"
+          )"
+          jq --exit-status '.resolvedCount == 0 and .weekStart == "2026-08-24"' <<< "$resolutions_response"
+          test "$(service_api_curl --output /dev/null --write-out '%{http_code}' \
+            "https://brief-service:8443$resolutions_path")" = "401"
+          test "$(curl --silent --show-error --connect-timeout 5 --max-time 10 \
+            --cacert "$staging_dir/root.crt" --resolve 'localhost:38443:127.0.0.1' \
+            --header "Authorization: Bearer $service_token" --output /dev/null --write-out '%{http_code}' \
+            "https://localhost:38443$resolutions_path")" = "404"
+
           service_health_status="$(
             service_api_curl \
               --header="Authorization: Bearer $service_token" \
