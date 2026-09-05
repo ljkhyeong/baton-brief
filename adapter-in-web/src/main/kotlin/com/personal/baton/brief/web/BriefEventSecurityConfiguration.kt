@@ -1,5 +1,6 @@
 package com.personal.baton.brief.web
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.DefaultValue
@@ -26,6 +27,7 @@ class BriefEventReceiverSecurityProperties(
 }
 
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @EnableConfigurationProperties(BriefEventReceiverSecurityProperties::class)
 class BriefEventSecurityConfiguration {
     @Bean

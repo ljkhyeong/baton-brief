@@ -74,6 +74,7 @@ data class AttentionItemTransition(
     val state: SourceEventState,
     val observedAt: Instant,
     val detectedRevisionGap: Boolean,
+    val sourceSeverity: SourceEventSeverity?,
 )
 
 data class AttentionItemTransitionHistory(

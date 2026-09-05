@@ -209,5 +209,5 @@ class BriefController(
 private fun BriefEdition.toResponse(
     builder: ResponseEntity.BodyBuilder = ResponseEntity.ok(),
 ): ResponseEntity<BriefEditionResponse> = builder
-    .eTag("brief-edition-v1-$editionId")
+    .eTag("brief-edition-v2-$editionId")
     .body(BriefEditionResponse.from(this))

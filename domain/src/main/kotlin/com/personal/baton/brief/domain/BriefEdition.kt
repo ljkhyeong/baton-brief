@@ -28,6 +28,11 @@ data class WeeklyWindow(
     }
 }
 
+enum class EditionItemSection {
+    CURRENT_WEEK,
+    CARRY_OVER,
+}
+
 data class BriefEditionItem(
     val sourceReference: String,
     val reasonCode: SourceEventType,
@@ -37,6 +42,7 @@ data class BriefEditionItem(
     val ruleVersion: Int,
     val aggregateRevision: Long?,
     val revisionGap: Boolean?,
+    val section: EditionItemSection?,
 )
 
 data class BriefEdition(
@@ -49,4 +55,8 @@ data class BriefEdition(
     val sourceCursor: Long,
     val generatedAt: Instant,
     val items: List<BriefEditionItem>,
-)
+) {
+    companion object {
+        const val RULE_VERSION = 2
+    }
+}

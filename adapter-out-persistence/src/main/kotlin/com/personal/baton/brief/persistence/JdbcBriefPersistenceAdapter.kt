@@ -17,7 +17,6 @@ import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
 import com.personal.baton.brief.domain.AttentionItem
-import com.personal.baton.brief.domain.AttentionProjector
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.ProjectionDecision
@@ -282,7 +281,7 @@ class JdbcBriefPersistenceAdapter(
         val fetched = jdbc.sql(
             """
             SELECT event_id, aggregate_revision, event_state AS state, occurred_at AS observed_at,
-                   processing_outcome = 'APPLIED_WITH_GAP' AS detected_revision_gap
+                   processing_outcome = 'APPLIED_WITH_GAP' AS detected_revision_gap, source_severity
               FROM source_event_receipt
              WHERE workspace_id = :workspaceId
                AND season_id = :seasonId
@@ -373,7 +372,7 @@ class JdbcBriefPersistenceAdapter(
             seasonId = command.seasonId,
             generation = generation,
             window = window,
-            ruleVersion = AttentionProjector.RULE_VERSION,
+            ruleVersion = BriefEdition.RULE_VERSION,
             sourceCursor = sourceCursor,
             generatedAt = generatedAt,
             items = content.items,
@@ -547,14 +546,12 @@ class JdbcBriefPersistenceAdapter(
          WHERE workspace_id = :workspaceId
            AND season_id = :seasonId
            AND item_status = 'ACTIVE'
-           AND observed_at >= :windowStart
            AND observed_at < :windowEnd
         """.trimIndent(),
     ).params(
         mapOf(
             "workspaceId" to command.workspaceId,
             "seasonId" to command.seasonId,
-            "windowStart" to window.start.jdbcValue(),
             "windowEnd" to window.end.jdbcValue(),
         ),
     ).query(ATTENTION_ITEM_MAPPER).list()
@@ -623,7 +620,7 @@ class JdbcBriefPersistenceAdapter(
             "seasonId" to command.seasonId,
             "weekStart" to command.weekStart,
             "zoneId" to command.zoneId.id,
-            "ruleVersion" to AttentionProjector.RULE_VERSION,
+            "ruleVersion" to BriefEdition.RULE_VERSION,
             "stateFingerprint" to stateFingerprint,
         ),
     )
@@ -667,10 +664,10 @@ class JdbcBriefPersistenceAdapter(
             """
             INSERT INTO brief_edition_item (
                 edition_id, position, source_reference, reason_code, severity,
-                item_status, observed_at, rule_version, aggregate_revision, revision_gap
+                item_status, observed_at, rule_version, aggregate_revision, revision_gap, section
             ) VALUES (
                 :editionId, :position, :sourceReference, :reasonCode, :severity,
-                :itemStatus, :observedAt, :ruleVersion, :aggregateRevision, :revisionGap
+                :itemStatus, :observedAt, :ruleVersion, :aggregateRevision, :revisionGap, :section
             )
             """.trimIndent(),
             edition.items.mapIndexed { position, item ->
@@ -685,6 +682,7 @@ class JdbcBriefPersistenceAdapter(
                     "ruleVersion" to item.ruleVersion,
                     "aggregateRevision" to item.aggregateRevision,
                     "revisionGap" to item.revisionGap,
+                    "section" to checkNotNull(item.section).name,
                 )
             }.toTypedArray(),
         )
@@ -712,7 +710,7 @@ class JdbcBriefPersistenceAdapter(
     private fun findEditionItems(editionId: UUID): List<BriefEditionItem> = jdbc.sql(
         """
         SELECT source_reference, reason_code, severity, item_status AS status, observed_at, rule_version,
-               aggregate_revision, revision_gap
+               aggregate_revision, revision_gap, section
           FROM brief_edition_item
          WHERE edition_id = :editionId
          ORDER BY position

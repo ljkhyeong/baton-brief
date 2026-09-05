@@ -4,6 +4,7 @@ import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.AttentionProjector
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
+import com.personal.baton.brief.domain.EditionItemSection
 import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
@@ -107,7 +108,7 @@ class BriefService(
             command,
             window,
             { clock.instant().truncatedTo(ChronoUnit.MICROS) },
-            ::selectEditionContent,
+            { selectEditionContent(it, window) },
         )
     }
 
@@ -166,15 +167,11 @@ class BriefService(
         )
     }
 
-    private fun selectEditionContent(items: List<AttentionItem>): EditionContent {
+    private fun selectEditionContent(items: List<AttentionItem>, window: WeeklyWindow): EditionContent {
         val selected = items
             .asSequence()
             .filter { it.status == SourceEventState.ACTIVE }
-            .sortedWith(
-                compareByDescending<AttentionItem> { it.severity }
-                    .thenBy { it.eventType.name }
-                    .thenBy { it.sourceReference },
-            ).map {
+            .map {
                 BriefEditionItem(
                     sourceReference = it.sourceReference,
                     reasonCode = it.eventType,
@@ -184,8 +181,18 @@ class BriefService(
                     ruleVersion = it.ruleVersion,
                     aggregateRevision = it.lastRevision,
                     revisionGap = it.revisionGap,
+                    section = if (it.observedAt < window.start) {
+                        EditionItemSection.CARRY_OVER
+                    } else {
+                        EditionItemSection.CURRENT_WEEK
+                    },
                 )
-            }.toList()
+            }.sortedWith(
+                compareBy<BriefEditionItem> { it.section }
+                    .thenByDescending { it.severity }
+                    .thenBy { it.reasonCode.name }
+                    .thenBy { it.sourceReference },
+            ).toList()
         return EditionContent(
             items = selected,
             stateFingerprint = sha256(
@@ -199,6 +206,7 @@ class BriefService(
                         item.ruleVersion,
                         item.aggregateRevision,
                         item.revisionGap,
+                        item.section,
                     )
                 },
             ),
