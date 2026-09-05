@@ -1,7 +1,7 @@
 # BATON BRIEF
 
-BATON BRIEF는 BATON 생태계의 운영 사실을 설명 가능한 관심 항목으로 투영하고, 일정 시점의
-불변 운영 브리프로 고정하는 독립 읽기 모델 서비스다.
+BATON BRIEF는 BATON의 업무 변경을 받아 점검 항목과 주간 브리프를 만드는 서비스다.
+저장한 브리프는 변경하지 않는다.
 
 ## 현재 상태
 
@@ -46,17 +46,17 @@ BATON 화면 안의 탐색 선택을 유지하고, 특정 생성본 링크 복�
 
 ## 기능 지도
 
-### 이벤트와 수신 증거
+### 이벤트 수신 기록
 
 - `POST /api/v1/events`는 이벤트 식별자·버전·본문 지문으로 동일 재전달과 충돌을 구분한다.
 - 집계 리비전으로 오래된 전달과 공백을 판정하며 수신과 현재 투영을 한 트랜잭션에서 처리한다.
-- 최초 수신 결과 단건과 작업공간·시즌별 이상 수신 증거를 읽기 전용으로 조회한다.
+- 최초 수신 결과 단건과 작업공간·시즌별 이상 수신 기록을 읽기 전용으로 조회한다.
 - 대체 보존 계약 전에는 `UNSUPPORTED`를 포함한 수신 기록과 이벤트별 최초 충돌 한 건을
   삭제·압축하지 않는다.
 
 ### 현재 관심 항목
 
-- `(workspaceId, seasonId, eventType, sourceReference)`를 복합 정체성으로 사용한다.
+- `(workspaceId, seasonId, eventType, sourceReference)`를 복합 식별자로 사용한다.
 - 현재 단건과 `ACTIVE`·`RESOLVED` 상태별 키셋 목록을 조회하고,
   [심각도·리비전 공백 필터](docs/PRD/0028_attention-item-filters/spec.md)로 목록을 좁힌다.
 - 작업공간·시즌별 활성 `HIGH`·`MEDIUM` 개수와 리비전 공백이 기록된 활성 항목 수를
@@ -230,7 +230,7 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 수동 백업과 빈 DB 복원은 [PostgreSQL 백업·복원 절차](docs/operations/postgresql-backup-restore.md)를
 따른다. 자동 백업·보관소와 운영 DB 전환은 포함하지 않는다.
 
-호스트 실행 권한으로 수신 증거·이상 이력을 조회하거나 전체 재구축을 수행하려면
+호스트 실행 권한으로 수신 기록·이상 이력을 조회하거나 전체 재구축을 수행하려면
 [운영 명령과 지표 조회 절차](docs/operations/diagnostics-and-metrics.md)를 따른다. 선택적인
 `compose.observability.yml`은 컨테이너 내부 `127.0.0.1:9091`에서 health·Prometheus 지표만
 제공한다. 공개·서비스 Caddy 허용 경로는 유지한다.
