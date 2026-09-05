@@ -1,6 +1,7 @@
 package com.personal.baton.brief.web
 
 import com.personal.baton.brief.application.AttentionItemTransitionHistory
+import com.personal.baton.brief.application.WeeklyResolutionSummary
 import com.personal.baton.brief.application.BriefUseCases
 import com.personal.baton.brief.application.CurrentAttentionItemSummary
 import com.personal.baton.brief.application.EditionComparison
@@ -120,6 +121,13 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
     ): CurrentAttentionItemSummary = brief.findAttentionItemSummary(workspaceId, seasonId)
+
+    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions")
+    fun summarizeWeeklyResolutions(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @Valid @ModelAttribute request: EditionWeekRequest,
+    ): WeeklyResolutionSummary = brief.summarizeWeeklyResolutions(request.toCommand(workspaceId, seasonId))
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions")
     fun findAttentionItemTransitions(

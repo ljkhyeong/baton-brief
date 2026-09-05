@@ -254,6 +254,51 @@ class JdbcBriefPersistenceAdapter(
         .query(ATTENTION_ITEM_SUMMARY_MAPPER)
         .single()
 
+    override fun countWeeklyResolutions(
+        workspaceId: UUID,
+        seasonId: UUID,
+        window: WeeklyWindow,
+        evaluatedAt: Instant,
+    ): Long = jdbc.sql(
+        """
+        WITH applied AS (
+            SELECT event_type, source_reference, aggregate_revision, event_state, occurred_at, processing_outcome
+              FROM source_event_receipt
+             WHERE workspace_id = :workspaceId AND season_id = :seasonId
+               AND processing_outcome IN ('APPLIED', 'APPLIED_WITH_GAP')
+        ), latest_active AS (
+            SELECT event_type, source_reference, MAX(aggregate_revision) AS revision
+              FROM applied WHERE event_state = 'ACTIVE'
+             GROUP BY event_type, source_reference
+        )
+        SELECT COUNT(*)
+          FROM latest_active active
+          JOIN applied resolved ON resolved.event_type = active.event_type
+                               AND resolved.source_reference = active.source_reference
+                               AND resolved.aggregate_revision - 1 = active.revision
+                               AND resolved.event_state = 'RESOLVED'
+          JOIN attention_item current ON current.workspace_id = :workspaceId
+                                     AND current.season_id = :seasonId
+                                     AND current.event_type = active.event_type
+                                     AND current.source_reference = active.source_reference
+                                     AND current.item_status = 'RESOLVED'
+         WHERE resolved.occurred_at >= :windowStart AND resolved.occurred_at < :windowEnd
+           AND resolved.occurred_at <= :evaluatedAt
+           AND NOT EXISTS (
+               SELECT 1 FROM applied later
+                WHERE later.event_type = active.event_type AND later.source_reference = active.source_reference
+                  AND later.aggregate_revision > resolved.aggregate_revision
+                  AND later.processing_outcome = 'APPLIED_WITH_GAP'
+           )
+        """.trimIndent(),
+    ).param("workspaceId", workspaceId)
+        .param("seasonId", seasonId)
+        .param("windowStart", window.start.jdbcValue())
+        .param("windowEnd", window.end.jdbcValue())
+        .param("evaluatedAt", evaluatedAt.jdbcValue())
+        .query(Long::class.java)
+        .single()
+
     override fun findAttentionItemTransitions(
         workspaceId: UUID,
         seasonId: UUID,

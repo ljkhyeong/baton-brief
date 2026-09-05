@@ -68,6 +68,15 @@ data class CurrentAttentionItemSummary(
     val revisionGapCount: Long,
 )
 
+data class WeeklyResolutionSummary(
+    val weekStart: LocalDate,
+    val zoneId: ZoneId,
+    val windowStart: Instant,
+    val windowEnd: Instant,
+    val evaluatedAt: Instant,
+    val resolvedCount: Long,
+)
+
 data class AttentionItemTransition(
     val eventId: UUID,
     val aggregateRevision: Long,
@@ -187,6 +196,8 @@ interface BriefUseCases {
 
     fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary
 
+    fun summarizeWeeklyResolutions(command: GenerateEditionCommand): WeeklyResolutionSummary
+
     fun findAttentionItemTransitions(
         workspaceId: UUID,
         seasonId: UUID,
@@ -265,6 +276,13 @@ interface BriefPersistencePort {
     ): CurrentAttentionItemPage
 
     fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary
+
+    fun countWeeklyResolutions(
+        workspaceId: UUID,
+        seasonId: UUID,
+        window: WeeklyWindow,
+        evaluatedAt: Instant,
+    ): Long
 
     fun findAttentionItemTransitions(
         workspaceId: UUID,

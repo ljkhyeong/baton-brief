@@ -84,6 +84,15 @@ class BriefService(
     override fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary =
         persistence.findAttentionItemSummary(workspaceId, seasonId)
 
+    override fun summarizeWeeklyResolutions(command: GenerateEditionCommand): WeeklyResolutionSummary {
+        val window = WeeklyWindow.startingOn(command.weekStart, command.zoneId)
+        val evaluatedAt = clock.instant().truncatedTo(ChronoUnit.MICROS)
+        return WeeklyResolutionSummary(
+            window.weekStart, window.zoneId, window.start, window.end, evaluatedAt,
+            persistence.countWeeklyResolutions(command.workspaceId, command.seasonId, window, evaluatedAt),
+        )
+    }
+
     override fun findAttentionItemTransitions(
         workspaceId: UUID,
         seasonId: UUID,
