@@ -92,6 +92,25 @@ BATON 프로덕션 설정에 BRIEF HTTPS origin과 파일 기반 Bearer 주입�
 
 ## 현재 검증 근거
 
+### BATON 이력 탐색·원본 업무 연결·생성 준비 상태
+
+BATON `codex/brief-edition-carryover-ui`의 PRD-0010에 따라 현재 업무명·역할/루틴 이동,
+저장된 에디션 이력·비교와 생성 준비 상태를 연결했다. 현재 업무 정보와 전달·실행 기록은
+BATON에서 별도 조회하며 BRIEF 제품 코드·V9 스키마·이벤트 계약·공개 허용 목록은 유지했다.
+BATON 커밋은 기능 `7da7f33`, 테스트 `f6c8e4f`, 문서 `2384056`으로 나눴다.
+
+BATON의 `build checkApiContract`와 실제 두 JAR·MySQL 8.4·PostgreSQL 18.6·서비스 Caddy의
+`BriefEditionHttpsEndToEndTest`가 성공했다. 이력·비교와 다른 작업공간 접근 거부, BATON
+원본 API로 만든 역할 신호의 업무 연결·전달 대기를 확인했다. 비교용 BRIEF 투영은 격리한
+DB에 준비했고 이벤트 생산·전달 테스트 전체를 재실행하지 않았다.
+
+첫 전체 실행의 테스트 데이터 간섭은 기존 MySQL 시나리오에 검증을 합쳐 해결하고 해당
+클래스 21건을 재검증했다. 그 뒤 애플리케이션 전체 테스트는 반복하지 않았다. 프런트 빌드와
+API 대역의 Chromium·390px 모바일·WebKit BRIEF 브라우저 21건이 성공했다. 전달 시각 표시를
+시즌 시간대로 맞춘 뒤 관련 시나리오도 세 환경에서 다시 통과했다. BRIEF는 이번에 문서만
+바꿔 제품 테스트·JAR 빌드를 반복하지 않았으며, 교차 검증은 앞서 검증한 BRIEF JAR을 사용했다.
+실제 스테이징 배포, 이번 주 해소 요약과 자동 생성·RELAY 전달은 남아 있다.
+
 ### 2026-09-05 주간 구분·원본 심각도·운영 명령
 
 [PRD-0029](docs/PRD/0029_edition-carry-over/spec.md)의 선정 규칙 v2는 현재 활성 항목을

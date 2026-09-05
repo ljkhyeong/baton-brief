@@ -37,6 +37,9 @@ BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운�
 [PRD-0024](docs/PRD/0024_baton-driven-edition-generation/spec.md), 서비스 인증과 비공개 연결은
 [PRD-0025](docs/PRD/0025_baton-service-api-security/spec.md)를 따른다.
 
+BATON 화면은 저장된 에디션의 이력·비교를 조회하고 현재 업무로 이동할 수 있다. 현재 업무명과
+생성 전 전달 상태는 BATON에서 별도로 조회하며 BRIEF의 불변 본문과 ETag를 바꾸지 않는다.
+
 ## 기능 지도
 
 ### 이벤트와 수신 증거
