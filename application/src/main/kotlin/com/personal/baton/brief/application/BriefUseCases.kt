@@ -75,6 +75,15 @@ data class WeeklyResolutionSummary(
     val windowEnd: Instant,
     val evaluatedAt: Instant,
     val resolvedCount: Long,
+    val items: List<ResolutionItem>,
+    val nextCursor: AttentionItemCursor?,
+)
+
+data class ResolutionItem(
+    val reasonCode: SourceEventType,
+    val sourceReference: String,
+    val resolvedAt: Instant,
+    val resolvedRevision: Long,
 )
 
 data class AttentionItemTransition(
@@ -196,7 +205,11 @@ interface BriefUseCases {
 
     fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary
 
-    fun summarizeWeeklyResolutions(command: GenerateEditionCommand): WeeklyResolutionSummary
+    fun summarizeWeeklyResolutions(
+        command: GenerateEditionCommand,
+        after: AttentionItemCursor? = null,
+        limit: Int = 20,
+    ): WeeklyResolutionSummary
 
     fun findAttentionItemTransitions(
         workspaceId: UUID,
@@ -277,12 +290,14 @@ interface BriefPersistencePort {
 
     fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary
 
-    fun countWeeklyResolutions(
+    fun findWeeklyResolutions(
         workspaceId: UUID,
         seasonId: UUID,
         window: WeeklyWindow,
         evaluatedAt: Instant,
-    ): Long
+        after: AttentionItemCursor?,
+        limit: Int,
+    ): WeeklyResolutionSummary
 
     fun findAttentionItemTransitions(
         workspaceId: UUID,

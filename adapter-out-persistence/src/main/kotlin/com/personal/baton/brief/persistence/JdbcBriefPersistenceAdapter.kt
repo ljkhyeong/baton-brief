@@ -14,6 +14,8 @@ import com.personal.baton.brief.application.EventReceiptAnomalyResult
 import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
+import com.personal.baton.brief.application.WeeklyResolutionSummary
+import com.personal.baton.brief.application.ResolutionItem
 import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
 import com.personal.baton.brief.domain.AttentionItem
@@ -254,13 +256,27 @@ class JdbcBriefPersistenceAdapter(
         .query(ATTENTION_ITEM_SUMMARY_MAPPER)
         .single()
 
-    override fun countWeeklyResolutions(
+    override fun findWeeklyResolutions(
         workspaceId: UUID,
         seasonId: UUID,
         window: WeeklyWindow,
         evaluatedAt: Instant,
-    ): Long = jdbc.sql(
-        """
+        after: AttentionItemCursor?,
+        limit: Int,
+    ): WeeklyResolutionSummary {
+        val afterClause = if (after == null) "" else
+            "WHERE (reason_code, source_reference) > (:afterEventType, :afterSourceReference)"
+        val parameters = mutableMapOf<String, Any>(
+            "workspaceId" to workspaceId, "seasonId" to seasonId,
+            "windowStart" to window.start.jdbcValue(), "windowEnd" to window.end.jdbcValue(),
+            "evaluatedAt" to evaluatedAt.jdbcValue(), "fetchLimit" to limit + 1,
+        )
+        if (after != null) {
+            parameters["afterEventType"] = after.eventType.name
+            parameters["afterSourceReference"] = after.sourceReference
+        }
+        val rows = jdbc.sql(
+            """
         WITH applied AS (
             SELECT event_type, source_reference, aggregate_revision, event_state, occurred_at, processing_outcome
               FROM source_event_receipt
@@ -270,8 +286,9 @@ class JdbcBriefPersistenceAdapter(
             SELECT event_type, source_reference, MAX(aggregate_revision) AS revision
               FROM applied WHERE event_state = 'ACTIVE'
              GROUP BY event_type, source_reference
-        )
-        SELECT COUNT(*)
+        ), resolutions AS (
+        SELECT resolved.event_type AS reason_code, resolved.source_reference,
+               resolved.occurred_at AS resolved_at, resolved.aggregate_revision AS resolved_revision
           FROM latest_active active
           JOIN applied resolved ON resolved.event_type = active.event_type
                                AND resolved.source_reference = active.source_reference
@@ -290,14 +307,33 @@ class JdbcBriefPersistenceAdapter(
                   AND later.aggregate_revision > resolved.aggregate_revision
                   AND later.processing_outcome = 'APPLIED_WITH_GAP'
            )
-        """.trimIndent(),
-    ).param("workspaceId", workspaceId)
-        .param("seasonId", seasonId)
-        .param("windowStart", window.start.jdbcValue())
-        .param("windowEnd", window.end.jdbcValue())
-        .param("evaluatedAt", evaluatedAt.jdbcValue())
-        .query(Long::class.java)
-        .single()
+        )
+        SELECT total.resolved_count, page.*
+          FROM (SELECT COUNT(*) AS resolved_count FROM resolutions) total
+          LEFT JOIN LATERAL (
+              SELECT * FROM resolutions
+              $afterClause
+              ORDER BY reason_code, source_reference
+              LIMIT :fetchLimit
+          ) page ON TRUE
+            """.trimIndent(),
+        ).params(parameters).query { result, _ ->
+            result.getLong("resolved_count") to result.getString("source_reference")?.let { reference ->
+                ResolutionItem(
+                    SourceEventType.valueOf(result.getString("reason_code")), reference,
+                    result.getObject("resolved_at", OffsetDateTime::class.java).toInstant(),
+                    result.getLong("resolved_revision"),
+                )
+            }
+        }.list()
+        val candidates = rows.mapNotNull { it.second }
+        val items = candidates.take(limit)
+        return WeeklyResolutionSummary(
+            window.weekStart, window.zoneId, window.start, window.end, evaluatedAt,
+            rows.first().first, items,
+            if (candidates.size > limit) items.last().let { AttentionItemCursor(it.reasonCode, it.sourceReference) } else null,
+        )
+    }
 
     override fun findAttentionItemTransitions(
         workspaceId: UUID,

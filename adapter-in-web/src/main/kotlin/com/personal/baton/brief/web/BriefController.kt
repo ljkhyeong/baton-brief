@@ -12,6 +12,8 @@ import com.personal.baton.brief.application.IngestStatus
 import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
 import com.personal.baton.brief.domain.BriefEdition
+import com.personal.baton.brief.domain.Severity
+import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.validation.Valid
@@ -102,15 +104,18 @@ class BriefController(
     fun findAttentionItems(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
-        @Valid @ModelAttribute request: CurrentAttentionItemPageRequest,
+        @Valid @ModelAttribute request: AttentionItemCursorRequest,
+        @RequestParam("status", defaultValue = "ACTIVE") status: SourceEventState,
+        @RequestParam("severity", required = false) severity: Severity?,
+        @RequestParam("revisionGap", required = false) revisionGap: Boolean?,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
     ): CurrentAttentionItemPageResponse = CurrentAttentionItemPageResponse.from(
         brief.findAttentionItems(
             workspaceId,
             seasonId,
-            request.status,
-            request.severity,
-            request.revisionGap,
+            status,
+            severity,
+            revisionGap,
             request.toCursor(),
             limit,
         ),
@@ -127,7 +132,11 @@ class BriefController(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @Valid @ModelAttribute request: EditionWeekRequest,
-    ): WeeklyResolutionSummary = brief.summarizeWeeklyResolutions(request.toCommand(workspaceId, seasonId))
+        @Valid @ModelAttribute cursor: AttentionItemCursorRequest,
+        @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
+    ): WeeklyResolutionSummary = brief.summarizeWeeklyResolutions(
+        request.toCommand(workspaceId, seasonId), cursor.toCursor(), limit,
+    )
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions")
     fun findAttentionItemTransitions(
