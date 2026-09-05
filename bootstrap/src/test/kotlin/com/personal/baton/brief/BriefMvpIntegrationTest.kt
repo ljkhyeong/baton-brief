@@ -1,6 +1,7 @@
 package com.personal.baton.brief
 
 import com.jayway.jsonpath.JsonPath
+import com.personal.baton.brief.application.AttentionItemCursor
 import com.personal.baton.brief.application.BriefPersistencePort
 import com.personal.baton.brief.application.BriefService
 import com.personal.baton.brief.application.GenerateEditionCommand
@@ -2089,6 +2090,27 @@ class BriefMvpIntegrationTest(
         assertThat(service.summarizeWeeklyResolutions(command).resolvedCount).isEqualTo(1)
         deliver("reactivated", 4, "RESOLVED")
         assertThat(service.summarizeWeeklyResolutions(command).resolvedCount).isEqualTo(2)
+        val firstPage = service.summarizeWeeklyResolutions(command, limit = 1)
+        assertThat(firstPage.resolvedCount).isEqualTo(2)
+        assertThat(firstPage.items.map { it.sourceReference }).containsExactly("reactivated")
+        val lastPage = service.summarizeWeeklyResolutions(command, firstPage.nextCursor, 1)
+        assertThat(lastPage.resolvedCount).isEqualTo(2)
+        assertThat(lastPage.items.single().sourceReference).isEqualTo("repeated")
+        assertThat(lastPage.items.single().resolvedAt).isEqualTo(Instant.parse("2026-08-23T15:00:00Z"))
+        assertThat(lastPage.items.single().resolvedRevision).isEqualTo(2)
+        assertThat(lastPage.nextCursor).isNull()
+        val exhausted = service.summarizeWeeklyResolutions(command,
+            AttentionItemCursor(SourceEventType.HANDOFF_BLOCKED, "repeated"), 1)
+        assertThat(exhausted.items).isEmpty()
+        assertThat(exhausted.resolvedCount).isEqualTo(2)
+        deliver("reactivated", 5, "ACTIVE")
+        service.rebuild()
+        assertThat(service.summarizeWeeklyResolutions(command).items).isEqualTo(lastPage.items)
+        mockMvc.perform(get("/api/v1/workspaces/$workspace/seasons/$season/attention-items/resolutions")
+            .param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul")
+            .param("afterEventType", "HANDOFF_BLOCKED"))
+            .andExpect(status().isBadRequest)
+
         assertThat(service.summarizeWeeklyResolutions(command.copy(seasonId = UUID.randomUUID())).resolvedCount).isZero()
         assertThat(service.summarizeWeeklyResolutions(command.copy(workspaceId = UUID.randomUUID())).resolvedCount).isZero()
         mockMvc.perform(get("/api/v1/workspaces/$workspace/seasons/${UUID.randomUUID()}/attention-items/resolutions")
@@ -2098,6 +2120,8 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.windowStart").value("2026-08-23T15:00:00Z"))
             .andExpect(jsonPath("$.windowEnd").value("2026-08-30T15:00:00Z"))
             .andExpect(jsonPath("$.resolvedCount").value(0))
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
     }
 
     @Test
