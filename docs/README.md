@@ -33,7 +33,7 @@
 | --- | --- | --- |
 | [PRD-0007 수신 증거 단건](PRD/0007_event-receipt-query/spec.md) | 채택됨 | 최초 수신 결과와 최초 충돌 탐지 시각 조회 |
 | [PRD-0011 이상 수신 증거 이력](PRD/0011_event-receipt-anomalies/spec.md) | 채택됨 | 작업공간·시즌 범위 이상 기록 키셋 조회 |
-| [PRD-0018 BATON 생산자 선행조건](PRD/0018_baton-producer-compatibility/spec.md) | 채택됨 | 생산 의미·정체성·리비전·outbox·종단 간 검증 게이트 |
+| [PRD-0018 BATON 생산자 선행조건](PRD/0018_baton-producer-compatibility/spec.md) | 채택됨 | 이벤트 의미·식별자·변경 번호·outbox·연동 검증 조건 |
 | [PRD-0019 연속성 신호 이벤트 v2](PRD/0019_baton-continuity-event-v2/spec.md) | 채택됨 | 다섯 신호, 원본 심각도, v1 호환 소비와 계약 팩 |
 | [PRD-0020 이벤트 수신 인증](PRD/0020_baton-event-authentication/spec.md) | 채택됨 | BATON 전용 Bearer와 현재·직전 token 교체 경계 |
 
