@@ -15,6 +15,7 @@ BATON 사용자 계정이나 멤버십을 복제하지 않는다.
 서비스 자격 증명은 다음 경로와 메서드에만 권한을 준다.
 
 - 현재 관심 항목 단건·상태별 목록·전이 이력과 PRD-0027의 활성 요약 `GET`
+- PRD-0030의 `GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions`
 - 에디션 전역 최신·주간 최신·단건·이력·비교 `GET`
 - `POST /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions`
 

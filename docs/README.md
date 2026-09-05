@@ -48,6 +48,7 @@
 | [PRD-0017 현재 단건 조건부 조회](PRD/0017_current-attention-item-etag/spec.md) | 채택됨 | 현재 표현의 `ETag`와 `If-None-Match` |
 | [PRD-0027 현재 활성 항목 요약](PRD/0027_attention-item-summary/spec.md) | 채택됨 | 활성 심각도별 개수와 리비전 공백 항목 수 |
 | [PRD-0028 심각도·공백 필터](PRD/0028_attention-item-filters/spec.md) | 채택됨 | 기존 현재 목록의 선택 필터와 키셋 조건 유지 |
+| [PRD-0030 주간 해소 요약](PRD/0030_weekly-resolution-summary/spec.md) | 채택됨 | 연속된 활성·해소 증거와 현재 해소 상태를 함께 확인한 주간 집계 |
 
 ## 불변 에디션
 
