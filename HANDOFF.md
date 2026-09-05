@@ -13,7 +13,7 @@ BATON BRIEF의 로컬 MVP와 최소 스테이징 실행 경계를 구현했다.
 - 조회·생성만 허용하는 별도 Bearer와 호스트 포트 없는 서비스 전용 Caddy HTTPS 앞단
 - BRIEF 호스트 포트 비게시와 wrapper·외부 Action·Dockerfile·Caddy 실제 조립을 확인하는 CI 경계
 
-현재 데이터베이스 마이그레이션은 V8까지다. 이벤트 v2 계약 팩 버전은
+현재 데이터베이스 마이그레이션은 V9까지다. 이벤트 v2 계약 팩 버전은
 `2.0.0-rc.4`이며 원격 스테이징 호환을 완료한 안정 버전이 아니다. 계약과 구조 결정의
 전체 목록은 [문서 색인](docs/README.md)을 따른다.
 
@@ -83,6 +83,42 @@ BATON 프로덕션 설정에 BRIEF HTTPS origin과 파일 기반 Bearer 주입�
 
 ## 현재 검증 근거
 
+### 2026-09-05 주간 구분·원본 심각도·운영 명령
+
+[PRD-0029](docs/PRD/0029_edition-carry-over/spec.md)의 선정 규칙 v2는 현재 활성 항목을
+`CURRENT_WEEK`·`CARRY_OVER`로 나눠 불변 항목에 저장한다. V9 이전 분류는 `null`로 유지하며
+항목 투영 규칙은 1이다. `section`은 상태 지문·비교에 포함하고 전체 에디션 표현의 ETag
+버전도 올렸다. 전이 조회는 수신 기록의 원본 `sourceSeverity`를 그대로 반환한다.
+
+BRIEF의 전체 `test :bootstrap:bootJar contractsZip`이 성공했다. 이전 데이터 업그레이드,
+주차 양쪽 경계·그룹 정렬, 빈 에디션 규칙 전환, 늦은 해소·오래된 리비전, 기존 에디션과
+재구축 후 불변성, 원본 심각도 보존을 기존 PostgreSQL 통합 시나리오에서 확인했다.
+운영 명령의 웹·자동 마이그레이션 차단도 확인했다. 이벤트 요청·계약 버전은 유지했다.
+
+ADR-0008의 이미지·선택적 Compose 조립을 별도 PostgreSQL 18.6·임시 비밀로 실행했다.
+설정 유효성, UID/GID 10001·읽기 전용·cap_drop=ALL·내부 네트워크·호스트 포트 비게시,
+관리 포트의 DB aggregate health, 파일 Bearer 이벤트 수신과 결과 지표를 확인했다.
+Prometheus는 loopback에서 조회되고 컨테이너 네트워크 주소의 9091 접속은 거부됐다.
+`RECEIPT`·`ANOMALIES`·`REBUILD`는 웹 서버 없이 정상 종료했으며 미존재 조회는 오류로
+종료했다. 로그 token 비노출을 확인하고 검증 컨테이너·볼륨·네트워크·임시 비밀을 제거했다.
+
+BATON 소비자 변경은 `codex/brief-attention-view`에서 만든 별도
+`codex/brief-edition-carryover-ui` 브랜치에 있다. 분류와 원본 심각도를 중계하고 화면에서
+이번 주 변경·이전 미해소·이전 분류 미기록을 구분한다. 기존 성공 생성 실행은 BATON에서
+재사용하므로 업그레이드만으로 과거 에디션을 강제 재생성하지 않는다.
+
+BATON `build checkApiContract`와 실제 두 JAR·MySQL 8.4·PostgreSQL 18.6·서비스 Caddy의
+`BriefEditionHttpsEndToEndTest`가 성공했다. 격리된 BRIEF DB의 대표 투영·수신 증거로
+`CARRY_OVER` 생성·조회와 전이의 원본 `WARNING` 전달을 확인했다. 이벤트 생산·전달
+테스트를 다시 실행한 것은 아니다. 프런트 빌드와 API 대역의 BRIEF 브라우저 검증 12건도
+통과했다. 분류 영역 캡처는 다른 작업의 포트 사용을 피해 임시 3117 포트에서 3개 브라우저를
+다시 확인했다. Chromium·390px 모바일·WebKit 결과이며 실제 스테이징 브라우저 검증은 남아 있다.
+
+실제 스테이징 접속·배포 비밀 경로·수집 시스템이 제공되지 않아 원격 활성화와 수집·자동
+경보는 실행하지 않았다. 이벤트 VERSION·Schema·일곱 예시는 유지하며 새 로컬 계약 ZIP에는
+변경된 설명 문서가 포함된다. BATON의 기존 계약 핀·배포 릴리스는 변경하지 않았다.
+
+
 ### 현재 관심 항목 요약과 필터
 
 [PRD-0027](docs/PRD/0027_attention-item-summary/spec.md)에 따라 작업공간·시즌별 활성
@@ -123,7 +159,7 @@ MySQL 8.4·PostgreSQL 18.6과 서비스 Caddy에서 새 조회의 허용·거부
 사용한 Chromium·390px 모바일·WebKit 테스트로 확인했다. 두 검증을 실제 브라우저에서 두
 백엔드까지 한 번에 연결한 스테이징 검증으로 확대하지 않는다.
 
-이번 BRIEF 변경은 인수인계 문서뿐이다. 제품 코드·이벤트 계약·이미지 입력은 유지했으며
+해당 2026-08-31 BRIEF 변경은 인수인계 문서뿐이었다. 제품 코드·이벤트 계약·이미지 입력은 유지했으며
 실제 배포 비밀과 공인 인증서를 사용하는 스테이징 활성화, BATON 작업 브랜치 병합은 남아 있다.
 
 같은 BATON 브랜치에 PRD-0016 상태 전이 중계·상세와 기존 최신 에디션 조회·생성 화면도 연결했다.
@@ -138,7 +174,8 @@ BATON 전체 빌드·API 계약 검사와 프런트 빌드는 통과했다. 전�
 
 PRD-0026에 따라 웹 어댑터가 Micrometer `brief.events.received`에 수신 결과별 요청 수를
 기록한다. 기존 Actuator 자동 구성을 사용하고 `outcome` 외 식별자 태그는 넣지 않는다.
-외부 수집·경보와 지표 HTTP 노출은 활성화하지 않았다.
+기본 조립에는 지표 HTTP를 노출하지 않는다. ADR-0008의 선택적 조립은 컨테이너 loopback에서
+Prometheus 지표를 제공하며 외부 수집·경보 연결은 남아 있다.
 
 2026-08-30 기존 수신·health 대상 테스트에서 여섯 결과의 증가량과 `/actuator/metrics`의
 비노출을 확인한 뒤 `./gradlew --no-daemon test :bootstrap:bootJar`가 성공했다. 변경 없는
@@ -389,7 +426,7 @@ Jackson 3.1.5가 일치하는 것과 저장소 전체 검증을 확인했다.
 - WATCH·RELAY·GO 생산자 연동과 브로커
 - 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관과 숫자 보존 기간
 - 재구축 SLO·잠금 제한 시간, 체크포인트, 운영 백업 보관 정책·복구 전환과 RPO·RTO
-- 수신 지표의 비공개 수집 경로·인증·수집 시스템과 경보
+- 호스트 내부 지표 조회를 실제 수집 시스템에 연결하고 수집 장애·전달 장애 경보를 검증하는 작업
 - Caddy 인증서 볼륨 소유권을 포함한 비루트 전환과 다중 인스턴스 고가용성
 - 이미지 registry와 릴리스 정책
 - Gradle dependency verification metadata의 신뢰 가능한 최초 checksum 검토와

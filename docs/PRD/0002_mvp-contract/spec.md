@@ -262,8 +262,10 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 - 생성 트랜잭션에서 해당 작업공간·시즌에 보존된 지원 수신 기록의 최대
   `ingestion_sequence`를 `sourceCursor`로 고정한다. 이 값은 BRIEF가 처리한 로컬 수신 기록
   경계이며 원본 시스템의 완전성 워터마크나 수신 기록 도착 시각이 아니다.
-- 같은 트랜잭션의 현재 투영 중 `ACTIVE`이고 원본
-  `occurredAt`(`observedAt`)이 `[windowStart, windowEnd)`에 속한 항목만 선택한다.
+- PRD-0029의 에디션 선정 규칙 v2는 같은 트랜잭션의 현재 `ACTIVE` 항목 중 원본
+  `occurredAt`(`observedAt`)이 `windowEnd`보다 이른 항목을 선택한다. `[windowStart, windowEnd)`는
+  `CURRENT_WEEK`, `windowStart` 이전은 `CARRY_OVER`로 구분한다. 기존 규칙 v1은 해당 주간의
+  항목만 선정했으며 저장된 이전 에디션은 바꾸지 않는다.
 - 정렬·선택된 고정 항목 상태를 정규화해 `stateFingerprint`를 계산한다. 같은 작업공간,
   시즌, `weekStart`, `zoneId`와 규칙 버전의 가장 최근 에디션이 같은
   `stateFingerprint`를 가질 때만 반복 생성 요청으로 판단한다. 이 경우 하나의 논리적
@@ -272,8 +274,9 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 - PRD-0010을 적용한 상태 지문에는 선택 항목의 `aggregateRevision`과 `revisionGap`도
   포함한다. 표시 필드가 같더라도 리비전 근거가 달라지면 새 세대를 만들고, 같은 근거의
   반복 생성은 가장 최근 에디션을 멱등하게 반환한다.
-- 항목은 `severity` 내림차순(`HIGH`가 `MEDIUM`보다 먼저), 그다음 `reasonCode`, 마지막으로
-  `sourceReference` 오름차순으로 안정 정렬한다.
+- `CURRENT_WEEK`, `CARRY_OVER` 그룹 순서 안에서 `severity` 내림차순(`HIGH`가 `MEDIUM`보다
+  먼저), `reasonCode`, `sourceReference` 오름차순으로 안정 정렬한다. `section`도 새 항목의
+  상태 지문에 포함하며 새 에디션의 `ruleVersion=2`와 항목의 투영 `ruleVersion=1`을 구분한다.
 - 생성이 완료되면 선택한 항목과 표시 필드, PRD-0010의 집계 리비전·리비전 공백 근거,
   구간, 시간대, 규칙 버전과 원본 커서를 고정한다. 이후 투영 변경이나 재구축이 기존
   에디션을 수정하지 않는다.
@@ -295,7 +298,8 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 `workspaceId`, `seasonId`, `generation`, `weekStart`, `zoneId`, `windowStart`, `windowEnd`,
 `sourceCursor`, `generatedAt`, `ruleVersion`과 고정된 `items`를 포함한다. 항목에는
 `reasonCode`, `severity`, `sourceReference`, `status`, `observedAt`, `ruleVersion`, `null`을
-허용하는 `aggregateRevision`과 `revisionGap`을 둔다. PRD-0010 적용 뒤 새 항목은 두 근거가
+허용하는 `aggregateRevision`, `revisionGap`과 `section`을 둔다. `section`은 신규 항목에서
+필수이며 V9 이전 항목은 `null`을 유지한다. PRD-0010 적용 뒤 새 항목은 두 근거가
 모두 값이 있고, Flyway V3 이전 항목은 정확한 값을 저장하지 않았으므로 둘 다 `null`이다.
 이전 값을 `0`·`false`로 채우거나 현재 투영에서 추정하지 않는다. 조회 대상이 없으면
 `404 Not Found`를 반환한다.

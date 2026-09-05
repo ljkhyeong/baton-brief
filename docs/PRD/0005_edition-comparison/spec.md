@@ -58,6 +58,8 @@ PRD-0002와 PRD-0003은 불변 에디션의 단건·이력 조회를 제공하�
 표시 필드를 그대로 재사용한다. 즉 `reasonCode`, `severity`, `sourceReference`, `status`,
 `observedAt`, `ruleVersion`, `null`을 허용하는 `aggregateRevision`과 `revisionGap`을 포함한다.
 Flyway V3 이전 항목은 두 리비전 근거가 모두 `null`이며, 새 항목은 둘 다 저장된 값이다.
+PRD-0029의 `section`도 같은 고정 표현에 포함한다. V9 이전 항목은 `null`이며 분류만
+달라도 `changed`로 반환한다.
 변경되지 않은 항목은 응답에 반복하지 않는다.
 
 ## 비교 규칙
@@ -77,7 +79,8 @@ Flyway V3 이전 항목은 두 리비전 근거가 모두 `null`이며, 새 항�
 
 `added`와 `changed`는 대상 에디션에 저장된 항목 순서를 유지한다. `removed`는 기준
 에디션에 저장된 항목 순서를 유지한다. 따라서 별도 정렬 선택지 없이도 PRD-0002의
-`severity` 내림차순, `reasonCode`, `sourceReference` 오름차순 결과가 재현된다.
+저장 순서가 재현된다. PRD-0029 적용 뒤 새 에디션은 그룹 순서 안에서 `severity` 내림차순,
+`reasonCode`, `sourceReference` 오름차순을 사용한다.
 
 `removed`는 대상 스냅샷에 해당 비교 키가 없다는 뜻일 뿐이다. 현재 투영이나 원본의
 `RESOLVED` 상태를 판정하거나 추론하지 않는다.

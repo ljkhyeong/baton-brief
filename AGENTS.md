@@ -98,6 +98,11 @@
   기록만 원본 `aggregateRevision` 내림차순으로 반환한다. `detectedRevisionGap`은 해당
   전이에서 새로 발견한 공백이며 현재 항목의 누적 `revisionGap`으로 바꾸지 않는다.
 - 에디션은 불변이다. 기존 에디션을 덮어쓰지 않는다.
+- PRD-0029의 새 에디션 선정 규칙은 `2`, 현재 투영·항목 규칙은 `1`이다. 현재 `ACTIVE`이고
+  `observedAt < windowEnd`인 항목을 `CURRENT_WEEK`·`CARRY_OVER`로 구분해 저장·지문·비교에
+  포함한다. V9 이전 `section`은 `null`을 유지하고 기존 에디션을 다시 분류하지 않는다.
+- 상태 전이 응답의 `sourceSeverity`는 보존 수신 기록을 그대로 반환하며 v1의 `null`을
+  현재 표시 심각도로 채우지 않는다.
 - 새 에디션 항목은 `aggregateRevision`과 `revisionGap`을 함께 고정하고 응답,
   `stateFingerprint`와 비교 `changed` 판정에 포함한다. Flyway V3 이전 항목은 정확한
   근거가 없으므로 두 값을 `null`로 유지하며 `0`·`false`로 기존 데이터를 채우거나 현재
@@ -140,6 +145,9 @@
   않는다. 스테이징 Docker healthcheck는 이 aggregate endpoint를 사용한다. Spring Boot
   4.1의 health probes 기본값은 `true`이므로 오케스트레이터 계약 전에는 표준 속성으로
   비활성 상태를 유지한다.
+- ADR-0008의 선택적 관측 조립만 관리 서버를 컨테이너 loopback `127.0.0.1:9091`로 옮기고
+  health·Prometheus 지표를 제공한다. 기본 조립·공개 및 서비스 Caddy의 차단은 유지한다.
+  운영 명령은 HTTP 서버·Flyway를 끈 단발성 실행이며 호스트의 실행 권한과 감사를 사용한다.
 - 스테이징 이미지는 ADR-0004의 digest로 고정한 Java 21 JDK/JRE, UID/GID `10001`, 읽기
   전용 루트와 `/tmp` tmpfs를 유지한다. PostgreSQL과 Bearer 비밀은 파일 기반 Compose
   secrets와 Spring config tree로 주입하고 일반 환경 변수·별도 비밀 로더를 만들지 않는다.

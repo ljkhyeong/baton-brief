@@ -58,6 +58,7 @@
 | [PRD-0009 주간 범위 최신](PRD/0009_weekly-latest-edition/spec.md) | 채택됨 | 주간·시간대 정확 범위의 최신 불변 스냅샷 |
 | [PRD-0010 에디션 리비전 근거](PRD/0010_edition-revision-evidence/spec.md) | 채택됨 | 집계 리비전·공백 고정과 이전 항목 `null` 호환성 |
 | [PRD-0012 에디션 조건부 조회](PRD/0012_edition-etag/spec.md) | 채택됨 | 전체 에디션 응답의 `ETag`와 `If-None-Match` |
+| [PRD-0029 주간 변경·이전 미해소 구분](PRD/0029_edition-carry-over/spec.md) | 채택됨 | 에디션 선정 규칙 v2와 생성 당시 항목 분류 |
 
 ## 스테이징 실행
 
@@ -85,10 +86,12 @@
 | [ADR-0005 Caddy HTTPS 앞단](ADR/0005_caddy-event-ingress/adr.md) | 채택됨 | 자동 HTTPS, 공개 경로 허용 목록과 최소 capability |
 | [ADR-0006 BATON·BRIEF 애플리케이션 경계](ADR/0006_baton-brief-application-boundary/adr.md) | 채택됨 | BATON의 사용자 권한·생성 실행과 BRIEF 내부 읽기 모델 책임 |
 | [ADR-0007 BATON 서비스 API 인증](ADR/0007_baton-service-api-security/adr.md) | 채택됨 | 이벤트와 분리한 Bearer와 서비스 전용 HTTPS 앞단 |
+| [ADR-0008 호스트 권한 운영](ADR/0008_host-authorized-operations/adr.md) | 채택됨 | 단발성 진단·재구축과 컨테이너 loopback 지표 조회 |
 
 ## 다른 기준 자료
 
 - [PostgreSQL 수동 백업·격리 복원](operations/postgresql-backup-restore.md)
+- [수신 진단·재구축과 지표 조회](operations/diagnostics-and-metrics.md)
 - [이벤트 v2 계약 팩](../contracts/README.md)
 - [현재 검증과 다음 작업](../HANDOFF.md)
 - [개발 작업 규칙](../AGENTS.md)

@@ -145,6 +145,11 @@ description: BATON BRIEF 저장소 전용 보완 작업 절차. 기술 스택·�
   사용한다. 커스텀 controller, DTO, `HealthIndicator`, 상태 매퍼와 DB 확인 SQL을 만들지
   않는다. Spring Boot 4.1의 health probes 기본값은 `true`이므로 배포 계약을 채택하기
   전에는 `management.endpoint.health.probes.enabled=false`를 유지한다.
+- ADR-0008의 운영 명령은 같은 JAR과 기존 유스케이스를 사용하되 웹 서버·Flyway를 끄고
+  한 번 실행한 뒤 종료한다. 운영 권한은 배포 호스트가 소유하며 별도 공개 관리 API를 만들지 않는다.
+- 선택적 지표 조립은 표준 Prometheus registry와 관리 서버의 `127.0.0.1:9091` 바인딩,
+  같은 포트의 aggregate health를 사용한다. 외부 수집·경보 완료와 구분하고 호스트 포트나
+  Caddy 허용 목록을 늘리지 않는다.
 - 완료한 변경은 주된 목적에 따라 `설정`, `기능`, `수정`, `리팩터`, `테스트`, `문서`로
   나누고 명시적인 경로만 스테이징해 각각 커밋한다.
 

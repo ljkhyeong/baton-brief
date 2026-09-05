@@ -28,7 +28,8 @@ description: BATON BRIEF의 관심 항목 투영 작업 절차. AttentionItem, r
   확대하지 않는다.
 - PRD-0016을 실제 적용 상태 전이 증거 이력 기준으로 사용한다. 복합 정체성의 적용
   리비전을 원본 순서로 반환하고 전이별 `detectedRevisionGap`을 현재 항목의 누적
-  `revisionGap`과 구분한다.
+  `revisionGap`과 구분한다. 전이의 `sourceSeverity`는 저장한 원본 `CRITICAL`·`WARNING`을
+  그대로 반환하며 v1의 `null`은 표시 심각도에서 추정하지 않는다.
 - PRD-0017을 현재 관심 항목 단건 조건부 조회 기준으로 사용한다. 표현 버전·규칙 버전·
   마지막 적용 리비전에 결합한 검증자를 사용하고 목록이나 과거 전이의 스냅샷 토큰으로
   확대하지 않는다.
