@@ -1,4 +1,4 @@
 interface:
-  display_name: "BATON BRIEF 이벤트 흐름"
-  short_description: "안전한 BRIEF 이벤트 수신 계약 관리"
-  default_prompt: "$baton-brief-event-flows를 사용해 신뢰할 수 있는 BATON 이벤트 수신 계약을 정의하거나 구현해 주세요."
+  display_name: "BATON BRIEF 이벤트 수신"
+  short_description: "BRIEF 이벤트 계약·멱등 수신·증거 보존 변경"
+  default_prompt: "$baton-brief-event-flows를 사용해 BATON BRIEF 이벤트 수신 계약과 호환성을 확인해 변경해 주세요."
