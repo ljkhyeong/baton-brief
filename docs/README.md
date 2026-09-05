@@ -90,6 +90,7 @@
 
 ## 다른 기준 자료
 
+- [brief.b4ton.com 배포 준비](operations/brief-b4ton-com-deployment.md)
 - [PostgreSQL 수동 백업·격리 복원](operations/postgresql-backup-restore.md)
 - [수신 진단·재구축과 지표 조회](operations/diagnostics-and-metrics.md)
 - [이벤트 v2 계약 팩](../contracts/README.md)

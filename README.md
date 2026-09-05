@@ -180,6 +180,10 @@ docker compose --env-file .env.staging \
 
 ## 스테이징 실행
 
+공개 이벤트 수신 주소는 `https://brief.b4ton.com`을 사용한다. 서버·DNS와 공개 앞단을
+준비하는 순서는 [도메인 배포 안내](docs/operations/brief-b4ton-com-deployment.md)를 따른다.
+현재 구축 상태는 `HANDOFF.md`에서 확인한다.
+
 `.env.staging.example`을 추적되지 않는 `.env.staging`으로 복사하고 데이터베이스·Bearer
 파일의 실제 절대 경로를 지정한다.
 
