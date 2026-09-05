@@ -92,6 +92,20 @@ BATON 프로덕션 설정에 BRIEF HTTPS origin과 파일 기반 Bearer 주입�
 
 ## 현재 검증 근거
 
+### 2026-09-05 BATON 화면 복원·공유·출력
+
+BATON 분리 작업 폴더 `/Users/lim/devProject/personal/manager-brief-edition-carryover`에서
+같은 작업공간의 필터·조회 생성본·비교 선택 유지, 특정 에디션 링크 복사와 로그인 복귀,
+선택한 불변 브리프 인쇄·PDF 저장을 연결했다. 상세 동작은 BATON PRD-0010을 따른다.
+현재 업무명은 별도로 구분하며 링크·인쇄 주소에 팀 접근 키를 넣지 않는다.
+
+BATON 프런트 빌드와 API 대역 브라우저 55건이 통과했다. Chromium·390px 모바일·WebKit에서
+기존 BRIEF 조회·생성·해소, 화면 왕복과 선택 복원, 링크·로그인·거부 처리, 출력 및 기존
+바통북 인쇄를 확인했다. Chromium이 생성한 5쪽 PDF에서 24개 항목의 원본 참조와 선택
+에디션 식별자, 주소의 접근 키 비노출을 확인했다. 임시 3179 포트 설정은 정리했다.
+실제 운영체제 인쇄 창·실기기 저장과 공인 스테이징 검증은 남아 있다. 이번 변경은 BATON
+화면과 문서에 한정하여 양쪽 백엔드 전체 테스트·교차 서비스 실행은 반복하지 않았다.
+
 ### 2026-09-05 주간 해소 상세
 
 주간 해소 응답에 항목·해소 시각·해소 리비전·배타 커서를 추가했다. 같은 SQL 문의 동일한
@@ -105,8 +119,9 @@ BATON 프로덕션 설정에 BRIEF HTTPS origin과 파일 기반 Bearer 주입�
 
 BATON 분리 작업 폴더 `/Users/lim/devProject/personal/manager-brief-edition-carryover`에는
 해소 건수를 눌러 업무·시점을 조회하고 현재 업무로 이동하는 화면과 생성·재사용 성공 후
-관련 조회를 첫 페이지부터 갱신하는 동작을 연결했다. BATON의 교차 서비스·브라우저 최종
-검증은 해당 저장소의 `HANDOFF.md`를 따른다. 상세 응답을 제공하는 BRIEF를 먼저 적용해야 하며,
+관련 조회를 첫 페이지부터 갱신하는 동작을 연결했다. 당시 BATON `build checkApiContract`와
+최신 두 JAR의 `BriefEditionHttpsEndToEndTest`, API 대역 브라우저 30건이 통과했다. 현재 화면
+검증은 위 BATON 화면 복원·공유·출력 항목을 따른다. 상세 응답을 제공하는 BRIEF를 먼저 적용해야 하며,
 공개·서비스 Caddy 경로와 배포 조립은 이번 상세 확장에서 변경하지 않았다.
 
 
