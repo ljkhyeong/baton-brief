@@ -17,14 +17,15 @@ DNS 연결·공인 인증서 발급·원격 배포·push는 이 작업에서 실
 
 ## 재사용할 검증 근거
 
-아래 결과는 기존 작업 기록에서 확인했다. 이번 지침 정리에서는 제품 테스트를 실행하지 않았다.
+아래 결과는 각 행의 기준에만 적용한다.
 재사용 전에는 기준 이후의 관련 소스·테스트·설정·환경 차이를 [검증 절차](docs/development/verification.md)로 확인한다.
 기준 커밋이 없는 과거 실행은 현재 코드의 검증을 생략할 근거로 단독 사용하지 않는다.
 
-### 로컬 메인 병합 기준: 2026-09-05
+### 최근 로컬 검증: 2026-09-05
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `c534951` 이후 주간 해소 RowMapper 교체 | `./gradlew :bootstrap:test --tests 'com.personal.baton.brief.BriefMvpIntegrationTest.주간 해소*'` 2건 통과, 제외 없음. JDK 21·PostgreSQL 18.6 | JDBC 어댑터 한 파일의 매핑 변경. 상세 값·빈 페이지·전체 건수·재구축·DST 경계 확인. 전체 테스트·JAR 생성은 반복하지 않음 |
 | BRIEF `aeb943e` | `./gradlew test :bootstrap:bootJar` 성공, Gradle 기존 결과 재사용 | 병합 시 제품 입력 유지. 새 전체 테스트 실행으로 기록하지 않음 |
 | BATON `1916d8c8` | `build checkApiContract`, 후속 계약 문서 수정의 `generateApiContract checkApiContract`, 최종 프런트 빌드 성공 | 병합한 코드·API 계약·프런트 빌드. 원격 배포 근거는 아님 |
 | BATON 병합 중 전체 브라우저 실행 | API 대역 환경에서 614건 통과·기존 조건에 따라 43건 제외 | 이후 열람자 제한 보완이 있어 최종 코드 전체 재실행 결과는 아님 |

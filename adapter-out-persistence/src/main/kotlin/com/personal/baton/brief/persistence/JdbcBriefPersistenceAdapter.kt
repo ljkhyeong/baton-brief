@@ -317,13 +317,9 @@ class JdbcBriefPersistenceAdapter(
               LIMIT :fetchLimit
           ) page ON TRUE
             """.trimIndent(),
-        ).params(parameters).query { result, _ ->
-            result.getLong("resolved_count") to result.getString("source_reference")?.let { reference ->
-                ResolutionItem(
-                    SourceEventType.valueOf(result.getString("reason_code")), reference,
-                    result.getObject("resolved_at", OffsetDateTime::class.java).toInstant(),
-                    result.getLong("resolved_revision"),
-                )
+        ).params(parameters).query { result, rowNumber ->
+            result.getLong("resolved_count") to result.getString("source_reference")?.let {
+                RESOLUTION_ITEM_MAPPER.mapRow(result, rowNumber)
             }
         }.list()
         val candidates = rows.mapNotNull { it.second }
@@ -857,6 +853,7 @@ class JdbcBriefPersistenceAdapter(
         private val ATTENTION_ITEM_MAPPER = PostgresDataClassRowMapper(AttentionItem::class.java)
         private val ATTENTION_ITEM_SUMMARY_MAPPER = DataClassRowMapper(CurrentAttentionItemSummary::class.java)
         private val ATTENTION_ITEM_TRANSITION_MAPPER = PostgresDataClassRowMapper(AttentionItemTransition::class.java)
+        private val RESOLUTION_ITEM_MAPPER = PostgresDataClassRowMapper(ResolutionItem::class.java)
         private val EDITION_SUMMARY_MAPPER = PostgresDataClassRowMapper(EditionSummary::class.java)
         private val EDITION_ITEM_MAPPER = PostgresDataClassRowMapper(BriefEditionItem::class.java)
         private val UPSERT_ATTENTION = """
