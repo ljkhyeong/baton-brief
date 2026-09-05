@@ -5,10 +5,8 @@ import com.personal.baton.brief.domain.AttentionProjector
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.EditionItemSection
-import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
-import com.personal.baton.brief.domain.SourceEventType
 import com.personal.baton.brief.domain.WeeklyWindow
 import java.io.DataOutputStream
 import java.io.OutputStream
@@ -22,7 +20,7 @@ import java.util.UUID
 class BriefService(
     private val persistence: BriefPersistencePort,
     private val clock: Clock,
-) : BriefUseCases {
+) : BriefUseCases, BriefQueries by persistence {
     override fun ingest(event: SourceEvent): IngestResult {
         val normalizedEvent = event.copy(occurredAt = event.occurredAt.truncatedTo(ChronoUnit.MICROS))
         val currentTimestamp = { clock.instant().truncatedTo(ChronoUnit.MICROS) }
@@ -37,53 +35,6 @@ class BriefService(
         }
     }
 
-    override fun findEventReceipt(eventId: UUID): SourceEventReceipt? = persistence.findEventReceipt(eventId)
-
-    override fun findEventReceiptAnomalies(
-        workspaceId: UUID,
-        seasonId: UUID,
-        beforeIngestionSequence: Long?,
-        limit: Int,
-    ): EventReceiptAnomalyResult = persistence.findEventReceiptAnomalies(
-        workspaceId,
-        seasonId,
-        beforeIngestionSequence,
-        limit,
-    )
-
-    override fun findAttentionItem(
-        workspaceId: UUID,
-        seasonId: UUID,
-        eventType: SourceEventType,
-        sourceReference: String,
-    ): AttentionItem? = persistence.findAttentionItem(
-        workspaceId,
-        seasonId,
-        eventType,
-        sourceReference,
-    )
-
-    override fun findAttentionItems(
-        workspaceId: UUID,
-        seasonId: UUID,
-        status: SourceEventState,
-        severity: Severity?,
-        revisionGap: Boolean?,
-        after: AttentionItemCursor?,
-        limit: Int,
-    ): CurrentAttentionItemPage = persistence.findAttentionItems(
-        workspaceId,
-        seasonId,
-        status,
-        severity,
-        revisionGap,
-        after,
-        limit,
-    )
-
-    override fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary =
-        persistence.findAttentionItemSummary(workspaceId, seasonId)
-
     override fun summarizeWeeklyResolutions(
         command: GenerateEditionCommand,
         after: AttentionItemCursor?,
@@ -91,22 +42,6 @@ class BriefService(
     ): WeeklyResolutionSummary = persistence.findWeeklyResolutions(
         command.workspaceId, command.seasonId, WeeklyWindow.startingOn(command.weekStart, command.zoneId),
         clock.instant().truncatedTo(ChronoUnit.MICROS), after, limit,
-    )
-
-    override fun findAttentionItemTransitions(
-        workspaceId: UUID,
-        seasonId: UUID,
-        eventType: SourceEventType,
-        sourceReference: String,
-        beforeAggregateRevision: Long?,
-        limit: Int,
-    ): AttentionItemTransitionHistory = persistence.findAttentionItemTransitions(
-        workspaceId,
-        seasonId,
-        eventType,
-        sourceReference,
-        beforeAggregateRevision,
-        limit,
     )
 
     override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)
@@ -120,28 +55,6 @@ class BriefService(
             { selectEditionContent(it, window) },
         )
     }
-
-    override fun findEdition(editionId: UUID): BriefEdition? = persistence.findEdition(editionId)
-
-    override fun findLatestEdition(
-        workspaceId: UUID,
-        seasonId: UUID,
-    ): BriefEdition? = persistence.findLatestEdition(workspaceId, seasonId)
-
-    override fun findLatestEditionForWeek(command: GenerateEditionCommand): BriefEdition? =
-        persistence.findLatestEditionForWeek(command)
-
-    override fun findEditionHistory(
-        workspaceId: UUID,
-        seasonId: UUID,
-        beforeGeneration: Long?,
-        limit: Int,
-    ): EditionHistoryResult = persistence.findEditionHistory(
-        workspaceId,
-        seasonId,
-        beforeGeneration,
-        limit,
-    )
 
     override fun compareEditions(
         baseEditionId: UUID,
