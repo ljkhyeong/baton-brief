@@ -11,6 +11,8 @@ dependencies {
     implementation(project(":adapter-in-web"))
     implementation(project(":adapter-out-persistence"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("tools.jackson.core:jackson-databind")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
