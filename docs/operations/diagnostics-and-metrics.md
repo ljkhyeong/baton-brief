@@ -47,7 +47,7 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
 성공하면 `receiptCount`, `itemCount`를 출력하고 종료한다. 기존 전역 잠금·한 트랜잭션을
 사용하며 실패 시 이전 투영으로 롤백한다. 수신 증거와 기존 에디션은 보존한다.
 
-## 선택적인 지표 조회
+## 추가 이용료 없는 지표 수집
 
 실행 조립에 관측 설정을 추가한다. 서비스 API를 함께 사용하면 기존
 `-f compose.service-api.yml`도 같은 명령에 유지한다.
@@ -65,6 +65,31 @@ docker compose --env-file .env.staging \
 관리 포트는 컨테이너 내부 loopback에만 바인딩한다. health도 같은 관리 서버로 이동하므로
 이 override의 healthcheck를 함께 적용해야 한다. 기본 조립은 기존 health 경로만 유지한다.
 
+같은 조립의 Prometheus가 BRIEF의 네트워크 공간에서 30초마다 지표를 수집한다.
+계정·API 키·외부 저장소가 필요 없으며, BRIEF와 수집기 모두 호스트 포트와 외부 송신 경로가 없다.
+Prometheus는 비루트·읽기 전용으로 실행하고 전용 볼륨에 지표를 저장한다.
+애플리케이션 재배포 때는 위 명령으로 두 서비스를 함께 갱신해 네트워크 연결도 맞춘다.
+
+보관 기준은 7일 또는 1GB 중 먼저 도달하는 값이다. 1GB는 디스크 사용량의 강제 상한이 아니며
+WAL·작업 파일 여유 공간이 추가로 필요하다. 메모리는 256MB, CPU는 0.5개로 제한했다.
+추가 서비스 이용료는 없지만 기존 서버의 자원을 사용하므로 실제 부하에 맞춰 조정한다.
+보관 방식은 [Prometheus 공식 문서](https://prometheus.io/docs/prometheus/latest/storage/)를 따른다.
+
+수집 상태와 현재 경보는 호스트 권한으로 조회한다.
+
+```shell
+docker compose --env-file .env.staging -f compose.staging.yml -f compose.observability.yml \
+  exec -T brief wget -q -T 10 -O - http://127.0.0.1:9090/api/v1/targets
+docker compose --env-file .env.staging -f compose.staging.yml -f compose.observability.yml \
+  exec -T brief wget -q -T 10 -O - http://127.0.0.1:9090/api/v1/alerts
+```
+
+[경보 규칙](../../ops/prometheus/alerts.yml)의 초기 기준은 지표 수집 실패 2분 지속과
+최근 5분 HTTP `5xx` 증가 5건 이상이 1분간 유지되는 경우다. 시작 직후 첫 카운터 값이나
+수집 사이에 발생하고 사라진 오류를 전부 포착하는 감사 기록은 아니다.
+외부 알림 발송은 미연결이며, 같은 서버의 Prometheus로 서버 전체 장애를 감지할 수는 없다.
+알림 수신 채널이 정해지면 기존 무료 채널에 연결한다. BRIEF 본문 발송은 RELAY가 담당한다.
+
 `brief_events_received_total{outcome="..."}`은 결과별 요청 수이며 고유 이벤트 수가 아니다.
 첫 수신 전에는 카운터가 아직 없을 수 있다. 재시작 초기화·수집 실패·업무 이벤트 없음은
 서로 다르게 다뤄야 한다. `CONFLICT`·`UNSUPPORTED` 증가와 HTTP 인증 실패·`5xx`·지연을
@@ -74,5 +99,5 @@ BATON 호스트에서는 기존 `ops/check-integration-delivery.sh`로 영구 �
 지표 갱신 실패를 확인한다. `ops/show-integration-metrics.sh`의 `integration="brief"`
 값과 함께 보되, BRIEF 카운터만으로 BATON 전달 완료나 최신성을 선언하지 않는다.
 
-외부 수집 저장소·알림 수신처가 연결되기 전에는 자동 감시가 완료된 상태가 아니다. 실제
-배포 주소·접속 방법·수집 시스템과 비밀 파일 경로는 저장소 예시로 대체하지 않는다.
+로컬 수집·규칙 검증과 실제 서버의 감시·알림 운영은 구분한다. 현재 검증과 미연결 범위는
+[HANDOFF](../../HANDOFF.md)를 따른다.

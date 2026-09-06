@@ -11,7 +11,8 @@ Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.6 기반의 로컬 MVP를 구현
 - 현재 관심 항목 투영, 상태별 키셋 조회, 상태 전이 증거와 원자적 전체 재구축
 - 월요일 시작 IANA 시간대 주간의 불변 에디션 생성·조회·이력·비교·조건부 조회
 - RFC 9457 `ProblemDetail`, Spring Boot Actuator aggregate health
-- 이벤트 수신 결과별 지표와 선택적 컨테이너 loopback 조회. 외부 수집·경보는 미연결
+- 이벤트 수신 결과별 지표와 선택적 Prometheus 수집·경보 규칙. 외부 알림은 미연결
+- PostgreSQL 기본 도구를 사용한 백업과 Linux 정기 실행 예시
 - BATON 전용 Bearer와 파일 기반 비밀을 사용하는 스테이징 컨테이너
 - 이벤트 수신 한 경로만 허용하는 선택적 Caddy HTTPS 앞단
 - BATON 백엔드 조회·생성을 위한 별도 Bearer와 호스트 포트 없는 서비스 Caddy HTTPS 앞단
@@ -227,13 +228,15 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 이 조립은 실제 DNS·방화벽, 공인 인증서 발급, 백업·복구, 이미지 registry와 BATON 원격
 전달을 대신하지 않는다.
 
-수동 백업과 빈 DB 복원은 [PostgreSQL 백업·복원 절차](docs/operations/postgresql-backup-restore.md)를
-따른다. 자동 백업·보관소와 운영 DB 전환은 포함하지 않는다.
+백업과 빈 DB 복원은 [PostgreSQL 백업·복원 절차](docs/operations/postgresql-backup-restore.md)를
+따른다. 추가 이용료 없이 기존 서버에서 실행하며 Linux 정기 백업 타이머를 제공한다.
+외부 보관소와 운영 DB 전환은 포함하지 않는다.
 
 호스트 실행 권한으로 수신 기록·이상 이력을 조회하거나 전체 재구축을 수행하려면
 [운영 명령과 지표 조회 절차](docs/operations/diagnostics-and-metrics.md)를 따른다. 선택적인
 `compose.observability.yml`은 컨테이너 내부 `127.0.0.1:9091`에서 health·Prometheus 지표만
-제공한다. 공개·서비스 Caddy 허용 경로는 유지한다.
+제공하고 같은 서버의 Prometheus로 수집한다. 별도 계정·API 키는 필요 없다.
+공개·서비스 Caddy 허용 경로는 유지한다.
 
 ## 문서
 

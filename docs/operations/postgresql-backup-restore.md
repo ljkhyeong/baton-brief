@@ -1,15 +1,16 @@
-# PostgreSQL 수동 백업과 격리 복원
+# PostgreSQL 백업과 격리 복원
 
 ## 범위
 
 BRIEF 데이터베이스 전체를 PostgreSQL 표준 `pg_dump` custom 형식으로 저장하고, 별도의 빈
-데이터베이스에 `pg_restore`로 복원한다. 백업 서비스·스케줄러·제품 API를 추가하지 않는다.
+데이터베이스에 `pg_restore`로 복원한다. 정기 실행에는 Linux의 systemd 타이머를 사용한다.
+애플리케이션에는 스케줄러나 제품 API를 추가하지 않는다.
 
 투영 재구축은 백업이 아니다. 수신 기록을 잃으면 재구축 근거가 사라지며 현재 투영으로
 과거 불변 에디션을 재현할 수 없다. 수신 기록·최초 충돌·현재 투영·에디션·항목·시퀀스와
 Flyway 이력을 같은 데이터베이스 백업에 포함한다. 원본의 `retain-all` 기준은 유지한다.
 
-이 절차는 운영 DB를 덮어쓰는 복구 전환을 허용하지 않는다. 자동 백업 주기·보관 기간·암호화
+이 절차는 운영 DB를 덮어쓰는 복구 전환을 허용하지 않는다. 보관 기간·암호화
 보관소·RPO·RTO와 운영 전환은 별도 결정이다. 현재 검증 범위는 [HANDOFF](../../HANDOFF.md)를
 따른다.
 
@@ -19,7 +20,7 @@ Flyway 이력을 같은 데이터베이스 백업에 포함한다. 원본의 `re
   별도 Bash 세션으로 실행한다.
 - DB와 같은 PostgreSQL 18 계열 도구를 사용한다. 스테이징의 고정 DB 이미지 안에 있는
   도구를 실행하면 로컬 클라이언트를 설치할 필요가 없다.
-- `brief_backup_root`에는 운영자가 승인한 실제 절대 경로를 지정한다. 저장소·DB 볼륨과
+- `BRIEF_BACKUP_DIRECTORY`에는 운영자가 승인한 실제 절대 경로를 지정한다. 저장소·DB 볼륨과
   분리하고 다른 사용자의 접근을 제한한다. 예시 경로를 그대로 실행하지 않는다.
 - 덤프는 운영 데이터를 포함한 민감한 파일이다. 저장소에 커밋하거나 공개 artifact·로그로
   올리지 않는다. 호스트 장애에 대비하려면 별도로 승인한 암호화 보관소에 복사해야 한다.
@@ -29,26 +30,47 @@ Flyway 이력을 같은 데이터베이스 백업에 포함한다. 원본의 `re
 ## 백업
 
 ```bash
-set -euo pipefail
-umask 077
-brief_backup_root=/absolute/approved/backup-directory
-brief_backup_dir=$(mktemp -d "$brief_backup_root/brief-XXXXXXXX")
-
-docker compose --env-file .env.staging -f compose.staging.yml \
-  exec -T --user postgres postgres sh -eu -c \
-  'exec pg_dump --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --format=custom' \
-  > "$brief_backup_dir/database.dump.part"
-
-mv "$brief_backup_dir/database.dump.part" "$brief_backup_dir/database.dump"
+BRIEF_BACKUP_DIRECTORY=/absolute/approved/backup-directory \
+  bash ops/backup-postgresql.sh
 ```
 
-성공한 `pg_dump`만 최종 파일명으로 옮긴다. 실패한 `.part` 파일은 유효한 백업으로 사용하지
-않는다. 덤프와 함께 백업 시작·완료 시각, DB 서버·도구 버전, 애플리케이션 commit 또는 이미지
+스크립트는 기존 백업 디렉터리 아래에 권한 `0700`인 실행별 폴더를 만들고, 권한 `0600`으로
+덤프를 저장한다. 성공한 `pg_dump`만 최종 파일명으로 옮기고 실패한 `.part` 파일은 삭제한다.
+기존 백업은 삭제하지 않는다. 다른 환경 파일은 `BRIEF_STAGING_ENV_FILE`, 별도 Compose
+프로젝트는 `COMPOSE_PROJECT_NAME`으로 지정한다.
+
+덤프와 함께 백업 시작·완료 시각, DB 서버·도구 버전, 애플리케이션 commit 또는 이미지
 digest, 적용한 Flyway 버전을 기록하되 비밀 값은 기록하지 않는다.
 
 `pg_dump`는 실행 중인 DB의 일관된 스냅샷을 만든다. 백업 시작 이후 변경이 모두 포함됐다고
 해석하지 않는다. 파일 생성 성공이나 `pg_restore --list`로 목차를 읽는 것만으로 복원 성공을
 주장하지 않는다.
+
+## Linux 정기 백업
+
+[service](../../ops/systemd/baton-brief-backup.service)와
+[timer](../../ops/systemd/baton-brief-backup.timer)는 매일 UTC 03:00(한국 시간 낮 12시)에 실행한다.
+부하 분산을 위해 최대 15분의 무작위 지연과 systemd의 실행 오차가 더해진다.
+꺼져 있는 동안 놓친 실행은 다음 기동 때 보충한다.
+실제 서버의 저장소 경로·환경 파일·백업 위치에 맞춰 service를 수정한 뒤 설치한다.
+기본 예시는 `/srv/baton-brief`와 rootful Docker를 사용하며 rootless 환경에는 맞지 않는다.
+
+```shell
+sudo install -d -m 0700 /var/backups/baton-brief
+sudo install -m 0644 ops/systemd/baton-brief-backup.{service,timer} /etc/systemd/system/
+sudo systemd-analyze verify /etc/systemd/system/baton-brief-backup.{service,timer}
+sudo systemctl daemon-reload
+sudo systemctl start baton-brief-backup.service
+sudo journalctl -u baton-brief-backup.service -n 20 --no-pager
+```
+
+첫 백업의 격리 복원을 아래 절차로 확인한 뒤 `sudo systemctl enable --now baton-brief-backup.timer`로
+예약을 켠다. 실행 상태는 `systemctl list-timers baton-brief-backup.timer`와 위 journal 명령으로 확인한다.
+타이머를 끄려면 `sudo systemctl disable --now baton-brief-backup.timer`를 사용한다.
+
+유료 API나 관리형 DB를 사용하지 않는다. 백업 파일은 서버 디스크를 계속 사용하며 자동 삭제는
+보관 정책을 정한 뒤 추가한다. 같은 서버의 백업은 서버·디스크 전체 손실을 복구하지 못하므로,
+이미 보유한 별도 저장소가 있으면 복사 위치와 암호화를 정한다. 외부 보관소는 자동 생성하지 않는다.
 
 ## 격리된 빈 DB에 복원
 

@@ -24,9 +24,14 @@ aggregate health를 사용한다. 앱 포트·공개 Caddy·서비스 Caddy 허�
 ## 수집·경보 책임
 
 Micrometer의 Prometheus registry와 Spring Boot 자동 구성을 사용한다. 업무 수신 결과는
-기존 `brief.events.received`, 요청 오류·지연은 기존 HTTP 지표로 수집한다. 프로세스 밖의
-보관·수집 주기·경보 수신처는 실제 수집 시스템 설정이 제공된 뒤 연결한다. 지표 조회를
-지원하는 것만으로 자동 감시·알림이 완료됐다고 기록하지 않는다.
+기존 `brief.events.received`, 요청 오류·지연은 기존 HTTP 지표로 수집한다.
+추가 이용료 없이 운영하도록 선택적 Compose에 자체 호스팅 Prometheus를 둔다.
+BRIEF의 네트워크 공간을 공유해 loopback 지표를 수집하며 외부 송신·호스트 포트를 추가하지 않는다.
+수집기는 비루트·읽기 전용이고 지표는 전용 볼륨에 보관한다. BRIEF 재생성 시 함께 갱신한다.
+
+수집은 30초 간격, 보관은 7일 또는 1GB 기준이다. 수집 실패와 지속적인 HTTP 서버 오류를
+규칙으로 판정하되 외부 알림 수신처는 미연결 상태로 둔다. 같은 서버의 수집기는 호스트 전체
+장애를 감지할 수 없다. 유료 관리형 저장소·API 대신 기존 서버 자원을 사용한다.
 
 BATON의 outbox 전달 장애는 BATON의 `ops/show-integration-metrics.sh`와
 `ops/check-integration-delivery.sh`가 소유한다. BRIEF의 최근 수신 시각·카운터·공백 여부로
@@ -46,4 +51,5 @@ BATON의 outbox 전달 장애는 BATON의 `ops/show-integration-metrics.sh`와
 
 - [Spring Boot 관리 서버 주소와 포트](https://docs.spring.io/spring-boot/reference/actuator/monitoring.html)
 - [Spring Boot 지표 registry 자동 구성](https://docs.spring.io/spring-boot/reference/actuator/metrics.html)
+- [Prometheus Docker 실행](https://prometheus.io/docs/prometheus/latest/installation/)
 - [운영 실행 절차](../../operations/diagnostics-and-metrics.md)
