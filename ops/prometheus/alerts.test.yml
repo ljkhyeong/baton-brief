@@ -1,0 +1,56 @@
+rule_files:
+  - alerts.yml
+evaluation_interval: 30s
+tests:
+  - name: 짧은 수집 실패는 기다리고 지속 실패만 경보한다
+    interval: 30s
+    input_series:
+      - series: 'up{job="brief",instance="127.0.0.1:9091"}'
+        values: '0x6'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: BriefMetricsUnavailable
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefMetricsUnavailable
+        exp_alerts:
+          - exp_labels:
+              job: brief
+              instance: 127.0.0.1:9091
+              severity: critical
+            exp_annotations:
+              summary: BRIEF 지표 수집이 2분 이상 실패했습니다.
+  - name: 업무 요청이 없어도 수집이 정상이면 경보하지 않는다
+    interval: 30s
+    input_series:
+      - series: 'up{job="brief"}'
+        values: '1x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefMetricsUnavailable
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BriefServerErrors
+        exp_alerts: []
+  - name: 서버 오류 증가와 재시작 초기화를 구분한다
+    interval: 30s
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="brief",status="500"}'
+        values: '20 20 0 0 0 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefServerErrors
+        exp_alerts: []
+  - name: 서버 오류가 계속 늘면 경보한다
+    interval: 30s
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="brief",status="500"}'
+        values: '0+1x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: BRIEF의 최근 5분 서버 오류가 5건 이상입니다.
