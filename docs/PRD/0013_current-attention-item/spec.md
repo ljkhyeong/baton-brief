@@ -23,14 +23,14 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 
 | 메서드 | 경로 | 의미 |
 |---|---|---|
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | 정확한 정체성의 점검 항목 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | 복합 식별자가 일치하는 점검 항목 조회 |
 
 ### 질의 매개변수
 
 | 이름 | 필수 | 형식과 제약 | 의미 |
 |---|---|---|---|
-| `eventType` | 예 | PRD-0002의 지원 이벤트 종류 | 투영 정체성의 이벤트 종류 |
-| `sourceReference` | 예 | PRD-0002의 문자·공백 규칙, Unicode code point 기준 최대 128자 | 길이가 제한된 불투명 원본 참조 |
+| `eventType` | 예 | PRD-0002의 지원 이벤트 종류 | 점검 항목을 식별하는 이벤트 종류 |
+| `sourceReference` | 예 | PRD-0002의 문자·공백 규칙, Unicode code point 기준 최대 128자 | 길이가 제한된 원본 참조값 |
 
 경로의 `workspaceId`와 `seasonId`는 UUID다. 잘못된 UUID·열거형, 누락되거나 비어 있는
 `sourceReference`, PRD-0002의 문자·공백 규칙을 어기거나 Unicode code point 기준 128자를
@@ -41,7 +41,7 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 
 ## 현재 상태 의미
 
-조회 정체성은 `(workspaceId, seasonId, eventType, sourceReference)`다. 결과는 마지막으로
+조회에 쓰는 복합 식별자는 `(workspaceId, seasonId, eventType, sourceReference)`다. 결과는 마지막으로
 적용된 원본 집계 리비전이 만든 현재 투영이며 `ACTIVE`와 `RESOLVED`를 모두 반환한다.
 
 - 더 큰 리비전의 `APPLIED` 또는 `APPLIED_WITH_GAP` 수신은 조회 결과를 갱신한다.
@@ -51,7 +51,7 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 - 현재 항목은 변경 가능하며 과거 상태 이력이나 생성 당시 스냅샷이 아니다. 과거 고정
   내용은 브리프를 조회한다.
 
-정확한 정체성에 현재 투영이 없으면 `404 Not Found`와 PRD-0004의 표준
+해당 복합 식별자의 점검 항목이 없으면 `404 Not Found`와 PRD-0004의 표준
 `ProblemDetail`을 반환한다. BRIEF는 작업공간이나 시즌의 원본 존재 여부를 별도로
 판정하지 않는다.
 
@@ -64,7 +64,7 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 |---|---|
 | `reasonCode` | 규칙 v1에서 `eventType`과 같은 설명 이유 코드 |
 | `severity` | 규칙 v1이 정한 `HIGH` 또는 `MEDIUM` |
-| `sourceReference` | 길이가 제한된 불투명 원본 참조 |
+| `sourceReference` | 길이가 제한된 원본 참조값 |
 | `status` | 현재 `ACTIVE` 또는 `RESOLVED` 상태 |
 | `observedAt` | 마지막 적용 이벤트의 정규화된 원본 관측 시각 |
 | `aggregateRevision` | 마지막 적용 집계 리비전 |
@@ -79,7 +79,7 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 - Flyway V4가 정의한 `attention_item`의
   `(workspace_id, season_id, event_type, source_reference)` 복합 기본 키를 그대로
   사용한다.
-- 이벤트 적용이 사용하던 동일한 단건 조회를 애플리케이션 포트로 승격해 재사용한다.
+- 이벤트 적용에 쓰던 단건 조회를 애플리케이션 포트에서도 사용한다.
 - 새 테이블, 열, 인덱스, Flyway 마이그레이션과 별도 응답 DTO를 추가하지 않는다.
 - 조회는 수신 기록, 현재 투영과 브리프를 생성·수정·삭제하지 않는다.
 - 현재 투영은 변경 가능하므로 PRD-0012의 브리프 식별자 기반 검증자를 재사용하지
@@ -88,7 +88,7 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 
 ## 수용 기준
 
-- 정확한 네 정체성 값이 같은 현재 항목 한 건을 반환한다.
+- 네 식별자 값이 모두 일치하는 점검 항목 한 건을 반환한다.
 - 재구축 뒤에도 마지막 적용 리비전, 상태와 리비전 공백 근거가 재현된다.
 - 후속 `RESOLVED` 이벤트를 적용하면 같은 조회가 증가한 리비전과 해소 상태를 반환한다.
 - 다른 작업공간·시즌·이벤트 종류·원본 참조의 항목을 반환하지 않는다.

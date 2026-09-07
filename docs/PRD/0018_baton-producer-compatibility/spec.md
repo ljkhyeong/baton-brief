@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 범위: BATON 이벤트 v2의 의미·식별자·전송 호환성과 안정 버전 승격 게이트
+- 범위: BATON 이벤트 v2의 의미·식별자·전송 호환성과 안정 버전 전환 조건
 
 ## 목적
 
@@ -11,8 +11,8 @@ BRIEF는 PRD-0002의 이벤트 v1·v2를 멱등하게 수신하고 투영·재�
 
 현재 BATON의 연속성 신호와 BRIEF 이벤트 v1을 직접 이름으로 연결하거나 테스트 고정값만
 공유하면, 조회 시점에 계산되는 신호를 영속 상태 전이처럼 오해하고 내부 동시성 버전을 원본
-집계 리비전처럼 사용할 위험이 있다. 생산자 구현 전에 불일치를 명시하고, 의미 정합화와
-내구성 있는 전달의 완료 조건을 고정한다.
+집계 리비전처럼 사용할 위험이 있다. 생산자 구현 전에 불일치를 명시하고, 이벤트 의미 일치 여부와
+전달 성공·재시도 조건을 정한다.
 
 ## 도입 전에 확인한 불일치
 
@@ -23,11 +23,11 @@ PRD-0019의 이벤트 v2와 BATON 생산자 구현으로 아래 차이를 해소
 | 관심사 | 당시 BATON | BRIEF 이벤트 v1 요구 | 결론 |
 |---|---|---|---|
 | 신호 종류 | `ROLE_UNASSIGNED`, `ROLE_SUCCESSOR_MISSING`, `ROLE_PREPARATION_INCOMPLETE`, `ROUTINE_REPEATEDLY_OVERDUE`, `HANDOFF_INCOMPLETE` | `HANDOFF_BLOCKED`, `ROUTINE_MISSED`, `DECISION_FOLLOW_UP_OVERDUE` | 이름과 의미가 일치하지 않는다. |
-| 심각도 | `CRITICAL`, `WARNING` | 규칙 v1이 `HIGH`, `MEDIUM`으로 결정 | 단순 enum 변환을 권위 판정처럼 사용하면 안 된다. |
-| 신호 저장 | 워크스페이스 조회 시 `Clock`과 시즌 시간대로 계산하는 프로젝션 | 안정적인 이벤트 식별자와 `ACTIVE`·`RESOLVED` 전이 | 조회 결과만으로 내구성 있는 생명주기를 만들 수 없다. |
-| 원본 정체성 | 역할·루틴 등 여러 참조를 가진 조회 신호 | `(workspaceId, seasonId, eventType, sourceReference)` | 범위와 안정적인 `sourceReference` 규칙이 필요하다. |
+| 심각도 | `CRITICAL`, `WARNING` | 규칙 v1이 `HIGH`, `MEDIUM`으로 결정 | enum 이름만 바꿔 BATON의 심각도 판정을 대신하지 않는다. |
+| 신호 저장 | 워크스페이스 조회 시 `Clock`과 시즌 시간대로 계산하는 프로젝션 | 안정적인 이벤트 식별자와 `ACTIVE`·`RESOLVED` 전이 | 조회 결과만으로 상태 변경 이력을 보존할 수 없다. |
+| 원본 식별자 | 역할·루틴 등 여러 참조를 가진 조회 신호 | `(workspaceId, seasonId, eventType, sourceReference)` | 범위와 안정적인 `sourceReference` 규칙이 필요하다. |
 | 리비전 | 엔티티별 JPA `@Version`은 내부 동시성 제어 | 복합 식별자별 양의 단조 증가 `aggregateRevision` | JPA 버전을 외부 리비전으로 사용하지 않는다. |
-| 시간 전이 | 쓰기 없이 날짜 경계만 지나도 신호가 달라질 수 있음 | 커밋 뒤 최소 한 번 전달되는 상태 이벤트 | 시간 경계 재조정과 초기 정합화가 필요하다. |
+| 시간 전이 | 쓰기 없이 날짜 경계만 지나도 신호가 달라질 수 있음 | 커밋 뒤 최소 한 번 전달되는 상태 이벤트 | 날짜 변경 시 재계산과 초기 동기화가 필요하다. |
 | 결정 후속 지연 | 현재 `Decision`에 후속 기한·상태가 없음 | `DECISION_FOLLOW_UP_OVERDUE` | 사실을 추측해 생산할 수 없다. |
 | 전달 경로 | WATCH·이메일용 outbox는 있으나 BRIEF 전용 생산자·outbox·client는 없음 | 동일 본문 재전달과 결과 분류가 가능한 최소 한 번 전달 | 기존 전용 outbox를 이름만 바꿔 재사용하지 않는다. |
 
@@ -39,21 +39,21 @@ BATON의 기존 WATCH transactional outbox는 원본 변경과 같은 트랜잭�
 
 다음 조건을 모두 결정·구현·검증하기 전에는 BATON→BRIEF 연동 완료를 주장하지 않는다.
 
-### 1. 권위 있는 신호 의미
+### 1. BATON 신호의 정의
 
 - BATON이 생산할 신호 종류와 BRIEF 이벤트 버전을 명시한다.
 - 기존 BRIEF v1 세 종류를 유지한다면 각 종류가 어떤 BATON 원본 사실에서 발생하고
   해소되는지 손실 없는 대응을 정의한다.
-- 현재 BATON 다섯 신호를 권위 있는 계약으로 채택한다면 이름만 매핑하지 않고 새 이벤트
+- BATON이 정의한 다섯 신호를 이벤트 계약으로 채택한다면 이름만 매핑하지 않고 새 이벤트
   버전 또는 명시적인 소비자 호환 변경을 먼저 정의한다.
-- `DECISION_FOLLOW_UP_OVERDUE`는 후속 기한·완료 상태의 권위 있는 원본이 생기기 전에는
+- `DECISION_FOLLOW_UP_OVERDUE`는 후속 기한·완료 상태의 원본 정보가 생기기 전에는
   생산하지 않는다.
 
-### 2. 안정적인 정체성과 생명주기
+### 2. 안정적인 식별자과 생명주기
 
 - `workspaceId`·`seasonId`가 BATON의 어떤 식별자와 정확히 대응하는지 정의한다.
 - 신호 인스턴스마다 재계산과 재시작 뒤에도 같은 `sourceReference`를 재현한다.
-- 동일 정체성의 발생은 `ACTIVE`, 해소·종료·비적격 전이는 더 큰 리비전의 `RESOLVED`로
+- 동일 항목의 발생은 `ACTIVE`, 해소·종료·점검 대상 제외는 더 큰 리비전의 `RESOLVED`로
   표현한다.
 - 시즌 종료, 보관, 구성원·역할·루틴·바통 변경과 날짜 경계가 각 신호를 어떻게 해소하거나
   다시 활성화하는지 정의한다.
@@ -68,7 +68,7 @@ BATON의 기존 WATCH transactional outbox는 원본 변경과 같은 트랜잭�
 ### 4. 날짜 변경 시 재계산과 초기 동기화
 
 - 사용자 쓰기 없이 날짜 경계로 발생·해소되는 신호를 찾는 재조정 트리거를 정의한다.
-- 첫 배포 때 현재 BATON 상태를 안정적인 정체성·리비전으로 정합화하고, 재시작·실패 뒤
+- 첫 배포 때 현재 BATON 상태를 신호·리비전에 반영하고, 재시작·실패 뒤
   같은 상태를 중복 효과 없이 다시 계산할 수 있어야 한다.
 - 재조정 기준 시각에는 주입한 `Clock`과 시즌 IANA 시간대를 사용한다.
 
@@ -84,9 +84,9 @@ BATON의 기존 WATCH transactional outbox는 원본 변경과 같은 트랜잭�
 
 ### 6. 계약 아티팩트와 종단 간 검증
 
-- 의미 정합화 뒤 BATON 실제 직렬화기가 만드는 이벤트 예시를 고정 계약 아티팩트로 둔다.
+- 이벤트 의미를 맞춘 뒤 BATON의 실제 직렬화 결과를 계약 예시 파일로 고정한다.
 - BRIEF 소비자 고정값을 생산자 직렬화 성공 근거로 대신 사용하지 않는다.
-- 최초 전달, 응답 유실 뒤 동일 재전달, 해소 전이, BRIEF 장애와 초기 정합화를 실제
+- 최초 전달, 응답 유실 뒤 동일 재전달, 해소 전이, BRIEF 장애와 초기 동기화를 실제
   BATON→BRIEF PostgreSQL 종단 간 시나리오로 검증한다.
 - 순서가 뒤바뀐 리비전은 BATON outbox 영속성 경계에서 선행 리비전 차단과 후속 재개를
   검증한다.
@@ -96,11 +96,10 @@ BATON의 기존 WATCH transactional outbox는 원본 변경과 같은 트랜잭�
 
 BATON은 `PRD-0006: BATON–BRIEF 연속성 신호 생산 계약`에서 다음 생산 의미를 채택했다.
 
-- 현재 다섯 `ContinuitySignalType`을 권위 있는 신호 종류로 유지하고 BRIEF 이벤트 v1에
+- BATON이 정의한 다섯 `ContinuitySignalType`을 신호 종류로 유지하고 BRIEF 이벤트 v1에
   이름만 대응하지 않는다.
 - BATON의 `CRITICAL`·`WARNING` 심각도를 원본 사실로 전달하는 이벤트 v2를 선행한다.
-- `teamId`를 `workspaceId`로 사용하고, 시즌·신호 종류·역할과 필요한 경우 루틴으로 자연
-  정체성을 구성해 영속 `signalId`와 `baton-continuity:<signalId>` 참조를 부여한다.
+- `teamId`를 `workspaceId`로 사용하고, 시즌·신호 종류·역할과 필요한 경우 루틴으로 자연 키를 구성해 영속 `signalId`와 `baton-continuity:<signalId>` 참조를 부여한다.
 - `aggregateRevision`은 전역 outbox 번호나 JPA `@Version`이 아니라 같은 `signalId` 안에서
   `1`부터 연속 증가한다.
 - 원본 변경과 시간 경계 재조정은 같은 신호 계산·저장 경계를 사용하고, 동일 상태에서는
@@ -116,15 +115,15 @@ BRIEF는 `contracts/VERSION`을 기준으로 이벤트 v2 JSON Schema와 예시�
 
 - 이번 결정은 PRD-0002의 이벤트 v1, 수신 결과, fingerprint, 투영 규칙과 HTTP 상태를
   변경하지 않는다.
-- BATON 의미 정합화 결과가 v1과 손실 없이 맞지 않으면 BRIEF가 임의 매핑을 수용하지 않고
+- BATON 신호를 정보 손실 없이 v1에 대응시킬 수 없으면 BRIEF가 임의 매핑을 수용하지 않고
   새 이벤트 버전의 생산자·소비자 호환 계약을 먼저 채택한다.
 - BRIEF에는 생산 방향을 뒤집는 BATON client, broker adapter, 인증 예외, 추측 enum,
   임시 source reference 변환과 생산자 의미가 없는 고정 fixture를 추가하지 않는다.
 
 ## 수용 기준
 
-- 생산 이벤트 종류마다 BATON의 권위 있는 발생·해소 사실과 심각도 의미가 문서화된다.
-- 재계산 가능한 안정적 정체성, `ACTIVE`·`RESOLVED` 생명주기와 외부 집계 리비전이 있다.
+- 생산 이벤트 종류마다 BATON의 발생·해소 조건과 심각도 기준이 문서화된다.
+- 재계산 가능한 안정적 식별자, `ACTIVE`·`RESOLVED` 생명주기와 외부 집계 리비전이 있다.
 - 날짜 경계와 초기 상태를 다루는 재조정이 동일 상태에서 멱등하다.
 - 원본 변경과 같은 트랜잭션의 전용 outbox, 커밋 뒤 최소 한 번 전달과 결과 분류가 있다.
 - 실제 BATON 직렬화 계약과 생산자→소비자 종단 간 시나리오가 성공한다.

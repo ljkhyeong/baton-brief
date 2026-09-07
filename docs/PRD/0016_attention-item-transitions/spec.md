@@ -10,8 +10,7 @@ PRD-0013~0015는 점검 항목의 마지막 현재 상태를 단건 또는 상�
 항목만으로는 어떤 적용 리비전에서 활성·해소 상태가 바뀌었고 어느 전이에서 리비전 공백이
 처음 발견됐는지 확인할 수 없다.
 
-`source_event_receipt`에 보존된 최초 수신 기록 중 실제로 투영에 적용된 리비전만 읽어 상태
-전이 증거를 제공한다. 현재 규칙으로 과거 투영을 다시 계산하거나 별도 상태 이력 테이블에
+`source_event_receipt`에 보존된 최초 수신 기록 중 실제로 투영에 적용된 리비전만 읽어 상태 변경 이력을 제공한다. 현재 규칙으로 과거 투영을 다시 계산하거나 별도 상태 이력 테이블에
 같은 사실을 복제하지 않는다.
 
 ## HTTP API
@@ -85,7 +84,7 @@ BATON은 응답 필드를 중계하도록 갱신하고, 기존 필드 거부 정
 
 - 기존 `source_event_receipt`의 복합 식별자, `aggregate_revision`, `event_state`,
   `occurred_at`, `processing_outcome`, `source_severity`를 읽는다.
-- `processingOutcome` 전체나 수신 시각, fingerprint, 원문 payload와 충돌 증거는 응답에
+- `processingOutcome` 전체나 수신 시각, fingerprint, 원문 payload와 충돌 기록은 응답에
   노출하지 않는다.
 - 재구축은 수신 기록을 바꾸지 않으므로 성공·실패 재구축 전후 전이 이력도 바뀌지 않는다.
 - 새 테이블, 열, 인덱스와 Flyway 마이그레이션을 추가하지 않는다. 실제 운영 규모와 조회

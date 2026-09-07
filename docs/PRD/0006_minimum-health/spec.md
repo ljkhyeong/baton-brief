@@ -56,9 +56,9 @@ Actuator의 표준 health 자동 구성을 사용해 최소 상태 확인 경계
 
 ## 노출 범위
 
-후속 ADR-0008의 `compose.observability.yml`을 선택한 조립에서는 health와 Prometheus 지표를
+후속 ADR-0008의 `compose.observability.yml`을 적용한 구성에서는 health와 Prometheus 지표를
 컨테이너 내부 `127.0.0.1:9091`로 옮긴다. 해당 override가 healthcheck도 함께 변경한다.
-이 문서의 기본 health 전용 조립과 공개·서비스 Caddy의 관리 경로 차단은 유지한다.
+이 문서의 기본 health 전용 구성과 공개·서비스 Caddy의 관리 경로 차단은 유지한다.
 
 Spring Boot 4.1.1은 health만 기본 웹 endpoint로 노출하고 상세를 기본 숨김 처리한다. 같은
 기본값을 설정에 반복하지 않는다. 반면 health probes의 기본값은 `true`이므로 배포 계약이

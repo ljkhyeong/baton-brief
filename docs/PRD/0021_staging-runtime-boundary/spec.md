@@ -11,7 +11,7 @@
 HTTP만 제공하고 PRD-0022의 명시적인 profile로 호스트의 이벤트 수신 전용 HTTPS 앞단을
 추가한다.
 
-## 실행 조립
+## 실행 구성
 
 - `Dockerfile`은 저장소의 Gradle wrapper로 `:bootstrap:bootJar`를 빌드한다.
 - 실행 이미지는 Java 21 JRE, UID/GID `10001`, 읽기 전용 루트 파일시스템과 `/tmp`
@@ -27,7 +27,7 @@ HTTP만 제공하고 PRD-0022의 명시적인 profile로 호스트의 이벤트 
   외부에는 PRD-0022의 이벤트 수신 한 경로만 제공한다.
 - 컨테이너 표준 출력·오류 로그는 Docker `json-file`의 `max-size: 10m`, `max-file: 3`으로
   회전한다. PRD-0025의 서비스 Caddy에도 같은 설정을 적용한다. 이는 실행 로그 제한이며
-  데이터베이스 수신 기록·충돌 증거의 `retain-all` 계약을 바꾸지 않는다.
+  데이터베이스 수신 기록·충돌 기록의 `retain-all` 계약을 바꾸지 않는다.
 
 ## 설정과 비밀
 
@@ -44,7 +44,7 @@ HTTP만 제공하고 PRD-0022의 명시적인 profile로 호스트의 이벤트 
 직전 Bearer 속성을 읽는다. 평상시 직전 token 파일은 비워 두고, PRD-0020의 수동 교체
 구간에만 기존 값을 넣는다.
 
-스테이징 조립은 `BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED=true`를 고정한다. Bearer
+스테이징 구성은 `BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED=true`를 고정한다. Bearer
 원문을 Compose 일반 환경 변수, 이미지, 로그와 문서에 넣지 않는다.
 
 ## 실행 방법

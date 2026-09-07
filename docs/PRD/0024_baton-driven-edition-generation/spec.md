@@ -7,9 +7,8 @@
 ## 목적
 
 BRIEF는 주간 범위의 결정적이고 멱등한 브리프 생성 명령을 이미 제공하지만, 어떤 작업공간과
-시즌을 언제 생성할지는 알지 못한다. 권위 있는 작업공간·시즌·시간대와 사용자 운영 주기는
-BATON이 소유한다. BATON이 생성 대상을 발견하고 실행을 보장하며 BRIEF는 스냅샷 생성만
-소유하게 한다.
+시즌을 언제 생성할지는 알지 못한다. 작업공간·시즌·시간대와 운영 주기는
+BATON이 관리한다. BATON이 생성 대상과 시점을 정해 BRIEF에 요청하고, BRIEF는 스냅샷을 생성한다.
 
 ## 책임 분리
 
@@ -43,7 +42,7 @@ Content-Type: application/json
 }
 ```
 
-- `workspaceId`와 `seasonId`는 BATON의 권위 있는 대상에서 가져온다.
+- `workspaceId`와 `seasonId`는 BATON이 관리하는 작업공간·시즌에서 가져온다.
 - `weekStart`는 해당 시즌 시간대의 월요일이고 `zoneId`는 이름이 있는 IANA 시간대다.
 - `201 Created`는 새 세대 생성, `200 OK`는 같은 범위의 직전 상태 재사용이며 둘 다 완료다.
 - 응답의 `editionId`, `generation`, `sourceCursor`와 `ETag`를 BATON 실행 결과에 연결한다.
@@ -103,7 +102,7 @@ BRIEF outbox 전달이 성공했음을 자신의 내구성 있는 실행 기록�
 ## 관련 문서
 
 - [BATON 백엔드 경유 조회 계약](../0023_baton-mediated-brief-query/spec.md)
-- [BATON이 사용자 경계와 생성을 소유하는 결정](../../ADR/0006_baton-brief-application-boundary/adr.md)
+- [BATON의 사용자 권한 확인·브리프 생성 요청](../../ADR/0006_baton-brief-application-boundary/adr.md)
 - [MVP 이벤트·투영·브리프 계약](../0002_mvp-contract/spec.md)
 - [주간 범위 최신 브리프 조회](../0009_weekly-latest-edition/spec.md)
 - [BATON 서비스 API 인증과 비공개 연결](../0025_baton-service-api-security/spec.md)

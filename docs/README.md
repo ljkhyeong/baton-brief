@@ -32,7 +32,7 @@
 | 문서 | 상태 | 내용 |
 | --- | --- | --- |
 | [PRD-0007 수신 기록 단건](PRD/0007_event-receipt-query/spec.md) | 채택됨 | 최초 수신 결과와 최초 충돌 탐지 시각 조회 |
-| [PRD-0011 이상 수신 기록 이력](PRD/0011_event-receipt-anomalies/spec.md) | 채택됨 | 작업공간·시즌 범위 이상 기록 키셋 조회 |
+| [PRD-0011 이상 수신 기록](PRD/0011_event-receipt-anomalies/spec.md) | 채택됨 | 작업공간·시즌 범위 이상 기록 키셋 조회 |
 | [PRD-0018 BATON 생산자 선행조건](PRD/0018_baton-producer-compatibility/spec.md) | 채택됨 | 이벤트 의미·식별자·변경 번호·outbox·연동 검증 조건 |
 | [PRD-0019 연속성 신호 이벤트 v2](PRD/0019_baton-continuity-event-v2/spec.md) | 채택됨 | 다섯 신호, 원본 심각도, v1 호환 소비와 계약 팩 |
 | [PRD-0020 이벤트 수신 인증](PRD/0020_baton-event-authentication/spec.md) | 채택됨 | BATON 전용 Bearer와 현재·직전 token 교체 경계 |
@@ -85,7 +85,7 @@
 | [ADR-0003 이벤트 Bearer](ADR/0003_baton-event-authentication/adr.md) | 채택됨 | Spring Security 표준 Bearer와 수동 교체 구간 |
 | [ADR-0004 스테이징 컨테이너](ADR/0004_staging-container-runtime/adr.md) | 채택됨 | 비루트·읽기 전용 실행 이미지와 내부 데이터베이스 |
 | [ADR-0005 Caddy HTTPS 앞단](ADR/0005_caddy-event-ingress/adr.md) | 채택됨 | 자동 HTTPS, 공개 경로 허용 목록과 최소 capability |
-| [ADR-0006 BATON·BRIEF 애플리케이션 경계](ADR/0006_baton-brief-application-boundary/adr.md) | 채택됨 | BATON의 사용자 권한·생성 실행과 BRIEF 내부 읽기 모델 책임 |
+| [ADR-0006 BATON·BRIEF 책임 분리](ADR/0006_baton-brief-application-boundary/adr.md) | 채택됨 | BATON의 사용자 권한·생성 실행과 BRIEF 내부 읽기 모델 책임 |
 | [ADR-0007 BATON 서비스 API 인증](ADR/0007_baton-service-api-security/adr.md) | 채택됨 | 이벤트와 분리한 Bearer와 서비스 전용 HTTPS 앞단 |
 | [ADR-0008 호스트 권한 운영](ADR/0008_host-authorized-operations/adr.md) | 채택됨 | 단발성 진단·재구축과 컨테이너 loopback 지표 조회 |
 

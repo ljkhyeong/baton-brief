@@ -25,7 +25,7 @@ JVM과 연결풀 계측은 Spring Boot Actuator의 자동 구성을 사용하며
 
 ## 보존·노출 경계
 
-2026-09-05 ADR-0008은 선택적 조립에 한해 컨테이너 loopback 관리 서버의 Prometheus 지표
+2026-09-05 ADR-0008은 선택적 구성에 한해 컨테이너 loopback 관리 서버의 Prometheus 지표
 조회를 후속 채택했다. 기본 실행의 health 전용 노출은 유지한다. 외부 수집·경보는 여전히
 연결되지 않았으며 [운영 절차](../../operations/diagnostics-and-metrics.md)를 따른다.
 
