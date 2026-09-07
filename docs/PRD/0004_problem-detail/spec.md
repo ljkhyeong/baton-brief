@@ -7,7 +7,7 @@
 ## 목적
 
 현재 로컬 MVP는 성공·도메인 처리 결과의 HTTP 상태와 본문을 정의하지만, 요청 검증 실패와
-없는 에디션은 Spring Boot 기본 오류 map으로 응답한다. 호출자가 상태마다 다른 오류 형식을
+없는 브리프는 Spring Boot 기본 오류 map으로 응답한다. 호출자가 상태마다 다른 오류 형식을
 해석하지 않도록 Spring Boot와 Spring Framework가 제공하는 RFC 9457 `ProblemDetail`
 자동 구성을 사용한다.
 
@@ -50,7 +50,7 @@ Spring Boot 표준 속성 `spring.mvc.problemdetails.enabled=true`를 사용한�
 - 이벤트 처리의 `CONFLICT` `409`, `UNSUPPORTED` `422`, `DUPLICATE`, `STALE`, `APPLIED`와
   `APPLIED_WITH_GAP`은 오류 예외가 아니라 PRD-0002가 정의한 도메인 처리 결과다. 기존
   `IngestResponse`를 유지한다.
-- 에디션 생성의 `200`·`201`, 조회의 성공 본문과 PRD-0003 이력 응답은 바꾸지 않는다.
+- 브리프 생성의 `200`·`201`, 조회의 성공 본문과 PRD-0003 이력 응답은 바꾸지 않는다.
 - 예상하지 못한 `DataAccessException`과 애플리케이션 `RuntimeException`은 이번
   `ProblemDetail` 자동 처리 범위가 아니다. 기본 500 응답의 예외명·메시지·스택 비노출
   설정을 유지하며, 재시도 가능성이나 오류 코드가 채택되기 전 임의 분류하지 않는다.
@@ -74,7 +74,7 @@ Spring Boot 표준 속성 `spring.mvc.problemdetails.enabled=true`를 사용한�
 
 ## 수용 기준
 
-- 대표적인 Bean Validation `400`과 없는 에디션 `404`가
+- 대표적인 Bean Validation `400`과 없는 브리프 `404`가
   `application/problem+json`으로 응답한다.
 - 대표 요청에서 정수가 아닌 숫자와 선언하지 않은 JSON 필드를 `400`으로 거부한다.
 - 응답에 `title`, `status`, `detail`, `instance`가 있고 상태와 요청 경로가 일치한다.

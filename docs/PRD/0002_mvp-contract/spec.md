@@ -1,38 +1,38 @@
-# PRD-0002: MVP 이벤트·투영·에디션 계약
+# PRD-0002: MVP 이벤트·투영·브리프 계약
 
 - 상태: 채택됨
 - 결정일: 2026-08-13
-- 범위: 로컬 MVP의 내부 HTTP 계약과 결정적 투영·에디션 규칙
+- 범위: 로컬 MVP의 내부 HTTP 계약과 결정적 투영·브리프 규칙
 
 ## 목적
 
 첫 MVP가 구현할 최소 경계를 고정한다. BRIEF는 BATON의 운영 사실을 내부 HTTP로 받아
-멱등하게 기록하고, 설명 가능한 관심 항목으로 투영한 뒤 작업공간·시즌 단위의 주간
-에디션을 생성·조회한다.
+멱등하게 기록하고, 설명 가능한 점검 항목으로 투영한 뒤 작업공간·시즌 단위의 주간
+브리프를 생성·조회한다.
 
 이 계약은 내부 HTTP 엔드포인트, PostgreSQL 영속성과 로컬 MVP 동작을 규정한다. BATON
 생산자 연동, 운영 인증·인가, 외부 종단 간 동작과 배포는 별도 계약의 범위다.
 
 PRD-0009는 이 계약의 기존 작업공간·시즌 전역 최신 조회를 바꾸지 않고 정확한 주간·시간대
-범위의 최신 에디션을 조회하는 별도 경로를 추가한다.
+범위의 최신 브리프를 조회하는 별도 경로를 추가한다.
 
-PRD-0010은 에디션 항목에 생성 당시의 집계 리비전과 리비전 공백 근거를 고정하는 계약을
+PRD-0010은 브리프 항목에 생성 당시의 집계 리비전과 리비전 공백 근거를 고정하는 계약을
 추가한다.
 
-PRD-0012는 생성·전역 최신·주간 최신·단건 에디션 응답에 불변 에디션 식별자를 기반으로 한
+PRD-0012는 생성·전역 최신·주간 최신·단건 브리프 응답에 브리프 식별자를 기반으로 한
 `ETag`를 제공하고, 적용 대상 `GET`의 `If-None-Match` 조건부 조회를 Spring MVC 표준
 처리로 지원한다.
 
-PRD-0013은 작업공간·시즌·이벤트 종류·원본 참조로 현재 관심 항목 한 건을 조회하는
-읽기 전용 경로를 추가한다. 현재 투영은 변경 가능하며 불변 에디션이나 과거 이력이 아니다.
+PRD-0013은 작업공간·시즌·이벤트 종류·원본 참조로 점검 항목 한 건을 조회하는
+읽기 전용 경로를 추가한다. 현재 투영은 변경 가능하며 브리프나 과거 이력이 아니다.
 
-PRD-0014는 작업공간·시즌의 현재 `ACTIVE` 관심 항목을 복합 정체성 키셋으로 발견하는
-읽기 전용 목록을 추가한다. 이 목록은 요청 간 스냅샷이나 불변 에디션 미리보기가 아니다.
+PRD-0014는 작업공간·시즌의 현재 `ACTIVE` 점검 항목을 복합 식별자 키셋으로 발견하는
+읽기 전용 목록을 추가한다. 이 목록은 요청 간 스냅샷이나 브리프 미리보기가 아니다.
 
 PRD-0015는 같은 목록 경로에 선택적인 `status`를 추가한다. 생략 시 기존 `ACTIVE`를
 유지하고 `RESOLVED`를 선택해 현재 해소 항목을 탐색할 수 있다. 과거 상태 이력은 아니다.
 
-PRD-0016은 복합 정체성에 실제 적용된 상태 전이 증거를 집계 리비전 내림차순 키셋으로
+PRD-0016은 복합 식별자에 실제 적용된 상태 변경 이력을 집계 리비전 내림차순 키셋으로
 조회한다. 현재 규칙으로 과거 투영 전체를 재계산하는 경로가 아니다.
 
 PRD-0019는 기존 v1을 보존하면서 BATON이 판정한 다섯 연속성 신호와 원본 심각도를 이벤트
@@ -54,14 +54,14 @@ v2로 수신·재생하는 계약을 추가한다.
 | 메서드 | 경로 | 의미 |
 |---|---|---|
 | `POST` | `/api/v1/events` | 이벤트 v1·v2 수신과 멱등 투영 |
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | PRD-0013의 현재 관심 항목 단건 조회 |
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items` | PRD-0014·0015의 현재 관심 항목 상태별 키셋 조회 |
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions` | PRD-0016의 적용 상태 전이 증거 이력 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | PRD-0013의 점검 항목 단건 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items` | PRD-0014·0015의 점검 항목 상태별 키셋 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions` | PRD-0016의 적용 상태 변경 이력 |
 | `POST` | `/api/v1/projections/rebuild` | 보존한 수신 기록으로 현재 투영 전체 재구축 |
-| `POST` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions` | 주간 에디션 생성 |
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest` | 작업공간·시즌 전역 최신 완료 에디션 조회 |
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest` | PRD-0009의 정확한 주간 범위 최신 에디션 조회 |
-| `GET` | `/api/v1/editions/{id}` | 불변 에디션 단건 조회 |
+| `POST` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions` | 주간 브리프 생성 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest` | 작업공간·시즌 전역 최신 완료 브리프 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest` | PRD-0009의 정확한 주간 범위 최신 브리프 조회 |
+| `GET` | `/api/v1/editions/{id}` | 브리프 단건 조회 |
 
 로컬 MVP의 엔드포인트는 기본적으로 인증 없는 내부 API다. PRD-0020에 따라
 `POST /api/v1/events`만 전용 Bearer를 선택적으로 필수화할 수 있다. 호출자가 전달한
@@ -192,8 +192,8 @@ HTTP 상태와 응답 본문은 다음과 같다.
 | v2 다섯 타입 + `sourceSeverity=CRITICAL` | 수신한 `eventType` | `HIGH` |
 | v2 다섯 타입 + `sourceSeverity=WARNING` | 수신한 `eventType` | `MEDIUM` |
 
-- `ACTIVE`는 해당 원본 참조의 관심 항목을 활성 상태로 투영한다.
-- `RESOLVED`는 해당 관심 항목을 해소 상태로 투영한다.
+- `ACTIVE`는 해당 원본 참조의 점검 항목을 활성 상태로 투영한다.
+- `RESOLVED`는 해당 점검 항목을 해소 상태로 투영한다.
 - AI 생성 결과, 수신 기록 도착 시간 또는 BRIEF의 추론으로 이유·심각도·상태를 바꾸지
   않는다.
 - 표시 가능한 항목은 작업공간·시즌, 이유 코드, 심각도, 불투명 원본 참조,
@@ -208,7 +208,7 @@ PRD-0014·0015의 목록은 작업공간·시즌과 선택한 `status`가 일치
 `ACTIVE`이며 `RESOLVED`도 선택할 수 있다. 자유 검색·정렬, 과거 이력과 현재 상태 변경
 명령은 포함하지 않는다.
 
-PRD-0016의 전이 이력은 같은 복합 정체성의 `APPLIED`·`APPLIED_WITH_GAP` 최초 수신 기록만
+PRD-0016의 전이 이력은 같은 복합 식별자의 `APPLIED`·`APPLIED_WITH_GAP` 최초 수신 기록만
 `aggregateRevision` 내림차순의 배타 키셋으로 반환한다. `STALE`·`UNSUPPORTED`, 중복과
 충돌은 투영 전이가 아니다.
 
@@ -221,7 +221,7 @@ PRD-0016의 전이 이력은 같은 복합 정체성의 `APPLIED`·`APPLIED_WITH
 - 실시간 처리와 같은 규칙 v1을 사용한다.
 - 간격과 오래된 이벤트의 증거를 잃지 않는다.
 - 부분 재구축 결과를 현재 투영으로 노출하지 않는다.
-- 재구축은 수락된 수신 기록과 기존 불변 에디션을 보존하고 현재 관심 항목
+- 재구축은 수락된 수신 기록과 기존 브리프를 보존하고 점검 항목
   투영만 원자적으로 다시 만든다.
 
 첫 MVP는 재구축 시작 명령만 HTTP로 제공하며 스케줄러나 브로커 소비자를 추가하지 않는다.
@@ -229,7 +229,7 @@ PRD-0016의 전이 이력은 같은 복합 정체성의 `APPLIED`·`APPLIED_WITH
 
 PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. 모든 저장된 수신 결과와
 이벤트별 최초 충돌 증거는 대체 계약 전까지 보존하되, 재구축은 `UNSUPPORTED`를 제외한
-수신 기록만 `ingestion_sequence` 순서로 재생한다. 현재 투영 전체 교체는 수신과 에디션
+수신 기록만 `ingestion_sequence` 순서로 재생한다. 현재 투영 전체 교체는 수신과 브리프
 생성과 공유하는 전역 잠금 경계 및 하나의 트랜잭션에서 수행하며 실패 시 이전 투영으로
 롤백한다. 숫자 TTL, 잠금 제한 시간과 재구축 SLO는 아직 채택하지 않았다.
 
@@ -250,8 +250,8 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 부호가 있는 연도와 다섯 자리 이상 연도는 생성·주간 최신 조회에서 모두 `400 Bad Request`로
 거부한다. JDK의 엄격한 날짜 파서에서 연도 자릿수를 제한하며, 파싱한 날짜의 월요일 여부는
 기존 요청 DTO에서 검증한다. 허용 범위에서는 다음 주 경계 계산과 PostgreSQL 저장이 가능하다.
-현재 시점 기준의 과거·미래 제한은 추가하지 않는다. 기존에 저장한 범위 밖 에디션은 변경하지
-않으며 에디션 ID·전역 최신·이력 조회는 유지한다.
+현재 시점 기준의 과거·미래 제한은 추가하지 않는다. 기존에 저장한 범위 밖 브리프는 변경하지
+않으며 브리프 ID·전역 최신·이력 조회는 유지한다.
 
 구간은 지정한 시간대에서 `weekStart` 00:00부터 다음 월요일 00:00까지의
 `[windowStart, windowEnd)`로 계산한다. 두 경계를 각각 시점으로 변환하므로 일광 절약 시간
@@ -262,30 +262,30 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 - 생성 트랜잭션에서 해당 작업공간·시즌에 보존된 지원 수신 기록의 최대
   `ingestion_sequence`를 `sourceCursor`로 고정한다. 이 값은 BRIEF가 처리한 로컬 수신 기록
   경계이며 원본 시스템의 완전성 워터마크나 수신 기록 도착 시각이 아니다.
-- PRD-0029의 에디션 선정 규칙 v2는 같은 트랜잭션의 현재 `ACTIVE` 항목 중 원본
+- PRD-0029의 브리프 선정 규칙 v2는 같은 트랜잭션의 현재 `ACTIVE` 항목 중 원본
   `occurredAt`(`observedAt`)이 `windowEnd`보다 이른 항목을 선택한다. `[windowStart, windowEnd)`는
   `CURRENT_WEEK`, `windowStart` 이전은 `CARRY_OVER`로 구분한다. 기존 규칙 v1은 해당 주간의
-  항목만 선정했으며 저장된 이전 에디션은 바꾸지 않는다.
+  항목만 선정했으며 저장된 이전 브리프는 바꾸지 않는다.
 - 정렬·선택된 고정 항목 상태를 정규화해 `stateFingerprint`를 계산한다. 같은 작업공간,
-  시즌, `weekStart`, `zoneId`와 규칙 버전의 가장 최근 에디션이 같은
+  시즌, `weekStart`, `zoneId`와 규칙 버전의 가장 최근 브리프가 같은
   `stateFingerprint`를 가질 때만 반복 생성 요청으로 판단한다. 이 경우 하나의 논리적
-  에디션만 유지하며 생성 시각이나 원본 커서만 달라졌다는 이유로 새 에디션을 만들지
+  브리프만 유지하며 생성 시각이나 원본 커서만 달라졌다는 이유로 새 브리프를 만들지
   않는다.
 - PRD-0010을 적용한 상태 지문에는 선택 항목의 `aggregateRevision`과 `revisionGap`도
   포함한다. 표시 필드가 같더라도 리비전 근거가 달라지면 새 세대를 만들고, 같은 근거의
-  반복 생성은 가장 최근 에디션을 멱등하게 반환한다.
+  반복 생성은 가장 최근 브리프를 멱등하게 반환한다.
 - `CURRENT_WEEK`, `CARRY_OVER` 그룹 순서 안에서 `severity` 내림차순(`HIGH`가 `MEDIUM`보다
   먼저), `reasonCode`, `sourceReference` 오름차순으로 안정 정렬한다. `section`도 새 항목의
-  상태 지문에 포함하며 새 에디션의 `ruleVersion=2`와 항목의 투영 `ruleVersion=1`을 구분한다.
+  상태 지문에 포함하며 새 브리프의 `ruleVersion=2`와 항목의 투영 `ruleVersion=1`을 구분한다.
 - 생성이 완료되면 선택한 항목과 표시 필드, PRD-0010의 집계 리비전·리비전 공백 근거,
   구간, 시간대, 규칙 버전과 원본 커서를 고정한다. 이후 투영 변경이나 재구축이 기존
-  에디션을 수정하지 않는다.
-- 선택 상태가 달라지거나 정정이 필요하면 기존 에디션을 덮어쓰지 않고 해당
+  브리프를 수정하지 않는다.
+- 선택 상태가 달라지거나 정정이 필요하면 기존 브리프를 덮어쓰지 않고 해당
   작업공간·시즌에서 증가하는 새 세대를 만든다. 상태가 `A → B → A`로 되돌아와 과거와
-  같은 지문이 다시 나타나더라도 직전 에디션과 다르므로 과거 `A` 에디션을 재사용하지
+  같은 지문이 다시 나타나더라도 직전 브리프와 다르므로 과거 `A` 브리프를 재사용하지
   않고 새 세대를 만든다.
-- 전역 최신 에디션은 해당 작업공간·시즌에서 완료된 에디션 중 세대가 가장 큰
-  에디션이다.
+- 전역 최신 브리프는 해당 작업공간·시즌에서 완료된 브리프 중 세대가 가장 큰
+  브리프다.
 
 `GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest`와
 `GET /api/v1/editions/{id}`는 저장된 고정 스냅샷을 반환하며 실시간 투영을 다시 조합하지
@@ -293,8 +293,8 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 범위에서 가장 큰 `generation`을 선택한다. `ruleVersion`으로 필터링하지 않고 선택한 저장
 스냅샷의 값을 응답에 포함한다.
 
-새 에디션 생성 응답은 `201 Created`와 단건 조회 `Location`을, 같은 논리 상태의 반복
-요청은 기존 에디션과 `200 OK`를 반환한다. 에디션 본문은 최소한 `editionId`,
+새 브리프 생성 응답은 `201 Created`와 단건 조회 `Location`을, 같은 논리 상태의 반복
+요청은 기존 브리프와 `200 OK`를 반환한다. 브리프 본문은 최소한 `editionId`,
 `workspaceId`, `seasonId`, `generation`, `weekStart`, `zoneId`, `windowStart`, `windowEnd`,
 `sourceCursor`, `generatedAt`, `ruleVersion`과 고정된 `items`를 포함한다. 항목에는
 `reasonCode`, `severity`, `sourceReference`, `status`, `observedAt`, `ruleVersion`, `null`을
@@ -304,9 +304,9 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 이전 값을 `0`·`false`로 채우거나 현재 투영에서 추정하지 않는다. 조회 대상이 없으면
 `404 Not Found`를 반환한다.
 
-PRD-0012에 따라 생성 응답과 저장된 전체 에디션을 반환하는 세 `GET` 경로는 선택된
-불변 에디션의 `ETag`를 함께 제공한다. 일치하는 `If-None-Match`가 있는 `GET`은 Spring
-MVC의 표준 처리로 `304 Not Modified`를 반환하며, 에디션 선택 결과가 바뀌면 기존처럼
+PRD-0012에 따라 생성 응답과 저장된 전체 브리프를 반환하는 세 `GET` 경로는 선택된
+브리프의 `ETag`를 함께 제공한다. 일치하는 `If-None-Match`가 있는 `GET`은 Spring
+MVC의 표준 처리로 `304 Not Modified`를 반환하며, 브리프 선택 결과가 바뀌면 기존처럼
 `200 OK`와 새 본문을 반환한다.
 
 ## 호환성과 오류 경계
@@ -331,12 +331,12 @@ MVC의 표준 처리로 `304 Not Modified`를 반환하며, 에디션 선택 결
 - 이벤트 v2 다섯 종류가 BATON 원본 심각도 대응과 함께 적용되고 v1과 함께 재구축된다.
 - 재구축 결과가 같은 수락 수신 기록의 실시간 투영과 같다.
 - 월요일 검증, IANA 시간대와 DST 경계의 `[start, end)` 계산이 고정 시간 테스트로 확인된다.
-- 같은 요청 범위의 직전 `stateFingerprint`와 동일한 반복 요청은 에디션을 중복 생성하지
+- 같은 요청 범위의 직전 `stateFingerprint`와 동일한 반복 요청은 브리프를 중복 생성하지
   않고, 선택 상태가 달라지거나 `A → B → A`로 되돌아오면 세대가 증가한다.
 - PRD-0010 적용 뒤 표시 필드가 같더라도 `aggregateRevision` 또는 `revisionGap`이 달라지면
   새 세대가 생기고, 이후 동일한 근거의 반복 생성은 멱등하다. 이전 항목의 두 값은
   `null`로 유지한다.
-- 정렬 순서가 항상 재현되고, 생성 뒤 투영을 바꿔도 에디션 항목이 변하지 않는다.
+- 정렬 순서가 항상 재현되고, 생성 뒤 투영을 바꿔도 브리프 항목이 변하지 않는다.
 - 전역 최신 조회가 작업공간·시즌의 최대 세대를 반환하고 단건 조회가 동일 고정 스냅샷을
   반환한다.
 - PRD-0009의 주간 최신 조회가 정확한 작업공간·시즌·주간·시간대 범위의 최대 세대를

@@ -18,7 +18,7 @@ PRD-0018과 PRD-0019는 BATON 원본에서 BRIEF PostgreSQL까지의 로컬 수�
   `WWW-Authenticate: Bearer` 응답을 받으며 수신 기록과 투영을 만들지 않는다.
 - 올바른 Bearer 뒤의 이벤트 본문·멱등성·충돌·HTTP 결과는 PRD-0002와 PRD-0019를
   그대로 따른다.
-- `GET` 조회, 에디션 생성과 투영 재구축의 운영자·사용자 권한은 이번 계약에 포함하지
+- `GET` 조회, 브리프 생성과 투영 재구축의 운영자·사용자 권한은 이번 계약에 포함하지
   않는다. 현재 로컬 경계를 운영 공개 API로 해석하지 않는다.
 
 ## 설정과 비밀 경계
@@ -85,7 +85,7 @@ PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secret
 
 ## 비목표
 
-- BRIEF 조회·에디션·재구축 API의 사용자·운영자 권한 모델
+- BRIEF 조회·브리프·재구축 API의 사용자·운영자 권한 모델
 - OAuth2 authorization server, JWT, token introspection, mTLS와 복수 생산자 권한
 - token 발급·자동 회전과 비밀 관리 제품 선택
 - 실제 공인 DNS, 방화벽, ACME 인증서 발급과 BATON 원격 스테이징 전달

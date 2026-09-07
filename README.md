@@ -2,14 +2,15 @@
 
 BATON BRIEF는 BATON의 업무 변경을 받아 점검 항목과 주간 브리프를 만드는 서비스다.
 저장한 브리프는 변경하지 않는다.
+점검 사유가 사라진 상태를 ‘해소’라고 한다.
 
 ## 현재 상태
 
 Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.6 기반의 로컬 MVP를 구현했다.
 
 - 버전이 있는 BATON 이벤트 v1·v2의 멱등 수신, 충돌 증거와 집계 리비전 처리
-- 현재 관심 항목 투영, 상태별 키셋 조회, 상태 전이 증거와 원자적 전체 재구축
-- 월요일 시작 IANA 시간대 주간의 불변 에디션 생성·조회·이력·비교·조건부 조회
+- 점검 항목 투영, 상태별 키셋 조회, 상태 변경 이력과 원자적 전체 재구축
+- 월요일 시작 IANA 시간대 주간의 브리프 생성·조회·이력·비교·조건부 조회
 - RFC 9457 `ProblemDetail`, Spring Boot Actuator aggregate health
 - 이벤트 수신 결과별 지표와 선택적 Prometheus 수집·경보 규칙. 외부 알림은 미연결
 - PostgreSQL 기본 도구를 사용한 백업과 Linux 정기 실행 예시
@@ -29,23 +30,23 @@ BATON 도메인 이벤트 ──> BRIEF 수신 기록 ──> AttentionItem 현�
 
 구현하고 로컬 교차 검증한 백엔드 연결:
 BATON 사용자 API ──> 세션·멤버십·접근 키 판정 ──> 서비스 Caddy ──> BRIEF 내부 조회
-BATON 대상·시점·전달 경계 결정 ────────────────> 서비스 Caddy ──> BRIEF 에디션 생성
+BATON 대상·시점·전달 경계 결정 ────────────────> 서비스 Caddy ──> BRIEF 브리프 생성
 ```
 
 BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운영 사실과 최종 판정은 원본
 서비스가 소유하고 BRIEF는 커밋 후 전달된 이벤트만 소비한다. 사용자 조회는
-[PRD-0023](docs/PRD/0023_baton-mediated-brief-query/spec.md), 에디션 생성 실행은
+[PRD-0023](docs/PRD/0023_baton-mediated-brief-query/spec.md), 브리프 생성 실행은
 [PRD-0024](docs/PRD/0024_baton-driven-edition-generation/spec.md), 서비스 인증과 비공개 연결은
 [PRD-0025](docs/PRD/0025_baton-service-api-security/spec.md)를 따른다.
 
-BATON 화면은 저장된 에디션의 이력·비교를 조회하고 현재 업무로 이동할 수 있다. 현재 업무명과
+BATON 화면은 저장된 브리프의 이력·비교를 조회하고 현재 업무로 이동할 수 있다. 현재 업무명과
 생성 전 전달 상태는 BATON에서 별도로 조회하며 BRIEF의 불변 본문과 ETag를 바꾸지 않는다.
 저장 이후 추가 전달 여부도 BATON의 성공 생성·재사용 기록을 기준으로 별도 안내한다.
 BATON 화면 안의 탐색 선택을 유지하고, 특정 생성본 링크 복사와 선택한 불변 브리프의
 인쇄·PDF 저장을 제공한다. 링크는 기존 사용자 권한 검사를 거치며 출력의 현재 업무명은
 생성 당시 기록과 구분한다. 이 기능을 위한 BRIEF API·저장 변경은 없다.
 
-## 기능 지도
+## 주요 기능
 
 ### 이벤트 수신 기록
 
@@ -55,7 +56,7 @@ BATON 화면 안의 탐색 선택을 유지하고, 특정 생성본 링크 복�
 - 대체 보존 계약 전에는 `UNSUPPORTED`를 포함한 수신 기록과 이벤트별 최초 충돌 한 건을
   삭제·압축하지 않는다.
 
-### 현재 관심 항목
+### 점검 항목
 
 - `(workspaceId, seasonId, eventType, sourceReference)`를 복합 식별자로 사용한다.
 - 현재 단건과 `ACTIVE`·`RESOLVED` 상태별 키셋 목록을 조회하고,
@@ -69,16 +70,16 @@ BATON 화면 안의 탐색 선택을 유지하고, 특정 생성본 링크 복�
   누적 공백을 구분한다. v2 전이에는 원본 심각도도 제공하며 v1은 `null`을 유지한다.
 - 단건 응답은 현재 규칙 버전과 마지막 적용 리비전에 결합한 `ETag`를 제공한다.
 
-### 불변 에디션
+### 브리프
 
 - 월요일 시작 IANA 시간대 주간과 로컬 수신 `sourceCursor`를 기준으로 결정적으로 생성한다.
 - 같은 범위의 직전 상태는 멱등하게 재사용하고 `A → B → A`처럼 과거 상태로 돌아오면 새
   `generation`으로 기록한다.
 - 전역 최신·주간 범위 최신·단건·이력·비교 조회를 제공한다.
-- 생성 당시 항목과 집계 리비전·리비전 공백을 함께 고정하며 기존 에디션을 수정하지 않는다.
+- 생성 당시 항목과 집계 리비전·리비전 공백을 함께 고정하며 기존 브리프를 수정하지 않는다.
 - [선정 규칙 v2](docs/PRD/0029_edition-carry-over/spec.md)는 이번 주 변경과 이전부터 미해소인
-  항목을 `section`으로 구분한다. 이전 에디션의 미기록 분류는 `null`이다.
-- 전체 에디션 응답은 선택된 불변 에디션을 나타내는 `ETag`를 제공한다.
+  항목을 `section`으로 구분한다. 이전 브리프의 미기록 분류는 `null`이다.
+- 전체 브리프 응답은 선택된 브리프를 나타내는 `ETag`를 제공한다.
 
 ### 실행 경계
 
@@ -101,8 +102,8 @@ BATON 화면 안의 탐색 선택을 유지하고, 특정 생성본 링크 복�
 BRIEF가 소유한다.
 
 - 멱등 수신 기록과 제한된 최초 충돌 증거
-- 작업공간·시즌별 현재 관심 항목 투영
-- 결정적 생성 커서와 불변 에디션
+- 작업공간·시즌별 점검 항목 투영
+- 결정적 생성 커서와 브리프
 - 재구축과 조회에 필요한 로컬 운영 증거
 
 BRIEF가 소유하지 않는다.
@@ -215,7 +216,7 @@ docker compose --env-file .env.staging -f compose.staging.yml config --quiet
 docker compose --env-file .env.staging -f compose.staging.yml up --build -d --wait
 ```
 
-기본 조립은 PostgreSQL과 BRIEF의 호스트 포트를 열지 않는다. 컨테이너 healthcheck만으로
+기본 Compose 구성은 PostgreSQL과 BRIEF의 호스트 포트를 열지 않는다. 컨테이너 healthcheck만으로
 내부 애플리케이션·데이터베이스 상태를 확인하며, 호스트에서 이벤트를 보내려면 공개 호스트가
 준비된 환경에서 Caddy profile을 명시적으로 활성화한다. 개발 중 직접 HTTP 호출은 위의
 로컬 실행 절차를 사용한다.
@@ -225,7 +226,7 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https co
 docker compose --env-file .env.staging -f compose.staging.yml --profile https up --build -d --wait
 ```
 
-이 조립은 실제 DNS·방화벽, 공인 인증서 발급, 백업·복구, 이미지 registry와 BATON 원격
+이 구성은 실제 DNS·방화벽, 공인 인증서 발급, 백업·복구, 이미지 registry와 BATON 원격
 전달을 대신하지 않는다.
 
 백업과 빈 DB 복원은 [PostgreSQL 백업·복원 절차](docs/operations/postgresql-backup-restore.md)를

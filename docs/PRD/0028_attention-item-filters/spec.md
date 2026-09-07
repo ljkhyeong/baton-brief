@@ -1,8 +1,8 @@
-# PRD-0028: 현재 관심 항목의 심각도·리비전 공백 필터
+# PRD-0028: 점검 항목의 심각도·리비전 공백 필터
 
 - 상태: 채택됨
 - 결정일: 2026-08-31
-- 범위: 기존 현재 관심 항목 목록의 선택적 심각도·누적 리비전 공백 조건
+- 범위: 기존 점검 항목 목록의 선택적 심각도·누적 리비전 공백 조건
 
 ## 목적
 
@@ -56,7 +56,7 @@ GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items
 - 기존 `attention_item.severity`·`revision_gap`을 읽으며 새 테이블·열·인덱스·캐시와
   Flyway 마이그레이션은 추가하지 않는다.
 - 값은 Spring JDBC의 이름 있는 매개변수로 바인딩하고 입력 문자열을 SQL에 직접 넣지 않는다.
-- 투영·수신 증거·불변 에디션과 규칙 버전은 변경하지 않는다.
+- 투영·수신 기록·브리프와 규칙 버전은 변경하지 않는다.
 - PRD-0023·0025의 BATON 권한 판정과 서비스 Bearer·비공개 HTTPS 경계를 유지한다.
   새 경로나 Caddy 허용 목록은 추가하지 않는다.
 
@@ -79,7 +79,7 @@ GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items
 
 ## 관련 문서
 
-- [현재 활성 관심 항목 목록](../0014_active-attention-items/spec.md)
+- [활성 점검 항목 목록](../0014_active-attention-items/spec.md)
 - [현재 상태 필터](../0015_attention-item-status-filter/spec.md)
-- [현재 활성 관심 항목 요약](../0027_attention-item-summary/spec.md)
+- [활성 점검 항목 요약](../0027_attention-item-summary/spec.md)
 - [BATON 백엔드 경유 조회](../0023_baton-mediated-brief-query/spec.md)

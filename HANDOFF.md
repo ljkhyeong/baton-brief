@@ -26,6 +26,7 @@ PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치�
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `c1e68a1` 오류 문구, 2026-09-08 | `:bootstrap:test` 선택 4건과 `contractsZip` 성공. 수신 조회·이벤트 입력 형식·브리프 조회·비교 오류 확인. 백업 경로 안내·문서 링크 163개·ZIP 내 문서 5개 확인 | 코드 변경은 안내 문자열에 한정. API 필드·상태 코드·검증 조건 유지. 전체 테스트·JAR 생성·컨테이너 재기동은 문구 변경 범위에서 제외 |
 | BRIEF `f2f34ab` 지표 수집, 2026-09-07 | `docker build --tag baton-brief:no-fee-verify .`, Compose 설정·격리 기동, Prometheus 3.14.0 `promtool check config`·`test rules` 4개 시나리오 성공. 실제 수집·경보 API·비루트·읽기 전용·비공개 네트워크·파일 Bearer·비밀 로그 비노출 확인 | Docker Compose 5.5.0·PostgreSQL 18.6. 원격 배포·외부 알림은 미실행. 제품 소스·의존성은 `5e7cd53`과 같아 아래 Gradle 결과 재사용 |
 | BRIEF `f2f34ab` 백업, 2026-09-07 | `bash ops/backup-postgresql.sh`의 파일 권한·실패한 임시 파일 제거·기존 백업 보존 확인. 별도 빈 PostgreSQL에 복원해 Flyway 포함 6개 테이블 일치 | 계약 예시 1건 기준. Linux 타이머 설치·대용량·외부 보관·서버 장애 복구는 미실행 |
 | BRIEF `5e7cd53` 조회 위임 정리, 2026-09-05 | `./gradlew test :bootstrap:bootJar` 성공. `bootstrap` 35건 실행·통과, 도메인 6건 기존 결과 재사용. 실패·제외 없음. JDK 21·PostgreSQL 18.6 | 동일한 조회 10개의 선언을 `BriefQueries`에 모으고 서비스의 단순 전달을 Kotlin 위임으로 대체. 기존 RowMapper 교체를 포함해 조회·페이지·인증·재구축·계약 검증. 원격·교차 서비스 검증은 미실행 |
@@ -40,12 +41,12 @@ PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치�
 
 | 범위·실행일 | 확인한 내용 | 남은 범위 |
 | --- | --- | --- |
-| BRIEF 주간 분류·운영 명령, 2026-09-05 | `test :bootstrap:bootJar contractsZip` 성공. JDK 21·Kotlin 2.4.10·PostgreSQL 18.6·V9, 대표 이전 데이터 업그레이드와 에디션 불변성 확인 | 원격 배포 미실행 |
+| BRIEF 주간 분류·운영 명령, 2026-09-05 | `test :bootstrap:bootJar contractsZip` 성공. JDK 21·Kotlin 2.4.10·PostgreSQL 18.6·V9, 대표 이전 데이터 업그레이드와 브리프 불변성 확인 | 원격 배포 미실행 |
 | BRIEF 주간 해소 상세, 2026-09-05 | `test :bootstrap:bootJar` 성공. 상세 값·페이지·재활성화·재구축·잘못된 커서 확인 | BATON 병합 후 교차 서비스 재실행은 미실행 |
 | 조회·생성 연결, 2026-09-05 | BATON `BriefEditionHttpsEndToEndTest` 성공. 실제 두 JAR·MySQL 8.4·PostgreSQL 18.6·서비스 Caddy로 분류·원본 심각도·주간 해소 상세 확인 | 당시 BATON 작업 브랜치 기준. 이후 메인 계정 권한 변경과 원격 인증서·비밀은 별도 확인 필요 |
 | 이벤트 생산·전달, 2026-08-30~31 | BATON `4a7f6d1`·BRIEF `0e6cd2a`로 실제 직렬화·두 JAR 전달 확인. 이후 BATON 계약 핀 갱신과 `BriefDeliveryEndToEndTest` 성공 | loopback HTTP·MySQL 8.4·PostgreSQL 18.6. 응답 유실은 전달 상태를 되돌려 재현했고 실제 TCP 절단은 미실행 |
 | 운영 명령·지표 조립, 2026-09-05 | 격리 PostgreSQL 18.6·임시 비밀로 비루트·읽기 전용·내부 네트워크·호스트 포트 비게시·파일 Bearer 확인. 지표 loopback 제한과 명령 종료·웹/Flyway 비활성 확인 | 로컬 선택적 Compose 기준. 외부 수집·경보는 미연결 |
-| 수동 백업·복원, 2026-08-30 | PostgreSQL 18.6의 소량 계약 예시를 별도 DB에 복원해 중복 수신·재구축·불변 에디션·ETag·순서 보존 확인 | loopback·인증 비활성 환경. 운영 비밀·대용량·원격 보관·운영 DB 전환은 미검증 |
+| 수동 백업·복원, 2026-08-30 | PostgreSQL 18.6의 소량 계약 예시를 별도 DB에 복원해 중복 수신·재구축·브리프·ETag·순서 보존 확인 | loopback·인증 비활성 환경. 운영 비밀·대용량·원격 보관·운영 DB 전환은 미검증 |
 
 검증용 컨테이너·볼륨·임시 비밀·덤프는 당시 정리했다. 임시 산출물이 지금도 남아 있다고 가정하지 않는다.
 공개·서비스 Caddy와 Compose의 실행 기준은 [배포 준비](docs/operations/brief-b4ton-com-deployment.md)를 따른다.
@@ -56,7 +57,7 @@ PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치�
 - 실제 서비스 인증서·truststore·배포 비밀을 사용한 조회·생성, 로그인 사용자 화면과 권한 확인
 - 실제 TCP 응답 절단·프로세스 중단 뒤 생성 실행 재시도, 운영 브라우저의 인쇄·PDF 결과
 - WATCH·RELAY·GO 생산자 연동과 브로커
-- 수신 기록·충돌 증거·에디션의 삭제·압축·외부 보관·보존 기간
+- 수신 기록·충돌 증거·브리프의 삭제·압축·외부 보관·보존 기간
 - 재구축 SLO·잠금 제한 시간·체크포인트, 백업 보관 정책·복구 전환·RPO·RTO
 - 실제 서버의 Prometheus·정기 백업 설치와 수집·전달 장애의 외부 알림 연결
 - 공개 Caddy의 인증서 볼륨 소유권을 포함한 비루트 전환, 다중 인스턴스 구성

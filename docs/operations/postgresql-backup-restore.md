@@ -7,7 +7,7 @@ BRIEF 데이터베이스 전체를 PostgreSQL 표준 `pg_dump` custom 형식으�
 애플리케이션에는 스케줄러나 제품 API를 추가하지 않는다.
 
 투영 재구축은 백업이 아니다. 수신 기록을 잃으면 재구축 근거가 사라지며 현재 투영으로
-과거 불변 에디션을 재현할 수 없다. 수신 기록·최초 충돌·현재 투영·에디션·항목·시퀀스와
+과거 브리프를 재현할 수 없다. 수신 기록·최초 충돌·현재 투영·브리프·항목·시퀀스와
 Flyway 이력을 같은 데이터베이스 백업에 포함한다. 원본의 `retain-all` 기준은 유지한다.
 
 이 절차는 운영 DB를 덮어쓰는 복구 전환을 허용하지 않는다. 보관 기간·암호화
@@ -109,7 +109,7 @@ DB를 지우지 않는다. `--single-transaction`은 오류 시 종료하고 복
 
 ## 검증 전용 애플리케이션 실행
 
-서비스 API 인증을 켠 인스턴스에서는 수신 증거·재구축 경로가 차단된다. 복원 확인에는
+서비스 API 인증을 켠 인스턴스에서는 수신 기록·재구축 경로가 차단된다. 복원 확인에는
 백업 시점과 맞는 실행 JAR을 사용하는 별도 로컬 프로세스를 띄운다. 운영 프로세스·Compose
 설정을 바꾸거나 Caddy·BATON 공유 네트워크에 검증 인스턴스를 연결하지 않는다.
 
@@ -153,11 +153,11 @@ java -jar "$brief_restore_jar" \
 앞 단계의 검증 전용 애플리케이션에서 다음 내용을 한 번 확인한다.
 
 1. Flyway 이력과 기대한 스키마로 애플리케이션이 기동하고 aggregate health가 정상이다.
-2. 대표 수신 기록·최초 충돌·기존 에디션과 고정 항목이 백업 전과 같다. `UNSUPPORTED`도
+2. 대표 수신 기록·최초 충돌·기존 브리프와 고정 항목이 백업 전과 같다. `UNSUPPORTED`도
    보존됐는지 확인한다.
 3. 백업에 있던 지원 이벤트의 동일 재전달은 `DUPLICATE`이며 새 수신 기록을 만들지 않는다.
-4. 격리된 검증 인스턴스에서 재구축한 현재 투영이 같고 기존 에디션과 `ETag`는 변하지 않는다.
-5. 새 이벤트의 `ingestionSequence`와 새 에디션의 `generation`이 이전 값 뒤로 이어진다.
+4. 격리된 검증 인스턴스에서 재구축한 현재 투영이 같고 기존 브리프와 `ETag`는 변하지 않는다.
+5. 새 이벤트의 `ingestionSequence`와 새 브리프의 `generation`이 이전 값 뒤로 이어진다.
 
 재구축과 동일 이벤트 재전달은 검증용 복원 DB에서만 수행한다. 운영 인증을 끄거나 수신
 증거·재구축 경로를 Caddy 허용 목록에 추가하지 않는다.
@@ -170,7 +170,7 @@ java -jar "$brief_restore_jar" \
 
 - 승인된 보관 위치·암호화·접근 권한과 백업 주기·보관 정책
 - 복원 지점 이후 BATON outbox 이벤트의 재전달 범위와 전달 상태 복구 절차
-- 장애 뒤 기존에 발급한 에디션 ID와 사용자 참조의 유실 처리
+- 장애 뒤 기존에 발급한 브리프 ID와 사용자 참조의 유실 처리
 - 새 DB로 연결을 전환할 권한, 원본 쓰기 중단·재개와 실패 시 복귀 절차
 - 실제 데이터 규모에서 확인한 RPO·RTO
 
@@ -182,4 +182,4 @@ BATON이 이미 전달 완료로 기록한 이벤트가 자동 재전송되는 �
 - [PostgreSQL SQL dump](https://www.postgresql.org/docs/18/backup-dump.html)
 - [pg_dump](https://www.postgresql.org/docs/18/app-pgdump.html)
 - [pg_restore](https://www.postgresql.org/docs/18/app-pgrestore.html)
-- [수신 증거 보존·재구축 계약](../PRD/0008_retention-rebuild-boundary/spec.md)
+- [수신 기록 보존·재구축 계약](../PRD/0008_retention-rebuild-boundary/spec.md)

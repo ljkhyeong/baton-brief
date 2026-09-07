@@ -51,5 +51,5 @@ PRD-0006의 health 전용 웹 노출과 Caddy 허용 목록은 그대로 유지�
 ## 관련 문서
 
 - [최소 상태 확인](../0006_minimum-health/spec.md)
-- [이상 수신 증거 조회](../0011_event-receipt-anomalies/spec.md)
+- [이상 수신 기록 조회](../0011_event-receipt-anomalies/spec.md)
 - [Spring Boot 지표 자동 구성](https://docs.spring.io/spring-boot/reference/actuator/metrics.html)

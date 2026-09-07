@@ -11,7 +11,7 @@ Docker 실행 권한으로만 실행한다. 실행자, 대상 환경·이미지 
 HTTP 서버를 열지 않고 Flyway를 실행하지 않는다. 앱 정상 배포에서 마이그레이션을 완료한
 뒤 실행하며 조회·재구축은 현재 DB 스키마에 맞는 이미지를 사용한다.
 
-## 수신 증거와 이상 이력
+## 수신 기록과 이상 이력
 
 ```shell
 docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps brief \
@@ -45,11 +45,11 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
 ```
 
 성공하면 `receiptCount`, `itemCount`를 출력하고 종료한다. 기존 전역 잠금·한 트랜잭션을
-사용하며 실패 시 이전 투영으로 롤백한다. 수신 증거와 기존 에디션은 보존한다.
+사용하며 실패 시 이전 투영으로 롤백한다. 수신 기록과 기존 브리프는 보존한다.
 
 ## 추가 이용료 없는 지표 수집
 
-실행 조립에 관측 설정을 추가한다. 서비스 API를 함께 사용하면 기존
+Compose에 지표 수집 설정을 추가한다. 서비스 API를 함께 사용하면 기존
 `-f compose.service-api.yml`도 같은 명령에 유지한다.
 
 ```shell
@@ -63,9 +63,9 @@ docker compose --env-file .env.staging \
 ```
 
 관리 포트는 컨테이너 내부 loopback에만 바인딩한다. health도 같은 관리 서버로 이동하므로
-이 override의 healthcheck를 함께 적용해야 한다. 기본 조립은 기존 health 경로만 유지한다.
+이 override의 healthcheck를 함께 적용해야 한다. 기본 Compose 구성은 기존 health 경로만 유지한다.
 
-같은 조립의 Prometheus가 BRIEF의 네트워크 공간에서 30초마다 지표를 수집한다.
+같은 Compose 구성의 Prometheus가 BRIEF의 네트워크 공간에서 30초마다 지표를 수집한다.
 계정·API 키·외부 저장소가 필요 없으며, BRIEF와 수집기 모두 호스트 포트와 외부 송신 경로가 없다.
 Prometheus는 비루트·읽기 전용으로 실행하고 전용 볼륨에 지표를 저장한다.
 애플리케이션 재배포 때는 위 명령으로 두 서비스를 함께 갱신해 네트워크 연결도 맞춘다.

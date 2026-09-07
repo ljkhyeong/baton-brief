@@ -1,8 +1,8 @@
-# PRD-0011: 이상 이벤트 수신 증거 이력 조회
+# PRD-0011: 이상 이벤트 수신 기록 이력 조회
 
 - 상태: 채택됨
 - 결정일: 2026-08-20
-- 범위: 작업공간·시즌별 과거 이상 수신 증거의 읽기 전용 키셋 조회
+- 범위: 작업공간·시즌별 과거 이상 수신 기록의 읽기 전용 키셋 조회
 
 ## 목적
 
@@ -20,24 +20,24 @@ BRIEF가 PRD-0008에 따라 보존하는 최초 수신 기록과 이벤트별 �
 
 | 메서드 | 경로 | 의미 |
 |---|---|---|
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/event-receipts/anomalies` | 과거 이상 수신 증거 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/event-receipts/anomalies` | 과거 이상 수신 기록 조회 |
 
 - `workspaceId`와 `seasonId`는 UUID다. 잘못된 UUID는 `400 Bad Request`와 PRD-0004의
   `ProblemDetail`로 응답한다.
-- 해당 범위에 이상 수신 증거가 없어도 `404`가 아니라 빈 페이지의 `200 OK`로 응답한다.
+- 해당 범위에 이상 수신 기록이 없어도 `404`가 아니라 빈 페이지의 `200 OK`로 응답한다.
 - 이 로컬 계약은 운영 외부 공개나 호출 권한 판정이 완료되었다는 뜻이 아니다.
 
 ### 질의 매개변수
 
 | 이름 | 필수 | 제약 | 의미 |
 |---|---|---|---|
-| `beforeIngestionSequence` | 아니요 | 양수 | 이 수신 순서보다 작은 증거만 조회하는 배타적 키셋 |
+| `beforeIngestionSequence` | 아니요 | 양수 | 지정한 수신 순서 이전의 기록을 조회하는 커서 |
 | `limit` | 아니요 | `1..100`, 기본값 `20` | 한 응답에 포함할 최대 증거 수 |
 
 숫자로 변환할 수 없는 값, 양수가 아닌 `beforeIngestionSequence`와 `1..100` 밖의 `limit`은
 `400 Bad Request`와 PRD-0004의 `ProblemDetail`로 거부한다.
 
-## 이상 수신 증거 선정
+## 이상 수신 기록 선정
 
 작업공간·시즌이 모두 일치하는 최초 수신 기록 중 다음 조건을 하나 이상 만족하면
 반환한다.
@@ -57,11 +57,11 @@ BRIEF가 PRD-0008에 따라 보존하는 최초 수신 기록과 이벤트별 �
 
 성공 응답은 `200 OK`이며 다음 필드를 가진다.
 
-- `receipts`: `ingestionSequence` 내림차순으로 정렬된 이상 수신 증거 배열
+- `receipts`: `ingestionSequence` 내림차순으로 정렬된 이상 수신 기록 배열
 - `nextBeforeIngestionSequence`: 다음 페이지가 있을 때 마지막으로 반환한
   `ingestionSequence`, 없으면 `null`
 
-각 배열 항목은 PRD-0007의 안전한 수신 증거 필드를 그대로 반환한다.
+각 배열 항목은 PRD-0007의 안전한 수신 기록 필드를 그대로 반환한다.
 
 | 필드 | 의미 |
 |---|---|
@@ -104,11 +104,11 @@ fingerprint, 원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 �
 
 ## 읽기 전용성과 호환성
 
-- 기존 `POST /api/v1/events`, `GET /api/v1/events/{eventId}/receipt`, 투영과 에디션 계약을
+- 기존 `POST /api/v1/events`, `GET /api/v1/events/{eventId}/receipt`, 투영과 브리프 계약을
   바꾸지 않는 추가 조회다.
 - 기존 `source_event_receipt`와 `source_event_conflict`만 읽으며 새 테이블, 열, 인덱스와
   Flyway 마이그레이션을 추가하지 않는다.
-- 조회는 수신 기록, 충돌 증거, 현재 투영과 불변 에디션을 생성·수정·삭제하지 않는다.
+- 조회는 수신 기록, 충돌 증거, 현재 투영과 브리프를 생성·수정·삭제하지 않는다.
 - PRD-0008의 `retain-all` 경계에서 보존된 최초 수신 결과와 최초 충돌 한 건만 사용한다.
   후속 삭제 계약은 단건 조회와 이력 페이지 모두의 만료 의미를 먼저 정의해야 한다.
 
@@ -133,4 +133,4 @@ fingerprint, 원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 �
 - 충돌이 나중에 발견된 기록은 첫 페이지부터 다시 시작한 탐색에서 현재 자격에 따라
   나타나며, 커서를 스냅샷 토큰으로 해석하지 않는다.
 - 응답은 PRD-0007의 안전한 필드만 포함하고 fingerprint와 원문 payload를 노출하지 않는다.
-- 조회 전후에 수신 기록, 충돌 증거, 투영과 에디션 저장 상태가 바뀌지 않는다.
+- 조회 전후에 수신 기록, 충돌 증거, 투영과 브리프 저장 상태가 바뀌지 않는다.

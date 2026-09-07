@@ -2,11 +2,11 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-29
-- 범위: BATON 백엔드가 BRIEF 조회와 에디션 생성 명령을 호출하는 서비스 전용 신뢰 경계
+- 범위: BATON 백엔드가 BRIEF 조회와 브리프 생성 명령을 호출하는 서비스 전용 신뢰 경계
 
 ## 목적
 
-BATON 사용자 요청을 중계하는 BRIEF 조회와 에디션 생성 명령을 공개 이벤트 수신 경로와
+BATON 사용자 요청을 중계하는 BRIEF 조회와 브리프 생성 명령을 공개 이벤트 수신 경로와
 분리한다. BATON 백엔드만 비공개 네트워크와 별도 Bearer로 이 경로에 접근하고, BRIEF는
 BATON 사용자 계정이나 멤버십을 복제하지 않는다.
 
@@ -14,13 +14,13 @@ BATON 사용자 계정이나 멤버십을 복제하지 않는다.
 
 서비스 자격 증명은 다음 경로와 메서드에만 권한을 준다.
 
-- 현재 관심 항목 단건·상태별 목록·전이 이력과 PRD-0027의 활성 요약 `GET`
+- 점검 항목 단건·상태별 목록·전이 이력과 PRD-0027의 활성 요약 `GET`
 - PRD-0030의 `GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions`
-- 에디션 전역 최신·주간 최신·단건·이력·비교 `GET`
+- 브리프 전역 최신·주간 최신·단건·이력·비교 `GET`
 - `POST /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions`
 
-이벤트 수신·수신 증거·이상 이력·투영 재구축·Actuator는 서비스 API 권한에 포함하지
-않는다. 에디션 생성은 새 경로를 만들지 않고 PRD-0024의 기존 명령을 사용한다.
+이벤트 수신·수신 기록·이상 이력·투영 재구축·Actuator는 서비스 API 권한에 포함하지
+않는다. 브리프 생성은 새 경로를 만들지 않고 PRD-0024의 기존 명령을 사용한다.
 
 ## 인증
 
@@ -78,7 +78,7 @@ BRIEF 서비스 전용 Caddy만 연결한다.
 - 이벤트 수신과 서비스 API의 현재·직전 token이 하나라도 같으면 애플리케이션이 기동하지
   않는다.
 - 허용한 조회와 생성만 서비스 token으로 접근할 수 있다.
-- 수신 증거·재구축·health는 같은 token으로도 서비스 API 경계를 통과하지 못한다.
+- 수신 기록·재구축·health는 같은 token으로도 서비스 API 경계를 통과하지 못한다.
 - BATON 애플리케이션과 서비스 전용 Caddy만 같은 `Internal=true` 네트워크에 연결된다.
 - BATON은 HTTPS 인증서 검증을 끄지 않고 서비스 Caddy를 호출한다.
 - 서비스 Caddy는 허용한 조회·생성 외의 경로를 `404`로 끝낸다.
@@ -92,12 +92,12 @@ BRIEF 서비스 전용 Caddy만 연결한다.
 - 공개 Caddy의 조회·생성 허용 목록 확장
 - OAuth2 authorization server, 사용자 JWT나 서비스 계정 데이터베이스
 - 평문 HTTP, 이번 계약에서 mTLS·인증서 발급 자동화 운영 체계 도입
-- 운영자용 수신 증거·재구축 API 공개
+- 운영자용 수신 기록·재구축 API 공개
 
 ## 관련 문서
 
 - [BATON 백엔드 경유 조회](../0023_baton-mediated-brief-query/spec.md)
-- [현재 활성 관심 항목 요약](../0027_attention-item-summary/spec.md)
-- [BATON 주도 에디션 생성](../0024_baton-driven-edition-generation/spec.md)
+- [활성 점검 항목 요약](../0027_attention-item-summary/spec.md)
+- [BATON 주도 브리프 생성](../0024_baton-driven-edition-generation/spec.md)
 - [이벤트 수신 인증](../0020_baton-event-authentication/spec.md)
 - [서비스 API 인증 결정](../../ADR/0007_baton-service-api-security/adr.md)
