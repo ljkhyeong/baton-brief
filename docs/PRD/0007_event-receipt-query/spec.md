@@ -40,8 +40,8 @@ PRD-0011이 별도로 소유한다.
 | `eventType` | 최초 저장한 이벤트 종류 |
 | `eventVersion` | 최초 저장한 이벤트 버전 |
 | `sourceSeverity` | v2가 저장한 BATON 원본 심각도, v1·기존 미지원 기록은 `null` |
-| `workspaceId` | 불투명 작업공간 참조 |
-| `seasonId` | 불투명 시즌 참조 |
+| `workspaceId` | 작업공간 식별자 |
+| `seasonId` | 시즌 식별자 |
 | `sourceReference` | 최초 저장한 이벤트의 길이가 제한된 원본 참조값 |
 | `aggregateRevision` | 최초 저장한 이벤트의 집계 리비전 |
 | `occurredAt` | 원본이 사실을 관측한 정규화된 시각 |
@@ -50,8 +50,8 @@ PRD-0011이 별도로 소유한다.
 | `receivedAt` | BRIEF가 최초 수신 기록을 저장한 시각 |
 | `conflictDetectedAt` | 다른 지문의 충돌을 처음 탐지한 시각, 없으면 `null` |
 
-`ingestionSequence`는 BRIEF 로컬 기록 경계이며 생산자 이벤트의 누락이 없음을 보장하는
-워터마크가 아니다.
+`ingestionSequence`는 BRIEF가 수신 기록에 부여한 순번이다.
+이 값만으로 생산자의 이벤트 누락 여부를 판단할 수 없다.
 
 ## 최초 저장 결과와 재전달 의미
 

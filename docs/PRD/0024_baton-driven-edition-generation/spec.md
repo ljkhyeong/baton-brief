@@ -24,7 +24,7 @@ BRIEF가 소유한다.
 - 기존 `POST /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions` 명령
 - 주간 `[windowStart, windowEnd)`, `sourceCursor`, 결정적 선정과 정렬
 - 불변 항목·`stateFingerprint`, 작업공간·시즌별 `generation`과 동시 생성 직렬화
-- 같은 범위의 직전 상태 재사용과 `A → B → A` 새 세대 의미
+- 같은 범위의 직전 상태 재사용과 `A → B → A` 상태 복귀 시 새 브리프 생성
 
 BRIEF에 대상 registry, 시즌 조회 client, `@Scheduled` 작업과 별도 생성 큐를 추가하지 않는다.
 
@@ -44,23 +44,22 @@ Content-Type: application/json
 
 - `workspaceId`와 `seasonId`는 BATON이 관리하는 작업공간·시즌에서 가져온다.
 - `weekStart`는 해당 시즌 시간대의 월요일이고 `zoneId`는 이름이 있는 IANA 시간대다.
-- `201 Created`는 새 세대 생성, `200 OK`는 같은 범위의 직전 상태 재사용이며 둘 다 완료다.
+- `201 Created`는 새 브리프 생성, `200 OK`는 같은 범위의 직전 상태 재사용이며 둘 다 완료다.
 - 응답의 `editionId`, `generation`, `sourceCursor`와 `ETag`를 BATON 실행 결과에 연결한다.
-- 같은 명령을 재시도하는 동안 BRIEF 투영이 바뀌면 새 세대가 생길 수 있다. BATON은 요청
+- 같은 명령을 재시도하는 동안 BRIEF 투영이 바뀌면 새 브리프가 생성될 수 있다. BATON은 요청
   값만으로 브리프 식별자가 영원히 같다고 가정하지 않고 실제 응답을 사용한다.
 
 별도 `Idempotency-Key`나 BATON 실행 식별자를 BRIEF 요청에 추가하지 않는다. BRIEF의 기존
 상태 지문과 생성 잠금이 반복·동시 호출의 저장 중복을 막는다.
 
-## 이벤트 전달과 생성 경계
+## 브리프 생성 전 이벤트 전달 확인
 
-BRIEF의 `sourceCursor`는 로컬 수신 순서이며 BATON 원본 이벤트가 모두 전달됐다는 생산자
-워터마크가 아니다. 정기 브리프를 완료 상태로 취급하려면 BATON은 해당 생성 경계까지 의도한
-BRIEF outbox 전달이 성공했음을 자신의 내구성 있는 실행 기록에서 확인한 뒤 생성 명령을
-호출한다.
+BRIEF의 `sourceCursor`만으로 BATON 이벤트의 전달 완료를 판단할 수 없다.
+BATON은 정기 브리프에 반영할 이벤트가 모두 전달됐는지 저장된 outbox·실행 기록으로 확인한 뒤
+생성을 요청한다.
 
-전달 완료를 확인하지 못한 상태에서 운영자가 수동 생성할 수는 있지만, 그 결과를 원본
-완전성이 보장된 브리프로 표시하지 않는다. 향후 생산자 워터마크를 도입하면 BRIEF의
+전달 완료를 확인하지 못해도 운영자가 수동 생성할 수는 있다.
+이 경우 모든 원본 이벤트가 반영된 브리프로 안내하지 않는다. 향후 생산자 워터마크를 도입하면 BRIEF의
 `sourceCursor`와 다른 필드·계약으로 정의한다.
 
 ## 인증과 실패 분류

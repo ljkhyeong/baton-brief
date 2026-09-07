@@ -29,14 +29,13 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
 
 각 결과는 기존 조회와 같은 JSON으로 표준 출력에 기록된다. 과거 페이지는 반환된
 `nextBeforeIngestionSequence`를 `--brief.operations.before-ingestion-sequence`로 넘긴다.
-최신 상태는 커서를 빼고 다시 조회한다. 단건 미존재·입력 오류·처리 실패는 0이 아닌 종료
-코드로 끝난다. 조회 결과는 최초 수신 결과를 유지하며 충돌 지문과 원문 payload를 포함하지 않는다.
+최신 상태는 커서를 빼고 다시 조회한다. 조회 대상이 없거나 입력·처리에 오류가 있으면 0이 아닌 종료 코드로 끝난다. 조회 결과는 최초 수신 결과를 유지하며 충돌 지문과 원문 payload를 포함하지 않는다.
 
 ## 전체 재구축
 
 진단 결과 재구축이 필요할 때만 다음 명령을 실행한다. 실행 전 대상과 최근 백업을 확인하고
-수신·생성의 잠금 대기를 고려해 운영 시간을 정한다. 재구축은 누락 이벤트를 생산하거나
-과거 `revisionGap` 증거를 지우는 수단이 아니다. 미지원·충돌 기록은 임의로 재처리하지 않는다.
+수신·생성의 잠금 대기를 고려해 운영 시간을 정한다. 재구축은 누락 이벤트를 생성하지 않으며
+이미 기록된 `revisionGap`도 지우지 않는다. 미지원·충돌 기록은 임의로 재처리하지 않는다.
 
 ```shell
 docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps brief \
