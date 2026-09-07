@@ -47,8 +47,8 @@ class BriefOperationsConfiguration {
         return ApplicationRunner {
             val result = when (properties.command) {
                 BriefOperationsProperties.Command.RECEIPT -> brief.findEventReceipt(
-                    requireNotNull(properties.eventId) { "수신 증거 조회에는 event-id가 필요합니다" },
-                ) ?: error("이벤트 수신 증거를 찾을 수 없습니다")
+                    requireNotNull(properties.eventId) { "수신 기록 조회에는 event-id가 필요합니다" },
+                ) ?: error("이벤트 수신 기록을 찾을 수 없습니다")
 
                 BriefOperationsProperties.Command.ANOMALIES -> {
                     require(properties.limit in 1..100) { "limit은 1~100이어야 합니다" }

@@ -58,11 +58,11 @@ data class SourceEventRequest(
         null
     }
 
-    @get:AssertTrue(message = "occurredAt은 ISO-8601 시점 형식이어야 합니다")
+    @get:AssertTrue(message = "occurredAt은 시간대 오프셋을 포함한 ISO-8601 형식이어야 합니다")
     val validOccurredAt: Boolean
         get() = occurredAtInstant != null
 
-    @get:AssertTrue(message = "eventVersion, eventType, sourceSeverity 조합이 계약과 일치해야 합니다")
+    @get:AssertTrue(message = "지원하지 않는 eventVersion·eventType·sourceSeverity 조합입니다")
     val validVersionContract: Boolean
         get() = eventVersion <= 0 ||
             SourceEvent.isReceivable(eventVersion, eventType, sourceSeverity)

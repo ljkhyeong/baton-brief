@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 brief_repository=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-: "${BRIEF_BACKUP_DIRECTORY:?백업을 보관할 기존 절대 경로를 지정하세요.}"
+: "${BRIEF_BACKUP_DIRECTORY:?존재하는 백업 디렉터리의 절대 경로를 지정하세요.}"
 case "$BRIEF_BACKUP_DIRECTORY" in
   /*) ;;
   *) printf '%s\n' 'BRIEF_BACKUP_DIRECTORY에는 절대 경로가 필요합니다.' >&2; exit 1 ;;
