@@ -7,7 +7,7 @@
 ## 목적
 
 PRD-0027의 요약에서 확인한 심각도별 개수와 공백 항목 수에 해당하는 목록을 조회하게 한다.
-호출자가 전체 페이지를 내려받아 거르지 않고 기존 키셋 목록에서 조건에 맞는 항목만 읽는다.
+호출자가 목록 전체를 내려받지 않도록 서버에서 조건에 맞는 항목만 반환한다.
 
 ## HTTP API
 
@@ -19,8 +19,8 @@ GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items
 
 | 이름 | 형식 | 생략 시 | 의미 |
 | --- | --- | --- | --- |
-| `severity` | `HIGH` 또는 `MEDIUM` | 심각도 제한 없음 | 현재 표시 심각도 일치 |
-| `revisionGap` | Boolean, `true` 또는 `false` | 공백 여부 제한 없음 | 현재 누적 공백 여부 일치 |
+| `severity` | `HIGH` 또는 `MEDIUM` | 심각도 제한 없음 | 지정한 심각도의 항목 |
+| `revisionGap` | Boolean, `true` 또는 `false` | 공백 여부 제한 없음 | `true`: 공백 탐지 기록 있음, `false`: 없음 |
 
 - 두 조건을 함께 보내면 모두 일치하는 항목만 반환한다.
 - `status`는 PRD-0015의 기본 `ACTIVE`를 유지하며 `RESOLVED`에도 같은 필터를 적용한다.
@@ -34,7 +34,7 @@ GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items
 `?revisionGap=true`, 높은 심각도이면서 공백이 있는 활성 항목은
 `?severity=HIGH&revisionGap=true`로 조회한다.
 
-## 필터와 페이지 의미
+## 필터 적용과 다음 페이지 조회
 
 - 작업공간·시즌·상태·선택 필터와 배타 커서 조건을 SQL에 적용한 뒤 정렬하고
   `limit + 1`건을 읽는다. 페이지를 읽은 뒤 애플리케이션에서 필터링하지 않는다.
@@ -46,8 +46,8 @@ GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items
   스냅샷으로 묶지 않으며, 조회 사이에 심각도·상태가 바뀌면 목록도 달라질 수 있다.
 - `revisionGap=false`는 공백 탐지 기록이 없다는 뜻이다. 원본 이벤트가 모두 전달됐다는
   보장이 아니며, `true`도 실제 누락 이벤트 수를 뜻하지 않는다.
-- 요약과 목록은 각각의 요청 시점에 읽으므로 개수 일치를 보장하지 않는다. 요약 API의
-  집계 범위와 응답에는 새 필터를 적용하지 않는다.
+- 목록 필터는 요약 API에 적용되지 않는다. 요약과 목록은 조회 시점도 다르므로
+  같은 조건의 항목 수를 비교해도 일치하지 않을 수 있다.
 
 ## 호환성과 구현 경계
 
