@@ -8,11 +8,12 @@ BRIEF 데이터베이스 전체를 PostgreSQL 표준 `pg_dump` custom 형식으�
 
 투영 재구축은 백업이 아니다. 수신 기록을 잃으면 재구축 근거가 사라지며 현재 투영으로
 과거 브리프를 재현할 수 없다. 수신 기록·최초 충돌·현재 투영·브리프·항목·시퀀스와
-Flyway 이력을 같은 데이터베이스 백업에 포함한다. 원본의 `retain-all` 기준은 유지한다.
+Flyway 이력을 같은 데이터베이스 백업에 포함한다. 수신·충돌 기록을 삭제하지 않는
+`retain-all` 기준은 유지한다.
 
-이 절차는 운영 DB를 덮어쓰는 복구 전환을 허용하지 않는다. 보관 기간·암호화
-보관소·RPO·RTO와 운영 전환은 별도 결정이다. 현재 검증 범위는 [HANDOFF](../../HANDOFF.md)를
-따른다.
+이 절차는 운영 DB를 덮어쓰는 복구 전환을 허용하지 않는다. 보관 기간·암호화 보관소·
+허용 데이터 손실 시간(RPO)·목표 복구 시간(RTO)과 운영 전환은 별도로 정한다.
+현재 검증 범위는 [HANDOFF](../../HANDOFF.md)를 따른다.
 
 ## 준비
 
@@ -75,10 +76,12 @@ sudo journalctl -u baton-brief-backup.service -n 20 --no-pager
 ## 격리된 빈 DB에 복원
 
 복원용 PostgreSQL 컨테이너를 원본과 별도로 준비한다. 원본 볼륨을 연결하지 않고 호스트
-포트를 외부에 공개하지 않는다. 아래 세 값은 확인한 복원 대상 컨테이너·역할·새 DB 이름으로
-바꾼다. 역할은 미리 준비되어 있어야 한다.
+포트를 외부에 공개하지 않는다. `brief_restore_dump`에는 백업 완료 메시지에 출력된
+`database.dump`의 실제 절대 경로를 넣는다. 나머지 세 값은 복원 대상 컨테이너·역할·새 DB
+이름으로 바꾼다. 역할은 미리 준비되어 있어야 한다.
 
 ```bash
+brief_restore_dump=/absolute/backup-directory/brief-.../database.dump
 brief_restore_container=brief-restore-rehearsal
 brief_restore_role=brief_restore_owner
 brief_restore_db=brief_restore
@@ -96,7 +99,7 @@ docker exec --user postgres "$brief_restore_container" \
 docker exec -i --user postgres "$brief_restore_container" \
   pg_restore --username="$brief_restore_role" --dbname="$brief_restore_db" \
   --no-owner --no-privileges --single-transaction \
-  < "$brief_backup_dir/database.dump"
+  < "$brief_restore_dump"
 ```
 
 `createdb`는 같은 이름의 DB가 이미 있으면 실패한다. 실패를 무시하거나 `--clean`으로 기존
@@ -152,15 +155,15 @@ java -jar "$brief_restore_jar" \
 
 앞 단계의 검증 전용 애플리케이션에서 다음 내용을 한 번 확인한다.
 
-1. Flyway 이력과 기대한 스키마로 애플리케이션이 기동하고 aggregate health가 정상이다.
-2. 대표 수신 기록·최초 충돌·기존 브리프와 고정 항목이 백업 전과 같다. `UNSUPPORTED`도
+1. Flyway 이력과 스키마가 백업 시점과 일치하고 애플리케이션·DB의 통합 상태가 정상이다.
+2. 대표 수신 기록·최초 충돌·기존 브리프와 브리프에 저장된 항목이 백업 전과 같다. `UNSUPPORTED`도
    보존됐는지 확인한다.
 3. 백업에 있던 지원 이벤트의 동일 재전달은 `DUPLICATE`이며 새 수신 기록을 만들지 않는다.
 4. 격리된 검증 인스턴스에서 재구축한 현재 투영이 같고 기존 브리프와 `ETag`는 변하지 않는다.
 5. 새 이벤트의 `ingestionSequence`와 새 브리프의 `generation`이 이전 값 뒤로 이어진다.
 
-재구축과 동일 이벤트 재전달은 검증용 복원 DB에서만 수행한다. 운영 인증을 끄거나 수신
-증거·재구축 경로를 Caddy 허용 목록에 추가하지 않는다.
+재구축과 동일 이벤트 재전달은 검증용 복원 DB에서만 수행한다. 운영 인증을 끄거나
+수신 기록·재구축 경로를 Caddy 허용 목록에 추가하지 않는다.
 
 실제 복원 소요 시간과 결과를 기록한다. 한 번의 로컬 복원 시간을 운영 RTO나 대용량 처리
 보장으로 사용하지 않는다. 검증이 끝나면 정확히 식별한 임시 인스턴스와 데이터만 제거한다.

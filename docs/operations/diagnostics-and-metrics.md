@@ -8,7 +8,7 @@ Docker 실행 권한으로만 실행한다. 실행자, 대상 환경·이미지 
 원본 참조를 메트릭 레이블이나 일반 애플리케이션 로그에 복사하지 않는다.
 
 아래 명령은 실제 대상의 `.env.staging`과 같은 이미지·DB 설정을 사용한다. 운영 명령은
-HTTP 서버를 열지 않고 Flyway를 실행하지 않는다. 앱 정상 배포에서 마이그레이션을 완료한
+HTTP 서버를 열지 않고 Flyway를 실행하지 않는다. 애플리케이션 배포로 마이그레이션을 완료한
 뒤 실행하며 조회·재구축은 현재 DB 스키마에 맞는 이미지를 사용한다.
 
 ## 수신 기록과 이상 이력
@@ -27,9 +27,14 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
   --brief.operations.limit=20
 ```
 
-각 결과는 기존 조회와 같은 JSON으로 표준 출력에 기록된다. 과거 페이지는 반환된
+결과는 기존 조회 API와 같은 JSON으로 표준 출력에 기록된다. 과거 페이지는 반환된
 `nextBeforeIngestionSequence`를 `--brief.operations.before-ingestion-sequence`로 넘긴다.
-최신 상태는 커서를 빼고 다시 조회한다. 조회 대상이 없거나 입력·처리에 오류가 있으면 0이 아닌 종료 코드로 끝난다. 조회 결과는 최초 수신 결과를 유지하며 충돌 지문과 원문 payload를 포함하지 않는다.
+첫 페이지를 다시 조회하려면 커서를 생략한다. 조회 결과는 최초 수신 결과를 유지하며
+충돌 지문과 원문 payload를 포함하지 않는다.
+
+`RECEIPT`는 해당 이벤트의 수신 기록이 없으면 오류로 종료한다. `ANOMALIES`는 조건에 맞는
+기록이 없으면 빈 `receipts`와 `nextBeforeIngestionSequence=null`을 반환하고 정상 종료한다.
+입력이나 처리에 오류가 있으면 두 명령 모두 0이 아닌 종료 코드로 끝난다.
 
 ## 전체 재구축
 
@@ -61,8 +66,9 @@ docker compose --env-file .env.staging \
   exec -T brief wget -q -T 10 -O - http://127.0.0.1:9091/actuator/prometheus
 ```
 
-관리 포트는 컨테이너 내부 loopback에만 바인딩한다. health도 같은 관리 서버로 이동하므로
-이 override의 healthcheck를 함께 적용해야 한다. 기본 Compose 구성은 기존 health 경로만 유지한다.
+관리 포트는 컨테이너 내부 loopback에만 바인딩한다. `/actuator/health`도 관리 포트로
+이동하므로 `compose.observability.yml`의 healthcheck를 함께 적용해야 한다.
+이 파일을 사용하지 않는 기본 구성은 기존 health 경로를 유지한다.
 
 같은 Compose 구성의 Prometheus가 BRIEF의 네트워크 공간에서 30초마다 지표를 수집한다.
 계정·API 키·외부 저장소가 필요 없으며, BRIEF와 수집기 모두 호스트 포트와 외부 송신 경로가 없다.
@@ -83,9 +89,9 @@ docker compose --env-file .env.staging -f compose.staging.yml -f compose.observa
   exec -T brief wget -q -T 10 -O - http://127.0.0.1:9090/api/v1/alerts
 ```
 
-[경보 규칙](../../ops/prometheus/alerts.yml)의 초기 기준은 지표 수집 실패 2분 지속과
-최근 5분 HTTP `5xx` 증가 5건 이상이 1분간 유지되는 경우다. 시작 직후 첫 카운터 값이나
-수집 사이에 발생하고 사라진 오류를 전부 포착하는 감사 기록은 아니다.
+[경보 규칙](../../ops/prometheus/alerts.yml)은 지표 수집이 2분간 실패하거나,
+최근 5분의 HTTP `5xx` 발생 건수가 5건 이상인 상태가 1분간 이어지면 작동한다.
+수집 시작 전의 오류나 수집 사이에 프로세스가 재시작되며 사라진 오류는 놓칠 수 있다.
 외부 알림 발송은 미연결이며, 같은 서버의 Prometheus로 서버 전체 장애를 감지할 수는 없다.
 알림 수신 채널이 정해지면 기존 무료 채널에 연결한다. BRIEF 본문 발송은 RELAY가 담당한다.
 
@@ -96,7 +102,7 @@ docker compose --env-file .env.staging -f compose.staging.yml -f compose.observa
 
 BATON 호스트에서는 기존 `ops/check-integration-delivery.sh`로 영구 실패·만료된 처리 임대·
 지표 갱신 실패를 확인한다. `ops/show-integration-metrics.sh`의 `integration="brief"`
-값과 함께 보되, BRIEF 카운터만으로 BATON 전달 완료나 최신성을 선언하지 않는다.
+값과 함께 보되, BRIEF 카운터만으로 BATON의 최신 이벤트가 모두 전달됐다고 판단하지 않는다.
 
 로컬 수집·규칙 검증과 실제 서버의 감시·알림 운영은 구분한다. 현재 검증과 미연결 범위는
 [HANDOFF](../../HANDOFF.md)를 따른다.
