@@ -1,0 +1,13 @@
+[Unit]
+Description=BATON BRIEF PostgreSQL 백업
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/baton-brief
+Environment=BRIEF_BACKUP_DIRECTORY=/var/backups/baton-brief
+Environment=BRIEF_STAGING_ENV_FILE=/srv/baton-brief/.env.staging
+ExecStart=/bin/bash /srv/baton-brief/ops/backup-postgresql.sh
+UMask=0077
+Nice=10

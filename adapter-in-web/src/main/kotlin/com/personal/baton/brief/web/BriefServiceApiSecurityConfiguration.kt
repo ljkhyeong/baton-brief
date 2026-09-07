@@ -1,5 +1,6 @@
 package com.personal.baton.brief.web
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.DefaultValue
@@ -8,7 +9,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
-import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern
@@ -29,6 +29,7 @@ class BriefServiceApiSecurityProperties(
 }
 
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @EnableConfigurationProperties(BriefServiceApiSecurityProperties::class)
 class BriefServiceApiSecurityConfiguration {
     @Bean
@@ -40,10 +41,7 @@ class BriefServiceApiSecurityConfiguration {
     ): SecurityFilterChain {
         http
             .securityMatcher(SERVICE_API)
-            .csrf { it.disable() }
-            .requestCache { it.disable() }
-            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-            .logout { it.disable() }
+            .configureStatelessApi()
 
         if (!properties.authenticationRequired) {
             return http
@@ -81,10 +79,7 @@ class BriefServiceApiSecurityConfiguration {
     ): SecurityFilterChain {
         http
             .securityMatcher(pathPattern("/api/v1/**"))
-            .csrf { it.disable() }
-            .requestCache { it.disable() }
-            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-            .logout { it.disable() }
+            .configureStatelessApi()
             .authorizeHttpRequests {
                 if (properties.authenticationRequired) {
                     it.anyRequest().denyAll()
@@ -99,6 +94,8 @@ class BriefServiceApiSecurityConfiguration {
         val SERVICE_API: RequestMatcher = OrRequestMatcher(
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current"),
+            pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary"),
+            pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest"),

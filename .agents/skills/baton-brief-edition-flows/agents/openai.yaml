@@ -1,4 +1,4 @@
 interface:
-  display_name: "BATON BRIEF 에디션 흐름"
-  short_description: "결정적인 불변 BRIEF 에디션 관리"
-  default_prompt: "$baton-brief-edition-flows를 사용해 결정적이고 불변인 BRIEF 에디션 변경을 구현해 주세요."
+  display_name: "BATON BRIEF 에디션"
+  short_description: "BRIEF 에디션 생성·불변 저장·이력·비교 변경"
+  default_prompt: "$baton-brief-edition-flows를 사용해 BATON BRIEF 에디션 생성과 조회 동작을 변경해 주세요."

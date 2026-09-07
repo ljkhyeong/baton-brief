@@ -6,7 +6,7 @@
 
 ## 목적
 
-PRD-0018과 PRD-0019는 BATON 원본에서 BRIEF PostgreSQL까지의 로컬 수렴을 검증했지만
+PRD-0018과 PRD-0019는 로컬 환경에서 BATON의 원본 변경이 BRIEF PostgreSQL에 반영되는지 검증했지만
 이벤트 수신 경로는 인증되지 않았다. 다른 BRIEF 조회·운영 API의 권한 모델을 추측하지
 않으면서 BATON 생산자가 호출하는 이벤트 수신 경로만 전용 비밀로 보호한다.
 
@@ -18,7 +18,7 @@ PRD-0018과 PRD-0019는 BATON 원본에서 BRIEF PostgreSQL까지의 로컬 수�
   `WWW-Authenticate: Bearer` 응답을 받으며 수신 기록과 투영을 만들지 않는다.
 - 올바른 Bearer 뒤의 이벤트 본문·멱등성·충돌·HTTP 결과는 PRD-0002와 PRD-0019를
   그대로 따른다.
-- `GET` 조회, 에디션 생성과 투영 재구축의 운영자·사용자 권한은 이번 계약에 포함하지
+- `GET` 조회, 브리프 생성과 투영 재구축의 운영자·사용자 권한은 이번 계약에 포함하지
   않는다. 현재 로컬 경계를 운영 공개 API로 해석하지 않는다.
 
 ## 설정과 비밀 경계
@@ -56,10 +56,10 @@ BRIEF는 현재 token과 선택적인 직전 token 한 건만 허용한다. BATO
 
 BATON은 loopback 이외의 BRIEF 기본 URL에 HTTPS origin만 허용하는 기존 검증을 유지한다.
 PRD-0022의 선택적인 Caddy 앞단은 공개 HTTPS에서 `POST /api/v1/events`만 내부 HTTP
-애플리케이션으로 전달한다. TLS 종단과 인증서 상태는 배포 경계가 소유하며 애플리케이션에
+애플리케이션으로 전달한다. TLS 처리와 인증서 관리는 Caddy가 담당하며 애플리케이션에
 자체 인증서 검증기나 우회 가능한 trust-all client를 추가하지 않는다.
 
-PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secrets와 Spring config tree로
+PRD-0021의 스테이징 구성은 현재·직전 token 파일을 Compose secrets와 Spring config tree로
 주입한다. 공인 DNS·ACME 인증서, 원격 전달과 비밀 관리 제품의 검증 범위는 `HANDOFF.md`를
 따른다.
 
@@ -79,13 +79,13 @@ PRD-0021의 스테이징 조립은 현재·직전 token 파일을 Compose secret
 - BRIEF가 새 token과 직전 token을 함께 허용하는 구간에 BATON의 직전 token 전달이
   계속 성공한다.
 - BATON 실제 `RestClient`가 전용 Bearer를 보내며 `401`을 영구 실패로 분류한다.
-- 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL을 사용한 기존 원본 수렴 시나리오가
+- 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL을 사용한 기존 원본 변경 반영 시나리오가
   Bearer 인증을 켠 상태에서도 성공한다.
 - 비밀 값은 문서, 로그, 응답과 영속 데이터에 노출되지 않는다.
 
 ## 비목표
 
-- BRIEF 조회·에디션·재구축 API의 사용자·운영자 권한 모델
+- BRIEF 조회·브리프·재구축 API의 사용자·운영자 권한 모델
 - OAuth2 authorization server, JWT, token introspection, mTLS와 복수 생산자 권한
 - token 발급·자동 회전과 비밀 관리 제품 선택
 - 실제 공인 DNS, 방화벽, ACME 인증서 발급과 BATON 원격 스테이징 전달

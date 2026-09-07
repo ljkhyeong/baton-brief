@@ -19,7 +19,7 @@ BRIEF 전체 API의 사용자·운영자 권한과 배포 환경은 아직 정�
 - 순차 배포 중 BRIEF는 현재 token과 선택적인 직전 token 한 건을 함께 허용한다. BATON은
   현재 설정값 하나만 전송하고 전환이 끝나면 직전 token을 제거한다.
 - loopback 이외의 생산자 기본 URL은 기존대로 HTTPS origin만 허용한다. TLS 종단은
-  ADR-0005의 Caddy 배포 경계가 소유하고 생산자는 정상 인증서 신뢰를 우회하지 않는다.
+  ADR-0005의 Caddy가 담당하고 생산자는 인증서 검증을 우회하지 않는다.
 - 다른 BRIEF API의 권한, token 자동 회전·발급, OAuth2/JWT와 mTLS는 별도 결정으로 남긴다.
 
 ## 근거

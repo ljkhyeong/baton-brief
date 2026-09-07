@@ -1,23 +1,25 @@
 # BATON BRIEF
 
-BATON BRIEF는 BATON 생태계의 운영 사실을 설명 가능한 관심 항목으로 투영하고, 일정 시점의
-불변 운영 브리프로 고정하는 독립 읽기 모델 서비스다.
+BATON BRIEF는 BATON의 업무 변경을 받아 점검 항목과 주간 브리프를 만드는 서비스다.
+저장한 브리프는 변경하지 않는다.
+점검 사유가 사라진 상태를 ‘해소’라고 한다.
 
 ## 현재 상태
 
 Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.6 기반의 로컬 MVP를 구현했다.
 
-- 버전이 있는 BATON 이벤트 v1·v2의 멱등 수신, 충돌 증거와 집계 리비전 처리
-- 현재 관심 항목 투영, 상태별 키셋 조회, 상태 전이 증거와 원자적 전체 재구축
-- 월요일 시작 IANA 시간대 주간의 불변 에디션 생성·조회·이력·비교·조건부 조회
-- RFC 9457 `ProblemDetail`, Spring Boot Actuator aggregate health
-- 이벤트 수신 결과별 프로세스 내 지표. 외부 수집·경보는 미연결
+- BATON 이벤트 v1·v2 수신, 중복 처리 방지와 충돌 기록
+- 점검 항목 조회·필터·상태 변경 이력과 전체 재구축
+- 월요일 기준 주간 브리프 생성·조회·이력·비교
+- 표준 오류 응답(`ProblemDetail`)과 애플리케이션·DB 상태 확인
+- 이벤트 수신 결과별 지표와 선택적 Prometheus 수집·경보 규칙. 외부 알림은 미연결
+- PostgreSQL 기본 도구를 사용한 백업과 Linux 정기 실행 예시
 - BATON 전용 Bearer와 파일 기반 비밀을 사용하는 스테이징 컨테이너
-- 이벤트 수신 한 경로만 허용하는 선택적 Caddy HTTPS 앞단
-- BATON 백엔드 조회·생성을 위한 별도 Bearer와 호스트 포트 없는 서비스 Caddy HTTPS 앞단
+- 선택적 Caddy HTTPS 프록시: 이벤트 수신 경로만 공개
+- BATON 백엔드용 비공개 HTTPS 조회·생성 API와 별도 Bearer 인증
 
-현재 검증 근거와 남은 작업은 [HANDOFF.md](HANDOFF.md), 제품·구조 문서의 전체 지도는
-[문서 색인](docs/README.md)을 기준으로 확인한다.
+현재 검증 결과와 남은 작업은 [HANDOFF.md](HANDOFF.md), 제품·구조 문서는
+[문서 색인](docs/README.md)에서 확인한다.
 
 ## 동작 구조
 
@@ -28,41 +30,56 @@ BATON 도메인 이벤트 ──> BRIEF 수신 기록 ──> AttentionItem 현�
 
 구현하고 로컬 교차 검증한 백엔드 연결:
 BATON 사용자 API ──> 세션·멤버십·접근 키 판정 ──> 서비스 Caddy ──> BRIEF 내부 조회
-BATON 대상·시점·전달 경계 결정 ────────────────> 서비스 Caddy ──> BRIEF 에디션 생성
+BATON 대상·시점·전달 경계 결정 ────────────────> 서비스 Caddy ──> BRIEF 브리프 생성
 ```
 
-BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운영 사실과 최종 판정은 원본
-서비스가 소유하고 BRIEF는 커밋 후 전달된 이벤트만 소비한다. 사용자 조회는
-[PRD-0023](docs/PRD/0023_baton-mediated-brief-query/spec.md), 에디션 생성 실행은
+BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 업무 데이터 관리와 상태 판정은 원본
+서비스가 담당하고 BRIEF는 커밋 후 전달된 이벤트만 소비한다. 사용자 조회는
+[PRD-0023](docs/PRD/0023_baton-mediated-brief-query/spec.md), 브리프 생성 실행은
 [PRD-0024](docs/PRD/0024_baton-driven-edition-generation/spec.md), 서비스 인증과 비공개 연결은
 [PRD-0025](docs/PRD/0025_baton-service-api-security/spec.md)를 따른다.
 
-## 기능 지도
+BATON 화면은 저장된 브리프의 이력·비교를 조회하고 현재 업무로 이동할 수 있다. 현재 업무명과
+생성 전 전달 상태는 BATON에서 별도로 조회하며 BRIEF의 불변 본문과 ETag를 바꾸지 않는다.
+저장 이후 추가 전달 여부도 BATON의 성공 생성·재사용 기록을 기준으로 별도 안내한다.
+BATON 화면은 조회 중 선택한 조건을 유지하며, 선택한 브리프의 링크 복사·인쇄·PDF 저장을 제공한다. 링크는 기존 사용자 권한 검사를 거치며 출력의 현재 업무명은
+생성 당시 기록과 구분한다. 이 기능을 위한 BRIEF API·저장 변경은 없다.
 
-### 이벤트와 수신 증거
+## 주요 기능
+
+### 이벤트 수신 기록
 
 - `POST /api/v1/events`는 이벤트 식별자·버전·본문 지문으로 동일 재전달과 충돌을 구분한다.
 - 집계 리비전으로 오래된 전달과 공백을 판정하며 수신과 현재 투영을 한 트랜잭션에서 처리한다.
-- 최초 수신 결과 단건과 작업공간·시즌별 이상 수신 증거를 읽기 전용으로 조회한다.
+- 최초 수신 결과 단건과 작업공간·시즌별 이상 수신 기록을 읽기 전용으로 조회한다.
 - 대체 보존 계약 전에는 `UNSUPPORTED`를 포함한 수신 기록과 이벤트별 최초 충돌 한 건을
   삭제·압축하지 않는다.
 
-### 현재 관심 항목
+### 점검 항목
 
-- `(workspaceId, seasonId, eventType, sourceReference)`를 복합 정체성으로 사용한다.
-- 현재 단건과 `ACTIVE`·`RESOLVED` 상태별 키셋 목록을 조회한다.
-- 실제 적용된 상태 전이를 집계 리비전 역순으로 조회하고 전이 시점의 공백 탐지와 현재의
-  누적 공백을 구분한다.
+- `(workspaceId, seasonId, eventType, sourceReference)`를 복합 식별자로 사용한다.
+- 현재 단건과 `ACTIVE`·`RESOLVED` 상태별 키셋 목록을 조회하고,
+  [심각도·리비전 공백 필터](docs/PRD/0028_attention-item-filters/spec.md)로 목록을 좁힌다.
+- 작업공간·시즌별 활성 `HIGH`·`MEDIUM` 개수와 리비전 공백이 기록된 활성 항목 수를
+  [요약 API](docs/PRD/0027_attention-item-summary/spec.md)로 조회한다.
+- [주간 해소 요약](docs/PRD/0030_weekly-resolution-summary/spec.md)은 해당 주에 해소된 뒤 현재도
+  해소 상태인 항목 수와 목록을 반환한다. 연속된 활성→해소 리비전으로 해소 시점을 확인하며,
+  재활성화됐거나 이후 기록에 공백이 생긴 항목은 제외한다. 목록은 커서로 다음 페이지를 조회한다.
+- 실제 적용된 리비전의 상태 이력을 최신 리비전부터 조회한다. 상태가 같아도 갱신 이력은
+  포함하며, 해당 리비전에서 탐지한 공백과 현재의 누적 공백을 구분한다.
+  v2 이력에는 원본 심각도도 제공하며 v1은 `null`을 유지한다.
 - 단건 응답은 현재 규칙 버전과 마지막 적용 리비전에 결합한 `ETag`를 제공한다.
 
-### 불변 에디션
+### 브리프
 
 - 월요일 시작 IANA 시간대 주간과 로컬 수신 `sourceCursor`를 기준으로 결정적으로 생성한다.
 - 같은 범위의 직전 상태는 멱등하게 재사용하고 `A → B → A`처럼 과거 상태로 돌아오면 새
   `generation`으로 기록한다.
 - 전역 최신·주간 범위 최신·단건·이력·비교 조회를 제공한다.
-- 생성 당시 항목과 집계 리비전·리비전 공백을 함께 고정하며 기존 에디션을 수정하지 않는다.
-- 전체 에디션 응답은 선택된 불변 에디션을 나타내는 `ETag`를 제공한다.
+- 생성 당시 항목과 집계 리비전·리비전 공백을 함께 고정하며 기존 브리프를 수정하지 않는다.
+- [선정 규칙 v2](docs/PRD/0029_edition-carry-over/spec.md)는 이번 주 변경과 이전부터 미해소인
+  항목을 `section`으로 구분한다. 이전 브리프의 미기록 분류는 `null`이다.
+- 전체 브리프 응답은 선택된 브리프를 나타내는 `ETag`를 제공한다.
 
 ### 실행 경계
 
@@ -84,10 +101,10 @@ BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 운�
 
 BRIEF가 소유한다.
 
-- 멱등 수신 기록과 제한된 최초 충돌 증거
-- 작업공간·시즌별 현재 관심 항목 투영
-- 결정적 생성 커서와 불변 에디션
-- 재구축과 조회에 필요한 로컬 운영 증거
+- 멱등 수신 기록과 이벤트별 최초 충돌 기록
+- 작업공간·시즌별 점검 항목 투영
+- 결정적 생성 커서와 브리프
+- 재구축·조회에 필요한 서비스 내부 처리 기록
 
 BRIEF가 소유하지 않는다.
 
@@ -95,7 +112,7 @@ BRIEF가 소유하지 않는다.
 - URL 점검과 상태 원본: BATON WATCH
 - 구독·제공자 전달과 재시도 생명주기: BATON RELAY
 - 링크 코드·만료·폐기·리디렉션: BATON GO
-- AI가 생성한 권위 있는 운영 판정
+- AI 요약을 근거로 한 업무 상태 판정
 
 ## 이벤트 v2 계약 팩
 
@@ -175,6 +192,10 @@ docker compose --env-file .env.staging \
 
 ## 스테이징 실행
 
+공개 이벤트 수신 주소는 `https://brief.b4ton.com`을 사용한다. 서버·DNS와 공개 앞단을
+준비하는 순서는 [도메인 배포 안내](docs/operations/brief-b4ton-com-deployment.md)를 따른다.
+현재 구축 상태는 `HANDOFF.md`에서 확인한다.
+
 `.env.staging.example`을 추적되지 않는 `.env.staging`으로 복사하고 데이터베이스·Bearer
 파일의 실제 절대 경로를 지정한다.
 
@@ -195,7 +216,7 @@ docker compose --env-file .env.staging -f compose.staging.yml config --quiet
 docker compose --env-file .env.staging -f compose.staging.yml up --build -d --wait
 ```
 
-기본 조립은 PostgreSQL과 BRIEF의 호스트 포트를 열지 않는다. 컨테이너 healthcheck만으로
+기본 Compose 구성은 PostgreSQL과 BRIEF의 호스트 포트를 열지 않는다. 컨테이너 healthcheck만으로
 내부 애플리케이션·데이터베이스 상태를 확인하며, 호스트에서 이벤트를 보내려면 공개 호스트가
 준비된 환경에서 Caddy profile을 명시적으로 활성화한다. 개발 중 직접 HTTP 호출은 위의
 로컬 실행 절차를 사용한다.
@@ -205,11 +226,18 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https co
 docker compose --env-file .env.staging -f compose.staging.yml --profile https up --build -d --wait
 ```
 
-이 조립은 실제 DNS·방화벽, 공인 인증서 발급, 백업·복구, 이미지 registry와 BATON 원격
+이 구성은 실제 DNS·방화벽, 공인 인증서 발급, 백업·복구, 이미지 registry와 BATON 원격
 전달을 대신하지 않는다.
 
-수동 백업과 빈 DB 복원은 [PostgreSQL 백업·복원 절차](docs/operations/postgresql-backup-restore.md)를
-따른다. 자동 백업·보관소와 운영 DB 전환은 포함하지 않는다.
+백업과 빈 DB 복원은 [PostgreSQL 백업·복원 절차](docs/operations/postgresql-backup-restore.md)를
+따른다. 추가 이용료 없이 기존 서버에서 실행하며 Linux 정기 백업 타이머를 제공한다.
+외부 보관소와 운영 DB 전환은 포함하지 않는다.
+
+호스트 실행 권한으로 수신 기록·이상 이력을 조회하거나 전체 재구축을 수행하려면
+[운영 명령과 지표 조회 절차](docs/operations/diagnostics-and-metrics.md)를 따른다. 선택적인
+`compose.observability.yml`은 컨테이너 내부 `127.0.0.1:9091`에서 health·Prometheus 지표만
+제공하고 같은 서버의 Prometheus로 수집한다. 별도 계정·API 키는 필요 없다.
+공개·서비스 Caddy 허용 경로는 유지한다.
 
 ## 문서
 

@@ -1,5 +1,6 @@
 package com.personal.baton.brief.web
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.DefaultValue
@@ -8,7 +9,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
-import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
@@ -27,6 +27,7 @@ class BriefEventReceiverSecurityProperties(
 }
 
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @EnableConfigurationProperties(BriefEventReceiverSecurityProperties::class)
 class BriefEventSecurityConfiguration {
     @Bean
@@ -37,10 +38,7 @@ class BriefEventSecurityConfiguration {
     ): SecurityFilterChain {
         http
             .securityMatcher(EVENT_INGESTION)
-            .csrf { it.disable() }
-            .requestCache { it.disable() }
-            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-            .logout { it.disable() }
+            .configureStatelessApi()
 
         if (!properties.authenticationRequired) {
             return http

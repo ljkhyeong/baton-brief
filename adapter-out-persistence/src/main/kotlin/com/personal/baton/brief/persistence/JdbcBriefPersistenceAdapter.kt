@@ -5,6 +5,7 @@ import com.personal.baton.brief.application.AttentionItemTransition
 import com.personal.baton.brief.application.AttentionItemTransitionHistory
 import com.personal.baton.brief.application.BriefPersistencePort
 import com.personal.baton.brief.application.CurrentAttentionItemPage
+import com.personal.baton.brief.application.CurrentAttentionItemSummary
 import com.personal.baton.brief.application.EditionContent
 import com.personal.baton.brief.application.EditionHistoryResult
 import com.personal.baton.brief.application.EditionResult
@@ -13,13 +14,15 @@ import com.personal.baton.brief.application.EventReceiptAnomalyResult
 import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
+import com.personal.baton.brief.application.WeeklyResolutionSummary
+import com.personal.baton.brief.application.ResolutionItem
 import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
 import com.personal.baton.brief.domain.AttentionItem
-import com.personal.baton.brief.domain.AttentionProjector
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.ProjectionDecision
+import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
@@ -187,26 +190,32 @@ class JdbcBriefPersistenceAdapter(
         workspaceId: UUID,
         seasonId: UUID,
         status: SourceEventState,
+        severity: Severity?,
+        revisionGap: Boolean?,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage {
-        val afterClause = if (after == null) {
-            ""
-        } else {
-            """
-            AND (event_type, source_reference) > (:afterEventType, :afterSourceReference)
-            """.trimIndent()
-        }
         val parameters = mutableMapOf<String, Any>(
             "workspaceId" to workspaceId,
             "seasonId" to seasonId,
             "status" to status.name,
             "fetchLimit" to limit + 1,
         )
-        if (after != null) {
-            parameters["afterEventType"] = after.eventType.name
-            parameters["afterSourceReference"] = after.sourceReference
-        }
+        val additionalConditions = buildList {
+            if (after != null) {
+                add("AND (event_type, source_reference) > (:afterEventType, :afterSourceReference)")
+                parameters["afterEventType"] = after.eventType.name
+                parameters["afterSourceReference"] = after.sourceReference
+            }
+            severity?.let {
+                add("AND severity = :severity")
+                parameters["severity"] = it.name
+            }
+            revisionGap?.let {
+                add("AND revision_gap = :revisionGap")
+                parameters["revisionGap"] = it
+            }
+        }.joinToString("\n")
 
         val fetched = jdbc.sql(
             """
@@ -214,7 +223,7 @@ class JdbcBriefPersistenceAdapter(
              WHERE workspace_id = :workspaceId
                AND season_id = :seasonId
                AND item_status = :status
-               $afterClause
+               $additionalConditions
              ORDER BY event_type, source_reference
              LIMIT :fetchLimit
             """.trimIndent(),
@@ -229,6 +238,96 @@ class JdbcBriefPersistenceAdapter(
             } else {
                 null
             },
+        )
+    }
+
+    override fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary = jdbc.sql(
+        """
+        SELECT COUNT(*) FILTER (WHERE severity = 'HIGH') AS high_count,
+               COUNT(*) FILTER (WHERE severity = 'MEDIUM') AS medium_count,
+               COUNT(*) FILTER (WHERE revision_gap) AS revision_gap_count
+          FROM attention_item
+         WHERE workspace_id = :workspaceId
+           AND season_id = :seasonId
+           AND item_status = 'ACTIVE'
+        """.trimIndent(),
+    ).param("workspaceId", workspaceId)
+        .param("seasonId", seasonId)
+        .query(ATTENTION_ITEM_SUMMARY_MAPPER)
+        .single()
+
+    override fun findWeeklyResolutions(
+        workspaceId: UUID,
+        seasonId: UUID,
+        window: WeeklyWindow,
+        evaluatedAt: Instant,
+        after: AttentionItemCursor?,
+        limit: Int,
+    ): WeeklyResolutionSummary {
+        val afterClause = if (after == null) "" else
+            "WHERE (reason_code, source_reference) > (:afterEventType, :afterSourceReference)"
+        val parameters = mutableMapOf<String, Any>(
+            "workspaceId" to workspaceId, "seasonId" to seasonId,
+            "windowStart" to window.start.jdbcValue(), "windowEnd" to window.end.jdbcValue(),
+            "evaluatedAt" to evaluatedAt.jdbcValue(), "fetchLimit" to limit + 1,
+        )
+        if (after != null) {
+            parameters["afterEventType"] = after.eventType.name
+            parameters["afterSourceReference"] = after.sourceReference
+        }
+        val rows = jdbc.sql(
+            """
+        WITH applied AS (
+            SELECT event_type, source_reference, aggregate_revision, event_state, occurred_at, processing_outcome
+              FROM source_event_receipt
+             WHERE workspace_id = :workspaceId AND season_id = :seasonId
+               AND processing_outcome IN ('APPLIED', 'APPLIED_WITH_GAP')
+        ), latest_active AS (
+            SELECT event_type, source_reference, MAX(aggregate_revision) AS revision
+              FROM applied WHERE event_state = 'ACTIVE'
+             GROUP BY event_type, source_reference
+        ), resolutions AS (
+        SELECT resolved.event_type AS reason_code, resolved.source_reference,
+               resolved.occurred_at AS resolved_at, resolved.aggregate_revision AS resolved_revision
+          FROM latest_active active
+          JOIN applied resolved ON resolved.event_type = active.event_type
+                               AND resolved.source_reference = active.source_reference
+                               AND resolved.aggregate_revision - 1 = active.revision
+                               AND resolved.event_state = 'RESOLVED'
+          JOIN attention_item current ON current.workspace_id = :workspaceId
+                                     AND current.season_id = :seasonId
+                                     AND current.event_type = active.event_type
+                                     AND current.source_reference = active.source_reference
+                                     AND current.item_status = 'RESOLVED'
+         WHERE resolved.occurred_at >= :windowStart AND resolved.occurred_at < :windowEnd
+           AND resolved.occurred_at <= :evaluatedAt
+           AND NOT EXISTS (
+               SELECT 1 FROM applied later
+                WHERE later.event_type = active.event_type AND later.source_reference = active.source_reference
+                  AND later.aggregate_revision > resolved.aggregate_revision
+                  AND later.processing_outcome = 'APPLIED_WITH_GAP'
+           )
+        )
+        SELECT total.resolved_count, page.*
+          FROM (SELECT COUNT(*) AS resolved_count FROM resolutions) total
+          LEFT JOIN LATERAL (
+              SELECT * FROM resolutions
+              $afterClause
+              ORDER BY reason_code, source_reference
+              LIMIT :fetchLimit
+          ) page ON TRUE
+            """.trimIndent(),
+        ).params(parameters).query { result, rowNumber ->
+            result.getLong("resolved_count") to result.getString("source_reference")?.let {
+                RESOLUTION_ITEM_MAPPER.mapRow(result, rowNumber)
+            }
+        }.list()
+        val candidates = rows.mapNotNull { it.second }
+        val items = candidates.take(limit)
+        return WeeklyResolutionSummary(
+            window.weekStart, window.zoneId, window.start, window.end, evaluatedAt,
+            rows.first().first, items,
+            if (candidates.size > limit) items.last().let { AttentionItemCursor(it.reasonCode, it.sourceReference) } else null,
         )
     }
 
@@ -259,7 +358,7 @@ class JdbcBriefPersistenceAdapter(
         val fetched = jdbc.sql(
             """
             SELECT event_id, aggregate_revision, event_state AS state, occurred_at AS observed_at,
-                   processing_outcome = 'APPLIED_WITH_GAP' AS detected_revision_gap
+                   processing_outcome = 'APPLIED_WITH_GAP' AS detected_revision_gap, source_severity
               FROM source_event_receipt
              WHERE workspace_id = :workspaceId
                AND season_id = :seasonId
@@ -350,7 +449,7 @@ class JdbcBriefPersistenceAdapter(
             seasonId = command.seasonId,
             generation = generation,
             window = window,
-            ruleVersion = AttentionProjector.RULE_VERSION,
+            ruleVersion = BriefEdition.RULE_VERSION,
             sourceCursor = sourceCursor,
             generatedAt = generatedAt,
             items = content.items,
@@ -524,14 +623,12 @@ class JdbcBriefPersistenceAdapter(
          WHERE workspace_id = :workspaceId
            AND season_id = :seasonId
            AND item_status = 'ACTIVE'
-           AND observed_at >= :windowStart
            AND observed_at < :windowEnd
         """.trimIndent(),
     ).params(
         mapOf(
             "workspaceId" to command.workspaceId,
             "seasonId" to command.seasonId,
-            "windowStart" to window.start.jdbcValue(),
             "windowEnd" to window.end.jdbcValue(),
         ),
     ).query(ATTENTION_ITEM_MAPPER).list()
@@ -600,7 +697,7 @@ class JdbcBriefPersistenceAdapter(
             "seasonId" to command.seasonId,
             "weekStart" to command.weekStart,
             "zoneId" to command.zoneId.id,
-            "ruleVersion" to AttentionProjector.RULE_VERSION,
+            "ruleVersion" to BriefEdition.RULE_VERSION,
             "stateFingerprint" to stateFingerprint,
         ),
     )
@@ -644,10 +741,10 @@ class JdbcBriefPersistenceAdapter(
             """
             INSERT INTO brief_edition_item (
                 edition_id, position, source_reference, reason_code, severity,
-                item_status, observed_at, rule_version, aggregate_revision, revision_gap
+                item_status, observed_at, rule_version, aggregate_revision, revision_gap, section
             ) VALUES (
                 :editionId, :position, :sourceReference, :reasonCode, :severity,
-                :itemStatus, :observedAt, :ruleVersion, :aggregateRevision, :revisionGap
+                :itemStatus, :observedAt, :ruleVersion, :aggregateRevision, :revisionGap, :section
             )
             """.trimIndent(),
             edition.items.mapIndexed { position, item ->
@@ -662,6 +759,7 @@ class JdbcBriefPersistenceAdapter(
                     "ruleVersion" to item.ruleVersion,
                     "aggregateRevision" to item.aggregateRevision,
                     "revisionGap" to item.revisionGap,
+                    "section" to checkNotNull(item.section).name,
                 )
             }.toTypedArray(),
         )
@@ -689,7 +787,7 @@ class JdbcBriefPersistenceAdapter(
     private fun findEditionItems(editionId: UUID): List<BriefEditionItem> = jdbc.sql(
         """
         SELECT source_reference, reason_code, severity, item_status AS status, observed_at, rule_version,
-               aggregate_revision, revision_gap
+               aggregate_revision, revision_gap, section
           FROM brief_edition_item
          WHERE edition_id = :editionId
          ORDER BY position
@@ -753,7 +851,9 @@ class JdbcBriefPersistenceAdapter(
         private val SOURCE_EVENT_RECEIPT_MAPPER = PostgresDataClassRowMapper(SourceEventReceipt::class.java)
         private val SOURCE_EVENT_MAPPER = PostgresDataClassRowMapper(SourceEvent::class.java)
         private val ATTENTION_ITEM_MAPPER = PostgresDataClassRowMapper(AttentionItem::class.java)
+        private val ATTENTION_ITEM_SUMMARY_MAPPER = DataClassRowMapper(CurrentAttentionItemSummary::class.java)
         private val ATTENTION_ITEM_TRANSITION_MAPPER = PostgresDataClassRowMapper(AttentionItemTransition::class.java)
+        private val RESOLUTION_ITEM_MAPPER = PostgresDataClassRowMapper(ResolutionItem::class.java)
         private val EDITION_SUMMARY_MAPPER = PostgresDataClassRowMapper(EditionSummary::class.java)
         private val EDITION_ITEM_MAPPER = PostgresDataClassRowMapper(BriefEditionItem::class.java)
         private val UPSERT_ATTENTION = """

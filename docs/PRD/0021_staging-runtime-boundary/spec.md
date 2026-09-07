@@ -7,16 +7,16 @@
 ## 목적
 
 실제 BATON→BRIEF 공개 HTTPS 전달을 검증하기 전에 BRIEF 실행 이미지, PostgreSQL 연결과
-파일 기반 비밀 주입을 운영과 유사한 컨테이너 경계에서 재현한다. 기본 조립은 Docker 내부
+파일 기반 비밀 주입을 운영과 유사한 컨테이너 경계에서 재현한다. 기본 Compose 구성은 Docker 내부
 HTTP만 제공하고 PRD-0022의 명시적인 profile로 호스트의 이벤트 수신 전용 HTTPS 앞단을
 추가한다.
 
-## 실행 조립
+## 실행 구성
 
 - `Dockerfile`은 저장소의 Gradle wrapper로 `:bootstrap:bootJar`를 빌드한다.
 - 실행 이미지는 Java 21 JRE, UID/GID `10001`, 읽기 전용 루트 파일시스템과 `/tmp`
   tmpfs를 사용한다.
-- `compose.staging.yml`의 기본 조립은 `brief`와 `postgres` 두 서비스를 제공한다.
+- `compose.staging.yml`의 기본 Compose 구성은 `brief`와 `postgres` 두 서비스를 제공한다.
 - PostgreSQL 18.6은 내부 `data` 네트워크와 이름 있는 볼륨만 사용하며 호스트 포트를
   열지 않는다.
 - BRIEF 프로세스는 컨테이너 내부의 `0.0.0.0:8080`에서 요청을 받고 `data`와 `proxy`
@@ -27,7 +27,7 @@ HTTP만 제공하고 PRD-0022의 명시적인 profile로 호스트의 이벤트 
   외부에는 PRD-0022의 이벤트 수신 한 경로만 제공한다.
 - 컨테이너 표준 출력·오류 로그는 Docker `json-file`의 `max-size: 10m`, `max-file: 3`으로
   회전한다. PRD-0025의 서비스 Caddy에도 같은 설정을 적용한다. 이는 실행 로그 제한이며
-  데이터베이스 수신 기록·충돌 증거의 `retain-all` 계약을 바꾸지 않는다.
+  데이터베이스 수신 기록·충돌 기록의 `retain-all` 계약을 바꾸지 않는다.
 
 ## 설정과 비밀
 
@@ -44,7 +44,7 @@ HTTP만 제공하고 PRD-0022의 명시적인 profile로 호스트의 이벤트 
 직전 Bearer 속성을 읽는다. 평상시 직전 token 파일은 비워 두고, PRD-0020의 수동 교체
 구간에만 기존 값을 넣는다.
 
-스테이징 조립은 `BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED=true`를 고정한다. Bearer
+스테이징 구성은 `BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED=true`를 고정한다. Bearer
 원문을 Compose 일반 환경 변수, 이미지, 로그와 문서에 넣지 않는다.
 
 ## 실행 방법
@@ -65,13 +65,13 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https co
 docker compose --env-file .env.staging -f compose.staging.yml --profile https up --build -d --wait
 ```
 
-기본 조립의 BRIEF는 호스트 포트를 게시하지 않는다. 호스트 접근은 PRD-0022의 Caddy
+기본 Compose 구성의 BRIEF는 호스트 포트를 게시하지 않는다. 호스트 접근은 PRD-0022의 Caddy
 profile이나 PRD-0025의 비공개 서비스 Caddy를 통해서만 제공한다.
 
 ## 수용 기준
 
 - 고정한 Java 21 이미지에서 실행 JAR을 빌드하고 컨테이너가 health 상태가 된다.
-- PostgreSQL은 호스트 포트 없이 기동하고 Flyway V1~V8을 적용한다.
+- PostgreSQL은 호스트 포트 없이 기동하고 저장소에 포함한 Flyway 마이그레이션을 적용한다.
 - BRIEF도 호스트 포트를 게시하지 않고 내부 `data`·`proxy` 네트워크에만 참여한다.
 - BRIEF 실행 컨테이너는 UID/GID `10001`과 읽기 전용 루트 파일시스템을 사용한다.
 - Bearer 없는 `POST /api/v1/events`는 `401`이고 파일에서 주입한 현재 Bearer로 기존 v2

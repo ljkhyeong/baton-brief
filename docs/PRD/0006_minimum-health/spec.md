@@ -10,7 +10,7 @@
 처리할 수 있는지 확인하는 관리 경로는 없다. 제품 API를 새로 만들지 않고 Spring Boot
 Actuator의 표준 health 자동 구성을 사용해 최소 상태 확인 경계를 추가한다.
 
-이 경로는 BRIEF의 실행 상태만 나타낸다. 이벤트 전달 완전성, 투영 최신성, 에디션 생성
+이 경로는 BRIEF의 실행 상태만 나타낸다. 이벤트 전달 완전성, 투영 최신성, 브리프 생성
 시각과 다른 BATON 서비스의 가용성을 재판정하지 않는다.
 
 ## 구현 수단
@@ -51,10 +51,14 @@ Actuator의 표준 health 자동 구성을 사용해 최소 상태 확인 경계
 
 - `components`, `details`, DB 제품명·버전과 확인 쿼리
 - JDBC URL, 사용자명, 스키마, SQL, 예외 메시지와 스택 트레이스
-- 이벤트 수, 충돌 수, 리비전 공백과 최근 에디션 시각
+- 이벤트 수, 충돌 수, 리비전 공백과 최근 브리프 시각
 - BATON, WATCH, RELAY와 GO의 연결 상태
 
 ## 노출 범위
+
+후속 ADR-0008의 `compose.observability.yml`을 적용한 구성에서는 health와 Prometheus 지표를
+컨테이너 내부 `127.0.0.1:9091`로 옮긴다. 해당 override가 healthcheck도 함께 변경한다.
+이 문서의 기본 health 전용 구성과 공개·서비스 Caddy의 관리 경로 차단은 유지한다.
 
 Spring Boot 4.1.1은 health만 기본 웹 endpoint로 노출하고 상세를 기본 숨김 처리한다. 같은
 기본값을 설정에 반복하지 않는다. 반면 health probes의 기본값은 `true`이므로 배포 계약이

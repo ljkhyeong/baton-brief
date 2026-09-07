@@ -4,6 +4,7 @@ import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.ProjectionDecision
+import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventSeverity
@@ -61,12 +62,37 @@ data class CurrentAttentionItemPage(
     val nextCursor: AttentionItemCursor?,
 )
 
+data class CurrentAttentionItemSummary(
+    val highCount: Long,
+    val mediumCount: Long,
+    val revisionGapCount: Long,
+)
+
+data class WeeklyResolutionSummary(
+    val weekStart: LocalDate,
+    val zoneId: ZoneId,
+    val windowStart: Instant,
+    val windowEnd: Instant,
+    val evaluatedAt: Instant,
+    val resolvedCount: Long,
+    val items: List<ResolutionItem>,
+    val nextCursor: AttentionItemCursor?,
+)
+
+data class ResolutionItem(
+    val reasonCode: SourceEventType,
+    val sourceReference: String,
+    val resolvedAt: Instant,
+    val resolvedRevision: Long,
+)
+
 data class AttentionItemTransition(
     val eventId: UUID,
     val aggregateRevision: Long,
     val state: SourceEventState,
     val observedAt: Instant,
     val detectedRevisionGap: Boolean,
+    val sourceSeverity: SourceEventSeverity?,
 )
 
 data class AttentionItemTransitionHistory(
@@ -148,9 +174,7 @@ data class EditionContent(
     val stateFingerprint: String,
 )
 
-interface BriefUseCases {
-    fun ingest(event: SourceEvent): IngestResult
-
+interface BriefQueries {
     fun findEventReceipt(eventId: UUID): SourceEventReceipt?
 
     fun findEventReceiptAnomalies(
@@ -171,9 +195,13 @@ interface BriefUseCases {
         workspaceId: UUID,
         seasonId: UUID,
         status: SourceEventState,
+        severity: Severity?,
+        revisionGap: Boolean?,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage
+
+    fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary
 
     fun findAttentionItemTransitions(
         workspaceId: UUID,
@@ -183,10 +211,6 @@ interface BriefUseCases {
         beforeAggregateRevision: Long?,
         limit: Int,
     ): AttentionItemTransitionHistory
-
-    fun rebuild(): RebuildResult
-
-    fun generateEdition(command: GenerateEditionCommand): EditionResult
 
     fun findEdition(editionId: UUID): BriefEdition?
 
@@ -203,6 +227,20 @@ interface BriefUseCases {
         beforeGeneration: Long?,
         limit: Int,
     ): EditionHistoryResult
+}
+
+interface BriefUseCases : BriefQueries {
+    fun ingest(event: SourceEvent): IngestResult
+
+    fun summarizeWeeklyResolutions(
+        command: GenerateEditionCommand,
+        after: AttentionItemCursor? = null,
+        limit: Int = 20,
+    ): WeeklyResolutionSummary
+
+    fun rebuild(): RebuildResult
+
+    fun generateEdition(command: GenerateEditionCommand): EditionResult
 
     fun compareEditions(
         baseEditionId: UUID,
@@ -210,7 +248,7 @@ interface BriefUseCases {
     ): EditionComparisonResult
 }
 
-interface BriefPersistencePort {
+interface BriefPersistencePort : BriefQueries {
     fun recordUnsupported(
         event: SourceEvent,
         fingerprint: String,
@@ -226,38 +264,14 @@ interface BriefPersistencePort {
         project: (AttentionItem?) -> ProjectionDecision,
     ): IngestResult
 
-    fun findEventReceipt(eventId: UUID): SourceEventReceipt?
-
-    fun findEventReceiptAnomalies(
+    fun findWeeklyResolutions(
         workspaceId: UUID,
         seasonId: UUID,
-        beforeIngestionSequence: Long?,
-        limit: Int,
-    ): EventReceiptAnomalyResult
-
-    fun findAttentionItem(
-        workspaceId: UUID,
-        seasonId: UUID,
-        eventType: SourceEventType,
-        sourceReference: String,
-    ): AttentionItem?
-
-    fun findAttentionItems(
-        workspaceId: UUID,
-        seasonId: UUID,
-        status: SourceEventState,
+        window: WeeklyWindow,
+        evaluatedAt: Instant,
         after: AttentionItemCursor?,
         limit: Int,
-    ): CurrentAttentionItemPage
-
-    fun findAttentionItemTransitions(
-        workspaceId: UUID,
-        seasonId: UUID,
-        eventType: SourceEventType,
-        sourceReference: String,
-        beforeAggregateRevision: Long?,
-        limit: Int,
-    ): AttentionItemTransitionHistory
+    ): WeeklyResolutionSummary
 
     fun rebuild(project: (SourceEvent, AttentionItem?) -> ProjectionDecision): RebuildResult
 
@@ -267,20 +281,4 @@ interface BriefPersistencePort {
         currentTime: () -> Instant,
         selectContent: (List<AttentionItem>) -> EditionContent,
     ): EditionResult
-
-    fun findEdition(editionId: UUID): BriefEdition?
-
-    fun findLatestEdition(
-        workspaceId: UUID,
-        seasonId: UUID,
-    ): BriefEdition?
-
-    fun findLatestEditionForWeek(command: GenerateEditionCommand): BriefEdition?
-
-    fun findEditionHistory(
-        workspaceId: UUID,
-        seasonId: UUID,
-        beforeGeneration: Long?,
-        limit: Int,
-    ): EditionHistoryResult
 }

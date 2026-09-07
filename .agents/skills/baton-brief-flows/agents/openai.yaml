@@ -1,4 +1,4 @@
 interface:
-  display_name: "BATON BRIEF 공통 흐름"
-  short_description: "계층을 가로지르는 BRIEF 변경 절차"
-  default_prompt: "$baton-brief-flows를 사용해 범위가 명확한 BATON BRIEF 변경을 구현해 주세요."
+  display_name: "BATON BRIEF 공통 설정"
+  short_description: "BRIEF 빌드·인증·스테이징·운영 설정 변경"
+  default_prompt: "$baton-brief-flows를 사용해 BATON BRIEF 공통 설정과 실행 구성을 변경해 주세요."

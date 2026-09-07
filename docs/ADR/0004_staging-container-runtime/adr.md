@@ -6,12 +6,12 @@
 
 ## 배경
 
-BRIEF는 실행 JAR과 로컬 PostgreSQL 조립을 제공하지만 운영과 유사한 실행 컨테이너가
+BRIEF는 실행 JAR과 로컬 PostgreSQL 구성을 제공하지만 운영과 유사한 실행 컨테이너가
 없었다. BATON 생산자는 loopback 밖에서 HTTPS origin만 허용하므로 실제 스테이징 전달을
 검증하려면 먼저 BRIEF 애플리케이션과 데이터베이스를 비밀 값 노출 없이 기동할 수 있어야
 한다. HTTPS 앞단 선택은 이 내부 실행 경계를 고정한 뒤 후속 결정으로 분리한다.
 
-초기 조립은 BRIEF HTTP를 호스트 loopback에 게시했지만 Docker Engine 29 계열에서 내부
+초기 구성은 BRIEF HTTP를 호스트 loopback에 게시했지만 Docker Engine 29 계열에서 내부
 네트워크에만 연결된 컨테이너의 게시 요청이 `HostConfig`에만 남고 실제 host port로
 적용되지 않는 동작을 확인했다. BRIEF에 일반 bridge를 추가하면 게시를 복구할 수 있지만
 애플리케이션 외부 송신 차단을 훼손한다. 실행 환경별 게시 동작에 의존하지 않고 Caddy를
@@ -28,7 +28,7 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 조립을 제공하지만 운영과 유
   배포 환경의 JDK 공급자를 강제하지 않는다.
 - 실행 컨테이너는 UID/GID `10001`, 읽기 전용 루트 파일시스템, `/tmp` tmpfs와 모든 Linux
   capability 제거를 사용한다.
-- `compose.staging.yml`의 기본 profile은 BRIEF와 PostgreSQL 18.6을 조립한다. PostgreSQL은 내부
+- `compose.staging.yml`의 기본 profile은 BRIEF와 PostgreSQL 18.6을 함께 실행한다. PostgreSQL은 내부
   데이터 네트워크에서만 실행하고 호스트 포트를 공개하지 않는다.
 - BRIEF 프로세스는 컨테이너 내부 네트워크 요청을 받도록 `0.0.0.0:8080`에서 실행하되,
   호스트에는 포트를 게시하지 않는다. 공개 호스트 인입은 후속 ADR-0005의 선택적인 Caddy
@@ -38,7 +38,7 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 조립을 제공하지만 운영과 유
 - 데이터베이스 비밀번호와 현재·직전 이벤트 수신 Bearer는 저장소 밖 파일을 Compose
   secrets로 마운트하고 Spring Boot `configtree:`로 읽는다. 별도 비밀 로더나 환경변수
   복사 스크립트를 만들지 않는다.
-- 스테이징 조립에서는 이벤트 수신 Bearer 인증을 항상 활성화한다.
+- 스테이징 구성에서는 이벤트 수신 Bearer 인증을 항상 활성화한다.
 - 컨테이너 상태 확인은 기존 `/actuator/health`를 사용한다. 커스텀 상태 확인 경로나
   상세 응답을 추가하지 않는다.
 
@@ -58,7 +58,7 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 조립을 제공하지만 운영과 유
 
 - 이미지 digest와 JDK 패치 버전을 의도적으로 갱신해야 한다.
 - 단일 PostgreSQL 볼륨만 제공하며 백업, 복구, 고가용성과 용량 정책은 포함하지 않는다.
-- 기본 조립은 호스트에서 BRIEF API에 직접 접근할 수 없다. 공개 이벤트 전달에는
+- 기본 Compose 구성은 호스트에서 BRIEF API에 직접 접근할 수 없다. 공개 이벤트 전달에는
   ADR-0005의 Caddy profile과 공인 DNS·인증서 환경이 필요하다.
 - 파일 기반 secret의 생성·배포·회수와 호스트 접근 통제는 운영 환경이 담당한다.
 
@@ -68,7 +68,7 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 조립을 제공하지만 운영과 유
   결합하므로 채택하지 않았다.
 - BRIEF나 PostgreSQL 포트를 호스트에 직접 게시: 데이터베이스 노출 위험이나 reverse proxy
   우회 경로가 생기고 내부 네트워크의 실행 환경별 게시 동작에 의존하므로 채택하지 않았다.
-- Bearer와 DB 비밀번호를 일반 환경 변수로 전달: Compose 조립과 프로세스 환경에 원문이
+- Bearer와 DB 비밀번호를 일반 환경 변수로 전달: Compose 설정과 프로세스 환경에 원문이
   남으므로 채택하지 않았다.
 - Kubernetes·관리형 PostgreSQL 즉시 채택: 현재 스테이징 규모와 운영 환경이 정해지지 않아
   보류한다.

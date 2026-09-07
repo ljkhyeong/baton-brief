@@ -7,5 +7,8 @@ import org.springframework.boot.runApplication
 class BriefApplication
 
 fun main(args: Array<String>) {
-    runApplication<BriefApplication>(*args)
+    val context = runApplication<BriefApplication>(*args)
+    if (context.environment.containsProperty("brief.operations.command")) {
+        context.close()
+    }
 }

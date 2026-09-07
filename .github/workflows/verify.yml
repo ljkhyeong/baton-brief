@@ -37,6 +37,18 @@ jobs:
           docker compose -f compose.yml config --quiet
           docker compose --env-file .env.staging.example -f compose.staging.yml --profile https config --quiet
           docker compose --env-file .env.staging.example -f compose.staging.yml -f compose.service-api.yml config --quiet
+          docker compose --env-file .env.staging.example -f compose.staging.yml -f compose.observability.yml config --quiet
+
+      - name: 지표 설정과 경보 규칙 검증
+        run: |
+          prometheus_image="$(docker compose --env-file .env.staging.example -f compose.staging.yml -f compose.observability.yml config --format json | jq -r '.services.prometheus.image')"
+          docker run --rm --network none --entrypoint /bin/promtool \
+            --volume "$PWD/ops/prometheus:/etc/prometheus:ro" \
+            "$prometheus_image" check config /etc/prometheus/prometheus.yml
+          docker run --rm --network none --entrypoint /bin/promtool \
+            --volume "$PWD/ops/prometheus:/etc/prometheus:ro" --workdir /etc/prometheus \
+            "$prometheus_image" test rules alerts.test.yml
+          bash -n ops/backup-postgresql.sh
 
       - name: 스테이징 PostgreSQL 이미지 확인
         run: >-
@@ -141,6 +153,15 @@ jobs:
           test -n "$brief_id"
           test -n "$https_id"
           test -n "$service_api_id"
+          service_api_curl() {
+            docker run --rm --network "container:$service_api_id" \
+              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
+              "$curl_image" \
+              --silent --show-error --connect-timeout 5 --max-time 10 \
+              --cacert /tmp/service-tls-cert.pem \
+              --resolve 'brief-service:8443:127.0.0.1' \
+              "$@"
+          }
           test -z "$(docker port "$brief_id")"
           test -z "$(docker port "$service_api_id")"
           test "$(docker inspect --format '{{.State.Status}}' "$service_api_id")" = "running"
@@ -235,36 +256,52 @@ jobs:
           test "$health_status" = "404"
 
           service_response="$(
-            docker run --rm --network "container:$service_api_id" \
-              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
-              "$curl_image" \
-              --silent --show-error --fail --connect-timeout 5 --max-time 10 \
-              --cacert /tmp/service-tls-cert.pem \
-              --resolve 'brief-service:8443:127.0.0.1' \
+            service_api_curl --fail \
               --header="Authorization: Bearer $service_token" \
               'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
           )"
           jq --exit-status '.items | length == 1' <<< "$service_response"
 
-          service_unauthenticated_status="$(
-            docker run --rm --network "container:$service_api_id" \
-              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
-              "$curl_image" \
-              --silent --show-error --connect-timeout 5 --max-time 10 \
-              --cacert /tmp/service-tls-cert.pem \
-              --resolve 'brief-service:8443:127.0.0.1' \
+          summary_path='/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items/summary'
+          summary_response="$(
+            service_api_curl --fail \
+              --header="Authorization: Bearer $service_token" \
+              "https://brief-service:8443$summary_path"
+          )"
+          jq --exit-status '.highCount == 1 and .mediumCount == 0 and .revisionGapCount == 0' <<< "$summary_response"
+
+          public_summary_status="$(
+            curl --silent --show-error --connect-timeout 5 --max-time 10 \
+              --cacert "$staging_dir/root.crt" \
+              --resolve 'localhost:38443:127.0.0.1' \
+              --header "Authorization: Bearer $service_token" \
               --output /dev/null --write-out '%{http_code}' \
-              'https://brief-service:8443/api/v1/workspaces/10000000-0000-0000-0000-000000000008/seasons/20000000-0000-0000-0000-000000000008/attention-items?limit=1'
+              "https://localhost:38443$summary_path"
+          )"
+          test "$public_summary_status" = "404"
+
+          service_unauthenticated_status="$(
+            service_api_curl \
+              --output /dev/null --write-out '%{http_code}' \
+              "https://brief-service:8443$summary_path"
           )"
           test "$service_unauthenticated_status" = "401"
 
+          resolutions_path="${summary_path%/summary}/resolutions?weekStart=2026-08-24&zoneId=Asia/Seoul"
+          resolutions_response="$(
+            service_api_curl --fail --header="Authorization: Bearer $service_token" \
+              "https://brief-service:8443$resolutions_path"
+          )"
+          jq --exit-status '.resolvedCount == 0 and .weekStart == "2026-08-24"' <<< "$resolutions_response"
+          test "$(service_api_curl --output /dev/null --write-out '%{http_code}' \
+            "https://brief-service:8443$resolutions_path")" = "401"
+          test "$(curl --silent --show-error --connect-timeout 5 --max-time 10 \
+            --cacert "$staging_dir/root.crt" --resolve 'localhost:38443:127.0.0.1' \
+            --header "Authorization: Bearer $service_token" --output /dev/null --write-out '%{http_code}' \
+            "https://localhost:38443$resolutions_path")" = "404"
+
           service_health_status="$(
-            docker run --rm --network "container:$service_api_id" \
-              --volume "$staging_dir/service-tls-cert.pem:/tmp/service-tls-cert.pem:ro" \
-              "$curl_image" \
-              --silent --show-error --connect-timeout 5 --max-time 10 \
-              --cacert /tmp/service-tls-cert.pem \
-              --resolve 'brief-service:8443:127.0.0.1' \
+            service_api_curl \
               --header="Authorization: Bearer $service_token" \
               --output /dev/null --write-out '%{http_code}' \
               'https://brief-service:8443/actuator/health'
@@ -286,6 +323,10 @@ jobs:
           fi
           if grep --fixed-strings --quiet "$service_token" <<< "$brief_logs"; then
             echo "BRIEF 로그에 서비스 API Bearer token이 노출됐습니다." >&2
+            exit 1
+          fi
+          if grep --fixed-strings --quiet "$service_token" <<< "$https_logs"; then
+            echo "공개 Caddy 로그에 서비스 API Bearer token이 노출됐습니다." >&2
             exit 1
           fi
           if grep --fixed-strings --quiet "$service_token" <<< "$service_api_logs"; then

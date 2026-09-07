@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -37,15 +38,27 @@ class BriefServiceApiSecurityIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000051"
         val seasonId = "20000000-0000-0000-0000-000000000051"
         val editionPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
-
-        mockMvc.perform(get("$editionPath/latest"))
+        val summaryPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/summary"
+        val resolutionsPath = summaryPath.removeSuffix("summary") + "resolutions?weekStart=2026-08-24&zoneId=Asia/Seoul"
+        mockMvc.perform(get(resolutionsPath)).andExpect(status().isUnauthorized)
+        mockMvc.perform(get(resolutionsPath).header(HttpHeaders.AUTHORIZATION, "Bearer $SECURITY_EVENT_TOKEN"))
             .andExpect(status().isUnauthorized)
-            .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
+        mockMvc.perform(get(resolutionsPath).header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"))
+            .andExpect(status().isOk).andExpect(jsonPath("$.resolvedCount").value(0))
+
+        listOf("$editionPath/latest", summaryPath).forEach { path ->
+            mockMvc.perform(get(path))
+                .andExpect(status().isUnauthorized)
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
+
+            mockMvc.perform(
+                get(path).header(HttpHeaders.AUTHORIZATION, "Bearer $SECURITY_EVENT_TOKEN"),
+            ).andExpect(status().isUnauthorized)
+        }
 
         mockMvc.perform(
-            get("$editionPath/latest")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $SECURITY_EVENT_TOKEN"),
-        ).andExpect(status().isUnauthorized)
+            get(summaryPath).header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"),
+        ).andExpect(status().isOk)
 
         mockMvc.perform(
             post(editionPath)

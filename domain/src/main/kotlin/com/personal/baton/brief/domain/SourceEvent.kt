@@ -37,8 +37,9 @@ data class SourceEvent(
     val sourceSeverity: SourceEventSeverity? = null,
 ) {
     init {
+        require(aggregateRevision > 0) { "aggregateRevision은 양수여야 합니다" }
         require(isReceivable(eventVersion, eventType, sourceSeverity)) {
-            "eventVersion, eventType and sourceSeverity must match"
+            "eventVersion, eventType과 sourceSeverity 조합이 올바르지 않습니다"
         }
     }
 

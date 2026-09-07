@@ -11,7 +11,7 @@ JSON Schema와 예시로 제공한다. BRIEF 소비자는 `VERSION`의 현재 �
 - `VERSION`: 계약 팩 버전의 단일 기준
 - ZIP에는 [이벤트 v2 소비 계약](../docs/PRD/0019_baton-continuity-event-v2/spec.md)과
   직접 참조하는 [MVP 계약](../docs/PRD/0002_mvp-contract/spec.md),
-  [수신 증거 조회](../docs/PRD/0007_event-receipt-query/spec.md),
+  [수신 기록 조회](../docs/PRD/0007_event-receipt-query/spec.md),
   [생산자 선행조건](../docs/PRD/0018_baton-producer-compatibility/spec.md)을 원래 경로로 포함한다.
 
 스키마는 개별 필드 형식과 v2 열거형을 정의한다. 같은 `sourceReference`의 리비전 증가,

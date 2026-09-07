@@ -1,18 +1,16 @@
-# PRD-0016: 현재 관심 항목 상태 전이 증거 이력
+# PRD-0016: 점검 항목 상태 변경 이력
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
-- 범위: 복합 정체성별 실제 적용 상태 전이의 집계 리비전 키셋 조회
+- 범위: 복합 식별자별 적용 리비전 이력과 커서 기반 페이지 조회
 
 ## 목적
 
-PRD-0013~0015는 관심 항목의 마지막 현재 상태를 단건 또는 상태별 목록으로 제공한다. 현재
-항목만으로는 어떤 적용 리비전에서 활성·해소 상태가 바뀌었고 어느 전이에서 리비전 공백이
-처음 발견됐는지 확인할 수 없다.
+PRD-0013~0015는 점검 항목의 현재 상태를 제공한다. 이 API는 리비전별 상태·원본 심각도와
+공백 탐지 여부를 조회한다. `ACTIVE`·`RESOLVED` 상태가 그대로인 갱신도 포함한다.
 
-`source_event_receipt`에 보존된 최초 수신 증거 중 실제로 투영에 적용된 리비전만 읽어 상태
-전이 증거를 제공한다. 현재 규칙으로 과거 투영을 다시 계산하거나 별도 상태 이력 테이블에
-같은 사실을 복제하지 않는다.
+`source_event_receipt`의 최초 수신 기록 중 실제로 투영에 적용된 리비전만 반환한다.
+현재 규칙으로 과거 투영을 다시 계산하거나 별도 이력 테이블에 같은 기록을 저장하지 않는다.
 
 ## HTTP API
 
@@ -20,14 +18,14 @@ PRD-0013~0015는 관심 항목의 마지막 현재 상태를 단건 또는 상�
 
 | 메서드 | 경로 | 의미 |
 |---|---|---|
-| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions` | 현재 관심 항목의 적용 상태 전이 이력 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions` | 점검 항목의 적용 리비전별 상태 이력 |
 
 ### 질의 매개변수
 
 | 이름 | 필수 | 형식과 제약 | 의미 |
 |---|---|---|---|
-| `eventType` | 예 | PRD-0002의 지원 이벤트 종류 | 복합 정체성의 이벤트 종류 |
-| `sourceReference` | 예 | PRD-0002의 문자·공백 규칙, Unicode code point 기준 최대 128자 | 복합 정체성의 원본 참조 |
+| `eventType` | 예 | PRD-0002의 지원 이벤트 종류 | 복합 식별자의 이벤트 종류 |
+| `sourceReference` | 예 | PRD-0002의 문자·공백 규칙, Unicode code point 기준 최대 128자 | 복합 식별자의 원본 참조 |
 | `beforeAggregateRevision` | 아니요 | 양의 정수 | 이 리비전보다 작은 과거 전이부터 조회 |
 | `limit` | 아니요 | `1..100`, 기본값 `20` | 한 응답의 최대 전이 수 |
 
@@ -38,7 +36,7 @@ PRD-0013~0015는 관심 항목의 마지막 현재 상태를 단건 또는 상�
 문자열은 수신과 같은 공용 입력 규칙으로 검증해 NBSP를 보존하고 `U+0000`과 짝이 없는
 surrogate를 거부한다. 조회를 위해 원본 참조를 정규화하거나 대체하지 않는다.
 
-작업공간·시즌이나 복합 정체성에 적용 전이가 없어도 원본 존재 여부를 판정하지 않고
+작업공간·시즌이나 복합 식별자에 적용 전이가 없어도 원본 존재 여부를 판정하지 않고
 `200 OK`의 빈 이력을 반환한다.
 
 ## 선정과 순서
@@ -50,7 +48,7 @@ surrogate를 거부한다. 조회를 위해 원본 참조를 정규화하거나 
 - `beforeAggregateRevision`은 배타 커서다. `limit + 1`로 다음 페이지를 판단하고 전체 개수는
   조회하지 않는다.
 
-같은 복합 정체성에서 실제 적용된 리비전은 단조 증가하므로 새 전이는 첫 페이지 앞에
+같은 복합 식별자에서 실제 적용된 리비전은 단조 증가하므로 새 전이는 첫 페이지 앞에
 추가된다. 현재 `retain-all` 경계에서는 이미 반환한 전이가 수정·삭제되지 않는다. 최신
 전이를 확인하려면 첫 페이지부터 다시 조회한다.
 
@@ -58,17 +56,24 @@ surrogate를 거부한다. 조회를 위해 원본 참조를 정규화하거나 
 
 성공 응답은 다음 필드를 가진다.
 
-- `transitions`: 적용 상태 전이 배열
+- `transitions`: 적용 리비전별 상태 이력
 - `nextBeforeAggregateRevision`: 다음 페이지가 있으면 마지막 반환 전이의
   `aggregateRevision`, 없으면 `null`
 
 각 전이는 다음 필드만 반환한다.
 
 - `eventId`: 전이를 만든 최초 수신 이벤트 식별자
-- `aggregateRevision`: 원본 복합 정체성의 적용 리비전
+- `aggregateRevision`: 원본 복합 식별자의 적용 리비전
 - `state`: 해당 전이의 `ACTIVE` 또는 `RESOLVED`
 - `observedAt`: 원본 이벤트의 정규화된 `occurredAt`
 - `detectedRevisionGap`: 해당 전이에서 직전 적용 리비전과의 공백을 새로 발견했는지 여부
+- `sourceSeverity`: 최초 수신 기록에 보존한 원본 심각도. v2는 `CRITICAL` 또는 `WARNING`,
+  v1은 `null`이다. 현재 표시 심각도로 과거 값을 재계산하지 않는다.
+
+2026-09-05 `sourceSeverity`를 추가했다. 상태가 `ACTIVE`로 같아도 심각도가 달라진 전이를
+설명할 수 있게 한다. 저장 열·투영 규칙·이벤트 요청 계약·기존 지문은 바꾸지 않는다.
+BATON은 응답 필드를 중계하도록 갱신하고, 기존 필드 거부 정책이 있다면 배포 전에 호환성을
+확인해야 한다.
 
 `detectedRevisionGap`은 전이별 사실이다. 이후 정상 리비전의 값은 `false`일 수 있지만 현재
 `AttentionItem.revisionGap`은 과거 공백을 누적해 `true`를 유지할 수 있다. 두 의미를 서로
@@ -76,9 +81,9 @@ surrogate를 거부한다. 조회를 위해 원본 참조를 정규화하거나 
 
 ## 영속성과 재구축
 
-- 기존 `source_event_receipt`의 복합 정체성, `aggregate_revision`, `event_state`,
-  `occurred_at`, `processing_outcome`을 읽는다.
-- `processingOutcome` 전체나 수신 시각, fingerprint, 원문 payload와 충돌 증거는 응답에
+- 기존 `source_event_receipt`의 복합 식별자, `aggregate_revision`, `event_state`,
+  `occurred_at`, `processing_outcome`, `source_severity`를 읽는다.
+- `processingOutcome` 전체나 수신 시각, fingerprint, 원문 payload와 충돌 기록은 응답에
   노출하지 않는다.
 - 재구축은 수신 기록을 바꾸지 않으므로 성공·실패 재구축 전후 전이 이력도 바뀌지 않는다.
 - 새 테이블, 열, 인덱스와 Flyway 마이그레이션을 추가하지 않는다. 실제 운영 규모와 조회
@@ -91,7 +96,8 @@ surrogate를 거부한다. 조회를 위해 원본 참조를 정규화하거나 
 - 동일 리비전의 `STALE`, 미지원, 중복과 충돌은 전이를 추가하지 않는다.
 - 배타 커서로 다음 과거 전이를 중복 없이 조회하고 끝에서는 `null`을 반환한다.
 - 다른 작업공간·시즌·이벤트 종류·원본 참조의 기록이 섞이지 않는다.
-- 조회는 수신 기록, 현재 투영과 불변 에디션을 변경하지 않는다.
+- 조회는 수신 기록, 현재 투영과 브리프를 변경하지 않는다.
+- v1의 `null`, v2의 `CRITICAL → WARNING`과 해소 이력이 재구축 전후 그대로 유지된다.
 
 ## 명시적 비목표
 
