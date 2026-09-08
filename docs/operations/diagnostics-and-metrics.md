@@ -89,14 +89,24 @@ docker compose --env-file .env.staging -f compose.staging.yml -f compose.observa
   exec -T brief wget -q -T 10 -O - http://127.0.0.1:9090/api/v1/alerts
 ```
 
-[경보 규칙](../../ops/prometheus/alerts.yml)은 지표 수집이 2분간 실패하거나,
-최근 5분의 HTTP `5xx` 발생 건수가 5건 이상인 상태가 1분간 이어지면 작동한다.
+[경보 규칙](../../ops/prometheus/alerts.yml)은 다음 조건에서 작동한다.
+
+| 경보 | 조건 |
+| --- | --- |
+| `BriefMetricsUnavailable` | 수집 실패 또는 `brief` 수집 대상 지표 누락이 2분간 지속 |
+| `BriefServerErrors` | 최근 5분의 HTTP `5xx` 발생 건수가 5건 이상인 상태가 1분간 지속 |
+| `BriefEventRejected` | 최근 5분의 `CONFLICT` 또는 `UNSUPPORTED` 카운터 증가가 감지된 상태가 1분간 지속 |
+
+이벤트 거부 경보는 `outcome`으로 충돌과 미지원을 구분한다. HTTP `409`·`422`도 확인할 수
+있으며, BATON의 이벤트 버전·본문과 BRIEF 수신 기록을 조사한다. 정상 적용·중복·오래된 리비전은
+이 경보에 포함하지 않는다. 최근 5분에 증가가 없으면 해제되며 미해결 오류 목록을 뜻하지 않는다.
+
 수집 시작 전의 오류나 수집 사이에 프로세스가 재시작되며 사라진 오류는 놓칠 수 있다.
 외부 알림 발송은 미연결이며, 같은 서버의 Prometheus로 서버 전체 장애를 감지할 수는 없다.
 알림 수신 채널이 정해지면 기존 무료 채널에 연결한다. BRIEF 본문 발송은 RELAY가 담당한다.
 
 `brief_events_received_total{outcome="..."}`은 결과별 요청 수이며 고유 이벤트 수가 아니다.
-첫 수신 전에는 카운터가 아직 없을 수 있다. 재시작 초기화·수집 실패·업무 이벤트 없음은
+기동 시 여섯 결과를 `0`으로 등록한다. 재시작 초기화·수집 실패·업무 이벤트 없음은
 서로 다르게 다뤄야 한다. `CONFLICT`·`UNSUPPORTED` 증가와 HTTP 인증 실패·`5xx`·지연을
 운영 조사 근거로 수집한다. 경보 주기·임계값은 실제 트래픽과 운영 목표에 맞춰 설정한다.
 
