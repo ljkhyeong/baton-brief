@@ -131,15 +131,6 @@ class JdbcBriefPersistenceAdapter(
         } else {
             "AND receipt.ingestion_sequence < :beforeIngestionSequence"
         }
-        val parameters = mutableMapOf<String, Any>(
-            "workspaceId" to workspaceId,
-            "seasonId" to seasonId,
-            "fetchLimit" to limit + 1,
-        )
-        if (beforeIngestionSequence != null) {
-            parameters["beforeIngestionSequence"] = beforeIngestionSequence
-        }
-
         val fetched = jdbc.sql(
             """
             $SOURCE_EVENT_RECEIPT_SELECT
@@ -153,7 +144,10 @@ class JdbcBriefPersistenceAdapter(
              ORDER BY receipt.ingestion_sequence DESC
              LIMIT :fetchLimit
             """.trimIndent(),
-        ).params(parameters)
+        ).param("workspaceId", workspaceId)
+            .param("seasonId", seasonId)
+            .param("beforeIngestionSequence", beforeIngestionSequence)
+            .param("fetchLimit", limit + 1)
             .query(SOURCE_EVENT_RECEIPT_MAPPER)
             .list()
         val hasNextPage = fetched.size > limit
@@ -195,25 +189,15 @@ class JdbcBriefPersistenceAdapter(
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage {
-        val parameters = mutableMapOf<String, Any>(
-            "workspaceId" to workspaceId,
-            "seasonId" to seasonId,
-            "status" to status.name,
-            "fetchLimit" to limit + 1,
-        )
         val additionalConditions = buildList {
             if (after != null) {
                 add("AND (event_type, source_reference) > (:afterEventType, :afterSourceReference)")
-                parameters["afterEventType"] = after.eventType.name
-                parameters["afterSourceReference"] = after.sourceReference
             }
-            severity?.let {
+            if (severity != null) {
                 add("AND severity = :severity")
-                parameters["severity"] = it.name
             }
-            revisionGap?.let {
+            if (revisionGap != null) {
                 add("AND revision_gap = :revisionGap")
-                parameters["revisionGap"] = it
             }
         }.joinToString("\n")
 
@@ -227,7 +211,14 @@ class JdbcBriefPersistenceAdapter(
              ORDER BY event_type, source_reference
              LIMIT :fetchLimit
             """.trimIndent(),
-        ).params(parameters)
+        ).param("workspaceId", workspaceId)
+            .param("seasonId", seasonId)
+            .param("status", status.name)
+            .param("severity", severity?.name)
+            .param("revisionGap", revisionGap)
+            .param("afterEventType", after?.eventType?.name)
+            .param("afterSourceReference", after?.sourceReference)
+            .param("fetchLimit", limit + 1)
             .query(ATTENTION_ITEM_MAPPER)
             .list()
         val items = fetched.take(limit)
@@ -266,15 +257,6 @@ class JdbcBriefPersistenceAdapter(
     ): WeeklyResolutionSummary {
         val afterClause = if (after == null) "" else
             "WHERE (reason_code, source_reference) > (:afterEventType, :afterSourceReference)"
-        val parameters = mutableMapOf<String, Any>(
-            "workspaceId" to workspaceId, "seasonId" to seasonId,
-            "windowStart" to window.start.jdbcValue(), "windowEnd" to window.end.jdbcValue(),
-            "evaluatedAt" to evaluatedAt.jdbcValue(), "fetchLimit" to limit + 1,
-        )
-        if (after != null) {
-            parameters["afterEventType"] = after.eventType.name
-            parameters["afterSourceReference"] = after.sourceReference
-        }
         val rows = jdbc.sql(
             """
         WITH applied AS (
@@ -317,11 +299,19 @@ class JdbcBriefPersistenceAdapter(
               LIMIT :fetchLimit
           ) page ON TRUE
             """.trimIndent(),
-        ).params(parameters).query { result, rowNumber ->
-            result.getLong("resolved_count") to result.getString("source_reference")?.let {
-                RESOLUTION_ITEM_MAPPER.mapRow(result, rowNumber)
-            }
-        }.list()
+        ).param("workspaceId", workspaceId)
+            .param("seasonId", seasonId)
+            .param("windowStart", window.start.jdbcValue())
+            .param("windowEnd", window.end.jdbcValue())
+            .param("evaluatedAt", evaluatedAt.jdbcValue())
+            .param("afterEventType", after?.eventType?.name)
+            .param("afterSourceReference", after?.sourceReference)
+            .param("fetchLimit", limit + 1)
+            .query { result, rowNumber ->
+                result.getLong("resolved_count") to result.getString("source_reference")?.let {
+                    RESOLUTION_ITEM_MAPPER.mapRow(result, rowNumber)
+                }
+            }.list()
         val candidates = rows.mapNotNull { it.second }
         val items = candidates.take(limit)
         return WeeklyResolutionSummary(
@@ -344,17 +334,6 @@ class JdbcBriefPersistenceAdapter(
         } else {
             "AND aggregate_revision < :beforeAggregateRevision"
         }
-        val parameters = mutableMapOf<String, Any>(
-            "workspaceId" to workspaceId,
-            "seasonId" to seasonId,
-            "eventType" to eventType.name,
-            "sourceReference" to sourceReference,
-            "fetchLimit" to limit + 1,
-        )
-        if (beforeAggregateRevision != null) {
-            parameters["beforeAggregateRevision"] = beforeAggregateRevision
-        }
-
         val fetched = jdbc.sql(
             """
             SELECT event_id, aggregate_revision, event_state AS state, occurred_at AS observed_at,
@@ -369,7 +348,12 @@ class JdbcBriefPersistenceAdapter(
              ORDER BY aggregate_revision DESC
              LIMIT :fetchLimit
             """.trimIndent(),
-        ).params(parameters)
+        ).param("workspaceId", workspaceId)
+            .param("seasonId", seasonId)
+            .param("eventType", eventType.name)
+            .param("sourceReference", sourceReference)
+            .param("beforeAggregateRevision", beforeAggregateRevision)
+            .param("fetchLimit", limit + 1)
             .query(ATTENTION_ITEM_TRANSITION_MAPPER)
             .list()
         val transitions = fetched.take(limit)
@@ -500,15 +484,6 @@ class JdbcBriefPersistenceAdapter(
         } else {
             "AND edition.generation < :beforeGeneration"
         }
-        val parameters = mutableMapOf<String, Any>(
-            "workspaceId" to workspaceId,
-            "seasonId" to seasonId,
-            "fetchLimit" to limit + 1,
-        )
-        if (beforeGeneration != null) {
-            parameters["beforeGeneration"] = beforeGeneration
-        }
-
         val summaries = jdbc.sql(
             """
             SELECT edition.edition_id, edition.generation, edition.week_start, edition.zone_id,
@@ -525,7 +500,10 @@ class JdbcBriefPersistenceAdapter(
              ORDER BY edition.generation DESC
              LIMIT :fetchLimit
             """.trimIndent(),
-        ).params(parameters)
+        ).param("workspaceId", workspaceId)
+            .param("seasonId", seasonId)
+            .param("beforeGeneration", beforeGeneration)
+            .param("fetchLimit", limit + 1)
             .query(EDITION_SUMMARY_MAPPER)
             .list()
         val hasNextPage = summaries.size > limit
