@@ -26,6 +26,7 @@ PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치�
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `f2000ae` 조회 매개변수, 2026-09-08 | `:bootstrap:test`의 `BriefMvpIntegrationTest`에서 조회 관련 7건 선택 실행·통과(8초). 이상 수신 기록·목록 필터·상태 이력·브리프 이력·주간 해소·DST·NBSP 참조 확인. JDK 21.0.10·PostgreSQL 18.6 | JDBC 조회 5곳의 수동 가변 맵을 제거하고 SQL·선택 조건·정렬·페이지 계산 유지. 실패·제외 없음. 단일 어댑터 변경으로 전체 테스트·JAR 생성·스테이징 재기동·계약 ZIP 재생성은 생략 |
 | BRIEF `c1e68a1` 오류 문구, 2026-09-08 | `:bootstrap:test` 선택 4건과 `contractsZip` 성공. 수신 조회·이벤트 입력 형식·브리프 조회·비교 오류 확인. 백업 경로 안내·문서 링크 163개·ZIP 내 문서 5개 확인 | 코드 변경은 안내 문자열에 한정. API 필드·상태 코드·검증 조건 유지. 전체 테스트·JAR 생성·컨테이너 재기동은 문구 변경 범위에서 제외 |
 | BRIEF `f2f34ab` 지표 수집, 2026-09-07 | `docker build --tag baton-brief:no-fee-verify .`, Compose 설정·격리 기동, Prometheus 3.14.0 `promtool check config`·`test rules` 4개 시나리오 성공. 실제 수집·경보 API·비루트·읽기 전용·비공개 네트워크·파일 Bearer·비밀 로그 비노출 확인 | Docker Compose 5.5.0·PostgreSQL 18.6. 원격 배포·외부 알림은 미실행. 제품 소스·의존성은 `5e7cd53`과 같아 아래 Gradle 결과 재사용 |
 | BRIEF `f2f34ab` 백업, 2026-09-07 | `bash ops/backup-postgresql.sh`의 파일 권한·실패한 임시 파일 제거·기존 백업 보존 확인. 별도 빈 PostgreSQL에 복원해 Flyway 포함 6개 테이블 일치 | 계약 예시 1건 기준. Linux 타이머 설치·대용량·외부 보관·서버 장애 복구는 미실행 |
