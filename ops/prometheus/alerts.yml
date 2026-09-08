@@ -2,12 +2,12 @@ groups:
   - name: brief
     rules:
       - alert: BriefMetricsUnavailable
-        expr: up{job="brief"} == 0
+        expr: up{job="brief"} == 0 or absent(up{job="brief"})
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: BRIEF 지표 수집이 2분 이상 실패했습니다.
+          summary: BRIEF 지표를 2분 이상 수집하지 못했습니다.
       - alert: BriefServerErrors
         expr: sum(increase(http_server_requests_seconds_count{job="brief",status=~"5.."}[5m])) >= 5
         for: 1m
@@ -15,3 +15,10 @@ groups:
           severity: warning
         annotations:
           summary: BRIEF의 최근 5분 서버 오류가 5건 이상입니다.
+      - alert: BriefEventRejected
+        expr: sum by (outcome) (increase(brief_events_received_total{job="brief",outcome=~"CONFLICT|UNSUPPORTED"}[5m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'BRIEF 이벤트 수신에서 {{ $labels.outcome }} 결과가 발생했습니다.'
