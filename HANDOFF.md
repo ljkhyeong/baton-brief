@@ -6,9 +6,9 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 계약·구조 결정은 [문서 색인](docs/README.md), 계약 버전은 [VERSION](contracts/VERSION)을 따른다.
 현재 마이그레이션은 V9이며 계약 팩은 원격 호환 검증 전인 RC 상태다.
 
-2026-09-05 BRIEF 기능·문구 개선은 로컬 `main`의 `aeb943e`에, BATON 연결 변경은
-BATON `1916d8c8`에 병합했다. 이후 BRIEF `ed2129e`까지는 문서·지시·스킬만 바뀌었다.
-BATON의 계정 권한 조회와 열람자 생성 제한을 병합에 반영했다. 병합 대기는 남아 있지 않다.
+2026-09-08 BRIEF 기능·운영·문구 개선을 원격 `main`의 `a4eb076`에 병합했다.
+조회 매개변수·수신 경보·토큰 캐시 정리의 구현 기준은 `7e1a054`다.
+BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
 이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
 공개 이벤트 수신 주소는 `brief.b4ton.com`으로 설정했지만 서버는 미구축이다.
@@ -26,6 +26,8 @@ PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치�
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `7e1a054` 수신 지표·인증, 2026-09-08 | `:bootstrap:test`에서 `BriefEventMetricsTest`·`BriefSecurityConfigurationTest`·`BriefServiceApiSecurityIntegrationTest`와 `BriefMvpIntegrationTest`의 수신·Bearer·상태 확인 3건을 선택해 총 7건 통과(11초). JDK 21.0.10·PostgreSQL 18.6. Prometheus 3.14.0의 `promtool check config`·`test rules`로 규칙 3개·시나리오 8개 통과 | 카운터 초기 등록·첫 충돌/미지원 증가·수집 대상 누락과 복구·정상 결과 제외·카운터 초기화 확인. 토큰 검증·교체 유지. 실패·제외 없음. 단일 웹 어댑터와 경보 규칙 변경으로 전체 테스트·JAR 생성·컨테이너 재기동·계약 ZIP 재생성은 생략. 외부 알림은 미연결 |
+| BRIEF `f2000ae` 조회 매개변수, 2026-09-08 | `:bootstrap:test`의 `BriefMvpIntegrationTest`에서 조회 관련 7건 선택 실행·통과(8초). 이상 수신 기록·목록 필터·상태 이력·브리프 이력·주간 해소·DST·NBSP 참조 확인. JDK 21.0.10·PostgreSQL 18.6 | JDBC 조회 5곳의 수동 가변 맵을 제거하고 SQL·선택 조건·정렬·페이지 계산 유지. 실패·제외 없음. 단일 어댑터 변경으로 전체 테스트·JAR 생성·스테이징 재기동·계약 ZIP 재생성은 생략 |
 | BRIEF `c1e68a1` 오류 문구, 2026-09-08 | `:bootstrap:test` 선택 4건과 `contractsZip` 성공. 수신 조회·이벤트 입력 형식·브리프 조회·비교 오류 확인. 백업 경로 안내·문서 링크 163개·ZIP 내 문서 5개 확인 | 코드 변경은 안내 문자열에 한정. API 필드·상태 코드·검증 조건 유지. 전체 테스트·JAR 생성·컨테이너 재기동은 문구 변경 범위에서 제외 |
 | BRIEF `f2f34ab` 지표 수집, 2026-09-07 | `docker build --tag baton-brief:no-fee-verify .`, Compose 설정·격리 기동, Prometheus 3.14.0 `promtool check config`·`test rules` 4개 시나리오 성공. 실제 수집·경보 API·비루트·읽기 전용·비공개 네트워크·파일 Bearer·비밀 로그 비노출 확인 | Docker Compose 5.5.0·PostgreSQL 18.6. 원격 배포·외부 알림은 미실행. 제품 소스·의존성은 `5e7cd53`과 같아 아래 Gradle 결과 재사용 |
 | BRIEF `f2f34ab` 백업, 2026-09-07 | `bash ops/backup-postgresql.sh`의 파일 권한·실패한 임시 파일 제거·기존 백업 보존 확인. 별도 빈 PostgreSQL에 복원해 Flyway 포함 6개 테이블 일치 | 계약 예시 1건 기준. Linux 타이머 설치·대용량·외부 보관·서버 장애 복구는 미실행 |

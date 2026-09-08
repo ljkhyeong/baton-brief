@@ -40,14 +40,18 @@ import org.springframework.web.server.ResponseStatusException
 @RequestMapping("/api/v1")
 class BriefController(
     private val brief: BriefUseCases,
-    private val meterRegistry: MeterRegistry,
+    meterRegistry: MeterRegistry,
 ) {
+    private val receivedCounters = IngestStatus.entries.associateWith {
+        meterRegistry.counter("brief.events.received", "outcome", it.name)
+    }
+
     @PostMapping("/events")
     fun ingest(
         @Valid @RequestBody request: SourceEventRequest,
     ): ResponseEntity<IngestResponse> {
         val result = brief.ingest(request.toDomain())
-        meterRegistry.counter("brief.events.received", "outcome", result.status.name).increment()
+        receivedCounters.getValue(result.status).increment()
         val status = when (result.status) {
             IngestStatus.APPLIED,
             IngestStatus.APPLIED_WITH_GAP,

@@ -19,7 +19,7 @@ tests:
               instance: 127.0.0.1:9091
               severity: critical
             exp_annotations:
-              summary: BRIEF 지표 수집이 2분 이상 실패했습니다.
+              summary: BRIEF 지표를 2분 이상 수집하지 못했습니다.
   - name: 업무 요청이 없어도 수집이 정상이면 경보하지 않는다
     interval: 30s
     input_series:
@@ -54,3 +54,78 @@ tests:
               severity: warning
             exp_annotations:
               summary: BRIEF의 최근 5분 서버 오류가 5건 이상입니다.
+  - name: 수집 대상이 없으면 경보하고 정상 수집되면 해제한다
+    interval: 30s
+    input_series:
+      - series: 'up{job="brief",instance="127.0.0.1:9091"}'
+        values: '_x6 1x2'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: BriefMetricsUnavailable
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefMetricsUnavailable
+        exp_alerts:
+          - exp_labels:
+              job: brief
+              severity: critical
+            exp_annotations:
+              summary: BRIEF 지표를 2분 이상 수집하지 못했습니다.
+      - eval_time: 3m
+        alertname: BriefMetricsUnavailable
+        exp_alerts: []
+  - name: 첫 충돌과 미지원도 구분해 경보하고 증가가 멈추면 해제한다
+    interval: 30s
+    input_series:
+      - series: 'brief_events_received_total{job="brief",outcome="CONFLICT"}'
+        values: '0 0 1x12'
+      - series: 'brief_events_received_total{job="brief",outcome="UNSUPPORTED"}'
+        values: '0 0 1x12'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: BriefEventRejected
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefEventRejected
+        exp_alerts:
+          - exp_labels:
+              outcome: CONFLICT
+              severity: warning
+            exp_annotations:
+              summary: BRIEF 이벤트 수신에서 CONFLICT 결과가 발생했습니다.
+          - exp_labels:
+              outcome: UNSUPPORTED
+              severity: warning
+            exp_annotations:
+              summary: BRIEF 이벤트 수신에서 UNSUPPORTED 결과가 발생했습니다.
+      - eval_time: 7m
+        alertname: BriefEventRejected
+        exp_alerts: []
+  - name: 정상 적용과 재전달 및 다른 작업의 결과로 수신 거부를 경보하지 않는다
+    interval: 30s
+    input_series:
+      - series: 'brief_events_received_total{job="brief",outcome="APPLIED"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="brief",outcome="APPLIED_WITH_GAP"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="brief",outcome="DUPLICATE"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="brief",outcome="STALE"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="other",outcome="CONFLICT"}'
+        values: '0+1x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefEventRejected
+        exp_alerts: []
+  - name: 수신 결과 카운터의 재시작 초기화만으로 경보하지 않는다
+    interval: 30s
+    input_series:
+      - series: 'brief_events_received_total{job="brief",outcome="CONFLICT"}'
+        values: '20 20 0x12'
+      - series: 'brief_events_received_total{job="brief",outcome="UNSUPPORTED"}'
+        values: '20 20 0x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefEventRejected
+        exp_alerts: []
