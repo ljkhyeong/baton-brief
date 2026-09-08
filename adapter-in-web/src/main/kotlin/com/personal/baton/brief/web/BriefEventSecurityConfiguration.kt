@@ -19,11 +19,8 @@ class BriefEventReceiverSecurityProperties(
     @DefaultValue("") private val bearerToken: String,
     @DefaultValue("") private val previousBearerToken: String,
 ) {
-    private val acceptedTokens: List<String> by lazy {
+    fun acceptedBearerTokens(): List<String> =
         acceptedBearerTokens(bearerToken, previousBearerToken, "BRIEF 이벤트 수신")
-    }
-
-    fun acceptedBearerTokens(): List<String> = acceptedTokens
 }
 
 @Configuration(proxyBeanMethods = false)
