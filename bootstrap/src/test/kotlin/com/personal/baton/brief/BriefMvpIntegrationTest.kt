@@ -1171,6 +1171,87 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `주간 이력은 주차와 시간대를 먼저 걸러 기존 생성 번호로 페이지를 조회한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000002"
+        val seasonId = "20000000-0000-0000-0000-000000000002"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val request = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        val otherZoneRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Tokyo"}"""
+        seedWeeklyEditionScenario(workspaceId, seasonId)
+        val first = postEdition(path, request)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(1))
+            .andReturn()
+        val firstEditionId = JsonPath.read<String>(first.response.contentAsString, "$.editionId")
+        postEdition(path, otherZoneRequest).andExpect(status().isCreated)
+        postEdition(path, """{"weekStart":"2026-08-17","zoneId":"Asia/Seoul"}""")
+            .andExpect(status().isCreated)
+
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000004",
+                workspaceId, seasonId, "handoff:weekly", 2, state = "RESOLVED",
+            ),
+        ).andExpect(status().isAccepted)
+        postEdition(path, request)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(4))
+        postEdition(path, otherZoneRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(5))
+
+        val otherWorkspacePath =
+            "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/editions"
+        val otherSeasonPath =
+            "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/editions"
+        listOf(otherWorkspacePath, otherSeasonPath).forEach {
+            postEdition(it, request).andExpect(status().isCreated)
+        }
+
+        mockMvc.perform(get(path).param("limit", "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions[0].generation").value(5))
+        val firstPage = mockMvc.perform(
+            get(path).param("weekStart", "2026-08-10").param("zoneId", "Asia/Seoul")
+                .param("limit", "1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions.length()").value(1))
+            .andExpect(jsonPath("$.editions[0].generation").value(4))
+            .andExpect(jsonPath("$.editions[0].weekStart").value("2026-08-10"))
+            .andExpect(jsonPath("$.editions[0].zoneId").value("Asia/Seoul"))
+            .andExpect(jsonPath("$.editions[0].itemCount").value(1))
+            .andExpect(jsonPath("$.nextBeforeGeneration").value(4))
+            .andReturn()
+        val cursor = JsonPath.read<Int>(firstPage.response.contentAsString, "$.nextBeforeGeneration")
+
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000005",
+                workspaceId, seasonId, "routine:weekly", 2, state = "RESOLVED", type = "ROUTINE_MISSED",
+            ),
+        ).andExpect(status().isAccepted)
+        postEdition(path, request)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(6))
+
+        mockMvc.perform(
+            get(path).param("weekStart", "2026-08-10").param("zoneId", "Asia/Seoul")
+                .param("beforeGeneration", cursor.toString()).param("limit", "1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions.length()").value(1))
+            .andExpect(jsonPath("$.editions[0].editionId").value(firstEditionId))
+            .andExpect(jsonPath("$.editions[0].generation").value(1))
+            .andExpect(jsonPath("$.editions[0].itemCount").value(2))
+            .andExpect(jsonPath("$.nextBeforeGeneration").value(nullValue()))
+
+        mockMvc.perform(
+            get(path).param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions").isEmpty)
+            .andExpect(jsonPath("$.nextBeforeGeneration").value(nullValue()))
+    }
+
+    @Test
     fun `재구축 실패는 현재 투영을 롤백하고 성공 뒤에도 기존 에디션을 보존한다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000002"
         val seasonId = "20000000-0000-0000-0000-000000000002"
@@ -1704,6 +1785,24 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(get(path).param("limit", "101"))
             .andExpect(status().isBadRequest)
 
+        listOf(
+            mapOf("weekStart" to "2026-08-10"),
+            mapOf("zoneId" to "Asia/Seoul"),
+            mapOf("weekStart" to "", "zoneId" to "Asia/Seoul"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to ""),
+            mapOf("weekStart" to "2026-02-30", "zoneId" to "Asia/Seoul"),
+            mapOf("weekStart" to "2026-08-11", "zoneId" to "Asia/Seoul"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to "+09:00"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to "Invalid/Zone"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to "Asia/Seoul", "beforeGeneration" to "0"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to "Asia/Seoul", "limit" to "101"),
+        ).forEach { params ->
+            mockMvc.perform(get(path).apply { params.forEach { (name, value) -> param(name, value) } })
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+        }
+
         mockMvc.perform(get("$path/latest")).andExpect(status().isNotFound)
         mockMvc.perform(get("/api/v1/editions/50000000-0000-0000-0000-000000000001"))
             .andExpect(status().isNotFound)
@@ -1767,6 +1866,12 @@ class BriefMvpIntegrationTest(
                 .andExpect(jsonPath("$.weekStart").value(weekStart))
                 .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
 
+            mockMvc.perform(get(path).param("weekStart", weekStart).param("zoneId", "UTC"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.editions.length()").value(1))
+                .andExpect(jsonPath("$.editions[0].editionId").value(editionId))
+                .andExpect(jsonPath("$.editions[0].weekStart").value(weekStart))
+
             mockMvc.perform(post("/api/v1/projections/rebuild"))
                 .andExpect(status().isOk)
             postEdition(path, request)
@@ -1788,6 +1893,9 @@ class BriefMvpIntegrationTest(
                         .param("weekStart", weekStart)
                         .param("zoneId", "UTC"),
                 ).andExpect(status().isBadRequest)
+                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                mockMvc.perform(get(path).param("weekStart", weekStart).param("zoneId", "UTC"))
+                    .andExpect(status().isBadRequest)
                     .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
             }
     }

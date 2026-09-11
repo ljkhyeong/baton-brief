@@ -15,6 +15,7 @@ import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
+import com.personal.baton.brief.domain.WeeklyWindow
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
@@ -199,13 +200,37 @@ class BriefController(
             ?.toResponse()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
 
-    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions")
+    @GetMapping(
+        "/workspaces/{workspaceId}/seasons/{seasonId}/editions",
+        params = ["!weekStart", "!zoneId"],
+    )
     fun findEditionHistory(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("beforeGeneration", required = false) @Positive beforeGeneration: Long?,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
     ): EditionHistoryResult = brief.findEditionHistory(workspaceId, seasonId, beforeGeneration, limit)
+
+    @GetMapping(
+        "/workspaces/{workspaceId}/seasons/{seasonId}/editions",
+        params = ["weekStart", "zoneId"],
+    )
+    fun findEditionHistoryForWeek(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @Valid @ModelAttribute request: EditionWeekRequest,
+        @RequestParam("beforeGeneration", required = false) @Positive beforeGeneration: Long?,
+        @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
+    ): EditionHistoryResult {
+        val command = request.toCommand(workspaceId, seasonId)
+        return brief.findEditionHistory(
+            workspaceId,
+            seasonId,
+            beforeGeneration,
+            limit,
+            WeeklyWindow.startingOn(command.weekStart, command.zoneId),
+        )
+    }
 
     @GetMapping("/editions/{editionId}")
     fun findEdition(

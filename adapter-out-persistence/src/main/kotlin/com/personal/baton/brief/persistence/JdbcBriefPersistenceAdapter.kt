@@ -483,11 +483,17 @@ class JdbcBriefPersistenceAdapter(
         seasonId: UUID,
         beforeGeneration: Long?,
         limit: Int,
+        window: WeeklyWindow?,
     ): EditionHistoryResult {
         val beforeClause = if (beforeGeneration == null) {
             ""
         } else {
             "AND edition.generation < :beforeGeneration"
+        }
+        val weekClause = if (window == null) {
+            ""
+        } else {
+            "AND edition.week_start = :weekStart AND edition.zone_id = :zoneId"
         }
         val summaries = jdbc.sql(
             """
@@ -502,12 +508,15 @@ class JdbcBriefPersistenceAdapter(
              WHERE edition.workspace_id = :workspaceId
                AND edition.season_id = :seasonId
                $beforeClause
+               $weekClause
              ORDER BY edition.generation DESC
              LIMIT :fetchLimit
             """.trimIndent(),
         ).param("workspaceId", workspaceId)
             .param("seasonId", seasonId)
             .param("beforeGeneration", beforeGeneration)
+            .param("weekStart", window?.weekStart)
+            .param("zoneId", window?.zoneId?.id)
             .param("fetchLimit", limit + 1)
             .query(EDITION_SUMMARY_MAPPER)
             .list()

@@ -227,6 +227,7 @@ interface BriefQueries {
         seasonId: UUID,
         beforeGeneration: Long?,
         limit: Int,
+        window: WeeklyWindow? = null,
     ): EditionHistoryResult
 }
 
