@@ -58,7 +58,7 @@
 | [PRD-0005 브리프 비교](PRD/0005_edition-comparison/spec.md) | 채택됨 | 추가·제거·변경과 기준·대상 순서 |
 | [PRD-0009 주간 범위 최신](PRD/0009_weekly-latest-edition/spec.md) | 채택됨 | 주간·시간대가 일치하는 최신 저장 브리프 |
 | [PRD-0010 브리프 리비전 근거](PRD/0010_edition-revision-evidence/spec.md) | 채택됨 | 집계 리비전·공백 고정과 이전 항목 `null` 호환성 |
-| [PRD-0012 브리프 조건부 조회](PRD/0012_edition-etag/spec.md) | 채택됨 | 전체 브리프 응답의 `ETag`와 `If-None-Match` |
+| [PRD-0012 브리프 조건부 조회](PRD/0012_edition-etag/spec.md) | 채택됨 | 브리프 본문·비교 결과의 `ETag`와 `If-None-Match` |
 | [PRD-0029 주간 변경·이전 미해소 구분](PRD/0029_edition-carry-over/spec.md) | 채택됨 | 브리프 선정 규칙 v2와 생성 당시 항목 분류 |
 
 ## 스테이징 실행
