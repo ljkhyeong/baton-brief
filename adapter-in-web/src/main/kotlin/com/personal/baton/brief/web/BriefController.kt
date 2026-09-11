@@ -244,8 +244,10 @@ class BriefController(
     fun compareEditions(
         @PathVariable("targetEditionId") targetEditionId: UUID,
         @RequestParam("fromEditionId") fromEditionId: UUID,
-    ): EditionComparison = when (val result = brief.compareEditions(fromEditionId, targetEditionId)) {
-        is EditionComparisonResult.Found -> result.comparison
+    ): ResponseEntity<EditionComparison> = when (val result = brief.compareEditions(fromEditionId, targetEditionId)) {
+        is EditionComparisonResult.Found -> ResponseEntity.ok()
+            .eTag("brief-edition-comparison-v1-$fromEditionId-$targetEditionId")
+            .body(result.comparison)
         EditionComparisonResult.NotFound ->
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
         EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(

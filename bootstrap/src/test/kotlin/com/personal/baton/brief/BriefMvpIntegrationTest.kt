@@ -1568,10 +1568,32 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.changed[0].after.aggregateRevision").value(3))
             .andExpect(jsonPath("$.changed[0].after.revisionGap").value(true))
             .andReturn()
+        val changesEtag = checkNotNull(changes.response.getHeader(HttpHeaders.ETAG))
+        mockMvc.perform(
+            get(changesPath).param("fromEditionId", baseEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
+        ).andExpect(status().isNotModified)
+            .andExpect(header().string(HttpHeaders.ETAG, changesEtag))
+            .andExpect(content().string(""))
+
+        mockMvc.perform(
+            get(changesPath).param("fromEditionId", revisionEvidenceEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.from.editionId").value(revisionEvidenceEditionId))
+            .andExpect(jsonPath("$.changed").isEmpty)
+        mockMvc.perform(
+            get("/api/v1/editions/$revisionEvidenceEditionId/changes").param("fromEditionId", baseEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.to.editionId").value(revisionEvidenceEditionId))
+            .andExpect(jsonPath("$.added").isEmpty)
+            .andExpect(jsonPath("$.removed").isEmpty)
 
         mockMvc.perform(
             get("/api/v1/editions/$baseEditionId/changes")
-                .param("fromEditionId", targetEditionId),
+                .param("fromEditionId", targetEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.from.editionId").value(targetEditionId))
             .andExpect(jsonPath("$.to.editionId").value(baseEditionId))
@@ -1602,6 +1624,12 @@ class BriefMvpIntegrationTest(
             .andReturn()
         assertThat(rebuiltChanges.response.contentAsString)
             .isEqualTo(changes.response.contentAsString)
+        mockMvc.perform(
+            get(changesPath).param("fromEditionId", baseEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
+        ).andExpect(status().isNotModified)
+            .andExpect(header().string(HttpHeaders.ETAG, changesEtag))
+            .andExpect(content().string(""))
 
         val otherWorkspaceId = "10000000-0000-0000-0000-000000000099"
         val otherGenerationPath =
@@ -1614,12 +1642,19 @@ class BriefMvpIntegrationTest(
             "$.editionId",
         )
 
-        mockMvc.perform(get(changesPath).param("fromEditionId", otherEditionId))
+        mockMvc.perform(
+            get(changesPath).param("fromEditionId", otherEditionId).header(HttpHeaders.IF_NONE_MATCH, "*"),
+        )
             .andExpect(status().isBadRequest)
 
         mockMvc.perform(
             get(changesPath)
-                .param("fromEditionId", "50000000-0000-0000-0000-000000000099"),
+                .param("fromEditionId", "50000000-0000-0000-0000-000000000099")
+                .header(HttpHeaders.IF_NONE_MATCH, "*"),
+        ).andExpect(status().isNotFound)
+        mockMvc.perform(
+            get("/api/v1/editions/50000000-0000-0000-0000-000000000099/changes")
+                .param("fromEditionId", baseEditionId).header(HttpHeaders.IF_NONE_MATCH, "*"),
         ).andExpect(status().isNotFound)
     }
 
