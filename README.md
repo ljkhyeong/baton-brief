@@ -62,6 +62,7 @@ BATON 화면은 조회 중 선택한 조건을 유지하며, 선택한 브리프
   예: `?eventType=ROLE_UNASSIGNED&severity=HIGH`는 심각도가 높은 역할 미배정 항목만 조회한다.
 - 작업공간·시즌별 활성 `HIGH`·`MEDIUM` 개수와 리비전 공백이 기록된 활성 항목 수를
   [요약 API](docs/PRD/0027_attention-item-summary/spec.md)로 조회한다.
+  `eventType`을 지정하면 선택한 업무 종류만 집계한다.
 - [주간 해소 요약](docs/PRD/0030_weekly-resolution-summary/spec.md)은 해당 주에 해소된 뒤 현재도
   해소 상태인 항목 수와 목록을 반환한다. 연속된 활성→해소 리비전으로 해소 시점을 확인하며,
   재활성화됐거나 이후 기록에 공백이 생긴 항목은 제외한다. 목록은 커서로 다음 페이지를 조회한다.
