@@ -246,6 +246,24 @@ jobs:
           test "$authenticated_status" = "202"
           jq --exit-status '.status == "APPLIED"' "$staging_dir/event-response.json"
 
+          mkdir "$staging_dir/backups"
+          COMPOSE_PROJECT_NAME=baton-brief-ci \
+            BRIEF_STAGING_ENV_FILE="$PWD/.env.staging.example" \
+            BRIEF_BACKUP_DIRECTORY="$staging_dir/backups" \
+            bash ops/backup-postgresql.sh
+          backup_files=("$staging_dir/backups"/*/database.dump)
+          test "${#backup_files[@]}" = "1"
+          test -s "${backup_files[0]}"
+          BRIEF_BACKUP_FILE="${backup_files[0]}" bash ops/verify-postgresql-backup.sh
+
+          backup_bytes="$(wc -c < "${backup_files[0]}")"
+          head -c "$((backup_bytes / 2))" "${backup_files[0]}" > "$staging_dir/truncated.dump"
+          if BRIEF_BACKUP_FILE="$staging_dir/truncated.dump" \
+            bash ops/verify-postgresql-backup.sh > "$staging_dir/restore-error.log" 2>&1; then
+            echo "손상된 백업을 복원 성공으로 처리했습니다." >&2
+            exit 1
+          fi
+
           health_status="$(
             curl --silent --show-error --connect-timeout 5 --max-time 10 \
               --cacert "$staging_dir/root.crt" \
