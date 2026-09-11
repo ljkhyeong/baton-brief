@@ -48,7 +48,7 @@
 | [PRD-0017 현재 단건 조건부 조회](PRD/0017_current-attention-item-etag/spec.md) | 채택됨 | `ETag`가 같으면 `304`를 반환하는 조건부 조회 |
 | [PRD-0027 현재 활성 항목 요약](PRD/0027_attention-item-summary/spec.md) | 채택됨 | 전체·업무 종류별 활성 심각도 개수와 리비전 공백 항목 수 |
 | [PRD-0028 점검 항목 필터](PRD/0028_attention-item-filters/spec.md) | 채택됨 | 현재 목록의 업무 종류·심각도·리비전 공백 필터와 기존 커서 유지 |
-| [PRD-0030 주간 해소 요약](PRD/0030_weekly-resolution-summary/spec.md) | 채택됨 | 연속 리비전으로 해소를 확인하고 현재도 해소 상태인 항목 집계 |
+| [PRD-0030 주간 해소 요약](PRD/0030_weekly-resolution-summary/spec.md) | 채택됨 | 연속 리비전으로 확인한 전체·업무 종류별 주간 해소 건수와 목록 |
 
 ## 브리프
 
