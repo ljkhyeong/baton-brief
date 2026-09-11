@@ -14,6 +14,9 @@
 `operations` 프로필은 HTTP 서버와 Flyway를 비활성화하고, 명령은 기존 유스케이스를 호출한
 뒤 종료한다. HTTP 인증 필터는 Servlet 실행에서만 구성하며 평상시 웹 인증은 유지한다.
 수신 원문·fingerprint를 출력하지 않고 기존 수신 조회 결과와 재구축 건수만 반환한다.
+운영 프로필에서는 성공 결과 JSON만 표준 출력으로 보내고 로그는 표준 오류로 분리한다.
+Spring Boot의 기본 로그 형식과 Logback의 `ConsoleAppender`를 사용한다. Docker 실행 시
+가상 터미널을 비활성화해 이 구분을 유지하며, 웹 서비스는 기존 기본 로그 설정을 사용한다.
 
 선택적인 `compose.observability.yml`은 Spring Boot 표준 속성으로 관리 서버를 컨테이너의
 `127.0.0.1:9091`에 둔다. `health`와 `prometheus`만 제공한다. Docker healthcheck는

@@ -14,12 +14,12 @@ HTTP 서버를 열지 않고 Flyway를 실행하지 않는다. 애플리케이�
 ## 수신 기록 단건·이상 기록 조회
 
 ```shell
-docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps brief \
+docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps -T brief \
   --spring.profiles.active=operations \
   --brief.operations.command=RECEIPT \
   --brief.operations.event-id=<이벤트-UUID>
 
-docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps brief \
+docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps -T brief \
   --spring.profiles.active=operations \
   --brief.operations.command=ANOMALIES \
   --brief.operations.workspace-id=<작업공간-UUID> \
@@ -27,7 +27,15 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
   --brief.operations.limit=20
 ```
 
-결과는 기존 조회 API와 같은 JSON으로 표준 출력에 기록된다. 과거 페이지는 반환된
+`operations` 프로필은 성공 결과 JSON 한 건만 표준 출력으로 보내고 시작·종료·오류 로그는
+표준 오류로 보낸다. `-T`는 가상 터미널을 끄고 두 출력을 분리한다. 다른 로그 설정을 지정할
+때도 이 구분을 유지한다.
+
+결과를 저장하려면 접근이 제한된 디렉터리에서 `umask 077`을 적용하고 위 명령 끝에
+`> receipt.json 2> receipt.log`를 붙인다. 종료 코드가 `0`일 때만 결과 파일을 사용한다.
+`jq` 등 다른 도구와 연결할 때는 Bash에서 `set -o pipefail`을 켜 명령 실패를 놓치지 않는다.
+
+결과는 기존 조회 API와 같은 JSON이다. 과거 페이지는 반환된
 `nextBeforeIngestionSequence`를 `--brief.operations.before-ingestion-sequence`로 넘긴다.
 첫 페이지를 다시 조회하려면 커서를 생략한다. 조회 결과는 최초 수신 결과를 유지하며
 충돌 지문과 원문 payload를 포함하지 않는다.
@@ -43,7 +51,7 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
 이미 기록된 `revisionGap`도 지우지 않는다. 미지원·충돌 기록은 임의로 재처리하지 않는다.
 
 ```shell
-docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps brief \
+docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps -T brief \
   --spring.profiles.active=operations \
   --brief.operations.command=REBUILD
 ```

@@ -240,7 +240,8 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 외부 보관소와 운영 DB 전환은 포함하지 않는다.
 
 호스트 실행 권한으로 수신 기록·이상 수신 기록을 조회하거나 전체 재구축을 수행하려면
-[운영 명령과 지표 조회 절차](docs/operations/diagnostics-and-metrics.md)를 따른다. 선택적인
+[운영 명령과 지표 조회 절차](docs/operations/diagnostics-and-metrics.md)를 따른다.
+운영 명령은 결과 JSON과 로그를 분리해 출력한다. 선택적인
 `compose.observability.yml`은 컨테이너 내부 `127.0.0.1:9091`에서 health·Prometheus 지표만
 제공하고 같은 서버의 Prometheus로 수집한다. 별도 계정·API 키는 필요 없다.
 공개·서비스 Caddy 허용 경로는 유지한다.
