@@ -29,3 +29,10 @@ groups:
           severity: warning
         annotations:
           summary: BRIEF의 DB 연결 대기가 2분 이상 지속되고 있습니다.
+      - alert: BriefEventRevisionGap
+        expr: sum(increase(brief_events_received_total{job="brief",outcome="APPLIED_WITH_GAP"}[5m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: BRIEF 이벤트에서 원본 변경 번호의 공백을 탐지했습니다.
