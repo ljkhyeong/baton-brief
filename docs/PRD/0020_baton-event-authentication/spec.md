@@ -83,7 +83,7 @@ PRD-0021의 스테이징 구성은 현재·직전 token 파일을 Compose secret
   Bearer 인증을 켠 상태에서도 성공한다.
 - 비밀 값은 문서, 로그, 응답과 영속 데이터에 노출되지 않는다.
 
-## 비목표
+## 제외 범위
 
 - BRIEF 조회·브리프·재구축 API의 사용자·운영자 권한 모델
 - OAuth2 authorization server, JWT, token introspection, mTLS와 복수 생산자 권한
@@ -93,7 +93,7 @@ PRD-0021의 스테이징 구성은 현재·직전 token 파일을 Compose secret
 
 ## 관련 문서
 
-- [BATON 생산자 호환성 선행조건](../0018_baton-producer-compatibility/spec.md)
+- [BATON 이벤트 연동 조건](../0018_baton-producer-compatibility/spec.md)
 - [BATON 연속성 신호 이벤트 v2](../0019_baton-continuity-event-v2/spec.md)
 - [서비스 간 이벤트 인증 결정](../../ADR/0003_baton-event-authentication/adr.md)
 - [스테이징 실행 계약](../0021_staging-runtime-boundary/spec.md)

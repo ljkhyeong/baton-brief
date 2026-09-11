@@ -72,7 +72,7 @@ Spring MVC 변환과 PRD-0004의 `400 Bad Request`·`ProblemDetail`을 따른다
 - 서비스 인증이 활성화된 환경에서 무인증·이벤트 Bearer는 거부하고 서비스 Bearer는 허용한다.
 - 신뢰한 서비스 HTTPS에서 조회되며 공개 HTTPS에서는 같은 경로가 `404`다.
 
-## 비목표
+## 제외 범위
 
 - BATON 저장소의 사용자 API·client·화면 구현과 교차 서비스 검증
 - `RESOLVED` 요약, 이벤트 종류·기간·주간 필터와 브리프 통계

@@ -1,21 +1,20 @@
 # BATON BRIEF 이벤트 계약 팩
 
-이 디렉터리는 PRD-0019의 BATON 연속성 신호 이벤트 v2 요청 계약을 언어 중립적인
-JSON Schema와 예시로 제공한다. BRIEF 소비자는 `VERSION`의 현재 계약을 사용한다. BATON
-실제 serializer·outbox·송신기는 별도로 고정한 계약 버전과 같은 예시를 사용해야 한다.
+이벤트 v2 요청 형식을 JSON Schema와 예시로 제공한다. BRIEF는 `VERSION`에 명시된 계약을
+사용한다. BATON은 사용할 계약 버전을 고정하고 해당 버전의 예시로 실제 직렬화·outbox·전달 처리를 검증한다.
 
 ## 포함 파일
 
 - `schemas/source-event.v2.schema.json`: `POST /api/v1/events`에 전달하는 이벤트 v2 요청
 - `examples/*.json`: BATON 다섯 신호와 `ROLE_UNASSIGNED`의 심각도 변경·해소 예시
 - `VERSION`: 계약 팩 버전의 단일 기준
-- ZIP에는 [이벤트 v2 소비 계약](../docs/PRD/0019_baton-continuity-event-v2/spec.md)과
+- ZIP에는 [이벤트 v2 수신 계약](../docs/PRD/0019_baton-continuity-event-v2/spec.md)과
   직접 참조하는 [MVP 계약](../docs/PRD/0002_mvp-contract/spec.md),
   [수신 기록 조회](../docs/PRD/0007_event-receipt-query/spec.md),
-  [생산자 선행조건](../docs/PRD/0018_baton-producer-compatibility/spec.md)을 원래 경로로 포함한다.
+  [BATON 이벤트 연동 조건](../docs/PRD/0018_baton-producer-compatibility/spec.md)을 원래 경로로 포함한다.
 
 스키마는 개별 필드 형식과 v2 열거형을 정의한다. 같은 `sourceReference`의 리비전 증가,
-`ACTIVE`·`RESOLVED` 생명주기, 멱등성·충돌·HTTP 결과와 재구축 의미는 PRD-0019가 기준이다.
+`ACTIVE`·`RESOLVED` 상태 변경, 멱등성·충돌·HTTP 응답과 재구축 규칙은 PRD-0019가 기준이다.
 
 Draft 2020-12의 `format`은 기본적으로 주석이므로 계약 검증기는 `format-assertion`을
 활성화해야 한다. UUID와 `date-time`을 실제 제약으로 검사하지 않는 기본 설정만으로 계약

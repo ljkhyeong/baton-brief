@@ -8,10 +8,10 @@
 
 현재 BRIEF는 제품 기능과 PostgreSQL 통합 동작을 검증했지만, 실행 중인 프로세스가 요청을
 처리할 수 있는지 확인하는 관리 경로는 없다. 제품 API를 새로 만들지 않고 Spring Boot
-Actuator의 표준 health 자동 구성을 사용해 최소 상태 확인 경계를 추가한다.
+Actuator의 표준 health 자동 구성으로 애플리케이션과 DB 상태를 확인한다.
 
-이 경로는 BRIEF의 실행 상태만 나타낸다. 이벤트 전달 완전성, 투영 최신성, 브리프 생성
-시각과 다른 BATON 서비스의 가용성을 재판정하지 않는다.
+이 경로는 BRIEF의 실행 상태만 나타낸다. 모든 이벤트를 받았는지, 점검 항목이 최신인지,
+브리프가 언제 생성됐는지, 다른 BATON 서비스가 정상인지는 확인하지 않는다.
 
 ## 구현 수단
 
@@ -64,7 +64,7 @@ Spring Boot 4.1.1은 health만 기본 웹 endpoint로 노출하고 상세를 기
 기본값을 설정에 반복하지 않는다. 반면 health probes의 기본값은 `true`이므로 배포 계약이
 없는 현재 MVP에서는 `management.endpoint.health.probes.enabled=false`를 명시한다.
 
-다음 기본 표면도 이번 계약에 포함하지 않는다.
+다음 관리 경로도 노출하지 않는다.
 
 - 기본 활성화되는 Actuator 링크 탐색 페이지 `/actuator`는 표준 속성으로 끈다.
 - 기본 활성화되는 `/actuator/health/liveness`와 `/actuator/health/readiness` probe 그룹은
@@ -74,7 +74,7 @@ Spring Boot 4.1.1은 health만 기본 웹 endpoint로 노출하고 상세를 기
 Kubernetes나 다른 배포 오케스트레이터를 채택할 때 liveness, readiness, 트래픽 제거와
 외부 의존성 포함 정책을 별도 운영 결정으로 정의한다.
 
-## 호환성과 비목표
+## 호환성과 제외 범위
 
 - 기존 `/api/v1` 요청·응답과 PostgreSQL 스키마를 바꾸지 않는 추가 관리 계약이다.
 - `info`, `metrics`, `prometheus`, `env`, `beans`, `loggers`, `flyway` endpoint를 노출하지

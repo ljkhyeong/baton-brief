@@ -1,4 +1,4 @@
-# PRD-0018: BATON 생산자 호환성 선행조건
+# PRD-0018: BATON 이벤트 연동 조건
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
@@ -49,7 +49,7 @@ BATON의 기존 WATCH transactional outbox는 원본 변경과 같은 트랜잭�
 - `DECISION_FOLLOW_UP_OVERDUE`는 후속 기한·완료 상태의 원본 정보가 생기기 전에는
   생산하지 않는다.
 
-### 2. 안정적인 식별자과 생명주기
+### 2. 고정 식별자와 상태 변경
 
 - `workspaceId`·`seasonId`가 BATON의 어떤 식별자와 정확히 대응하는지 정의한다.
 - 신호 인스턴스마다 재계산과 재시작 뒤에도 같은 `sourceReference`를 재현한다.
@@ -67,7 +67,7 @@ BATON의 기존 WATCH transactional outbox는 원본 변경과 같은 트랜잭�
 
 ### 4. 날짜 변경 시 재계산과 초기 동기화
 
-- 사용자 쓰기 없이 날짜 경계로 발생·해소되는 신호를 찾는 재조정 트리거를 정의한다.
+- 사용자 수정 없이 날짜가 바뀌어 발생·해소되는 신호를 언제 다시 계산할지 정한다.
 - 첫 배포 때 현재 BATON 상태를 신호·리비전에 반영하고, 재시작·실패 뒤
   같은 상태를 중복 효과 없이 다시 계산할 수 있어야 한다.
 - 재조정 기준 시각에는 주입한 `Clock`과 시즌 IANA 시간대를 사용한다.
@@ -102,10 +102,9 @@ BATON은 `PRD-0006: BATON–BRIEF 연속성 신호 생산 계약`에서 다음 �
 - `teamId`를 `workspaceId`로 사용하고, 시즌·신호 종류·역할과 필요한 경우 루틴으로 자연 키를 구성해 영속 `signalId`와 `baton-continuity:<signalId>` 참조를 부여한다.
 - `aggregateRevision`은 전역 outbox 번호나 JPA `@Version`이 아니라 같은 `signalId` 안에서
   `1`부터 연속 증가한다.
-- 원본 변경과 시간 경계 재조정은 같은 신호 계산·저장 경계를 사용하고, 동일 상태에서는
+- 원본 변경과 날짜 변경 시 재계산은 같은 신호 계산·저장 처리를 사용하고, 동일 상태에서는
   새 리비전과 outbox를 만들지 않는다.
-- BRIEF 전용 불변 outbox와 커밋 뒤 최소 한 번 전달을 사용한다. BATON 생산자는 이벤트 v2
-  소비 계약을 선행한 이 경계를 따라야 한다.
+- BRIEF 전용 불변 outbox와 커밋 뒤 최소 한 번 전달을 사용한다. BATON은 위 조건과 이벤트 v2 수신 계약을 따른다.
 
 BRIEF는 `contracts/VERSION`을 기준으로 이벤트 v2 JSON Schema와 예시를 제공하고, 같은
 예시를 소비자 통합 시나리오에서 검증한다. 이 파일은 소비자 소유 계약
@@ -130,7 +129,7 @@ BRIEF는 `contracts/VERSION`을 기준으로 이벤트 v2 JSON Schema와 예시�
 - `contracts/VERSION`에 기록된 계약 버전의 실제 serializer와 원격 종단 간 검증을 마치기
   전에는 README·HANDOFF와 배포 문서에서 안정 버전 연동 완료로 표시하지 않는다.
 
-## 명시적 비목표
+## 제외 범위
 
 - 이번 BRIEF 저장소 변경에서 BATON 생산자 코드·스키마를 수정하는 작업
 - 현재 불일치를 이름 변환표만으로 해결하는 임시 adapter

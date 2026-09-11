@@ -6,14 +6,14 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 계약·구조 결정은 [문서 색인](docs/README.md), 계약 버전은 [VERSION](contracts/VERSION)을 따른다.
 현재 마이그레이션은 V9이며 계약 팩은 원격 호환 검증 전인 RC 상태다.
 
-2026-09-08 BRIEF 기능·운영·문구 개선을 원격 `main`의 `a4eb076`에 병합했다.
+2026-09-08 조회 코드·수신 경보·인증 개선을 원격 `main`의 `5b7d880`에 병합했다(PR #14).
 조회 매개변수·수신 경보·토큰 캐시 정리의 구현 기준은 `7e1a054`다.
 BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
 이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
 공개 이벤트 수신 주소는 `brief.b4ton.com`으로 설정했지만 서버는 미구축이다.
 DNS 연결·공인 인증서 발급·원격 배포는 실행하지 않았다.
-다음 배포 입력은 서버 위치·접속 방법·실제 IP다. 추가 이용료 없는 자체 Prometheus와
+배포에 필요한 정보는 서버 위치·접속 방법·실제 IP다. 추가 이용료 없는 자체 Prometheus와
 PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치와 외부 경보 수신처는 미정이다.
 
 ## 재사용할 검증 근거
@@ -26,6 +26,7 @@ PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치�
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `9d6e9f2` 운영 안내·경보 문구, 2026-09-12 | `:bootstrap:test`에서 `BriefOperationsConfigurationTest` 1건과 `contractsZip` 성공. Prometheus 경보 시나리오 8개 통과. 계약 ZIP의 문서 5개·내부 링크 8개 확인 | 오류·경보 문자열만 변경. 검증 조건·경보 규칙·API·실행 예시는 유지. 문서 로컬 링크 177개 확인. 전체 테스트·JAR 생성·배포는 문구 수정 범위에서 제외 |
 | BRIEF `7e1a054` 수신 지표·인증, 2026-09-08 | `:bootstrap:test`에서 `BriefEventMetricsTest`·`BriefSecurityConfigurationTest`·`BriefServiceApiSecurityIntegrationTest`와 `BriefMvpIntegrationTest`의 수신·Bearer·상태 확인 3건을 선택해 총 7건 통과(11초). JDK 21.0.10·PostgreSQL 18.6. Prometheus 3.14.0의 `promtool check config`·`test rules`로 규칙 3개·시나리오 8개 통과 | 카운터 초기 등록·첫 충돌/미지원 증가·수집 대상 누락과 복구·정상 결과 제외·카운터 초기화 확인. 토큰 검증·교체 유지. 실패·제외 없음. 단일 웹 어댑터와 경보 규칙 변경으로 전체 테스트·JAR 생성·컨테이너 재기동·계약 ZIP 재생성은 생략. 외부 알림은 미연결 |
 | BRIEF `f2000ae` 조회 매개변수, 2026-09-08 | `:bootstrap:test`의 `BriefMvpIntegrationTest`에서 조회 관련 7건 선택 실행·통과(8초). 이상 수신 기록·목록 필터·상태 이력·브리프 이력·주간 해소·DST·NBSP 참조 확인. JDK 21.0.10·PostgreSQL 18.6 | JDBC 조회 5곳의 수동 가변 맵을 제거하고 SQL·선택 조건·정렬·페이지 계산 유지. 실패·제외 없음. 단일 어댑터 변경으로 전체 테스트·JAR 생성·스테이징 재기동·계약 ZIP 재생성은 생략 |
 | BRIEF `c1e68a1` 오류 문구, 2026-09-08 | `:bootstrap:test` 선택 4건과 `contractsZip` 성공. 수신 조회·이벤트 입력 형식·브리프 조회·비교 오류 확인. 백업 경로 안내·문서 링크 163개·ZIP 내 문서 5개 확인 | 코드 변경은 안내 문자열에 한정. API 필드·상태 코드·검증 조건 유지. 전체 테스트·JAR 생성·컨테이너 재기동은 문구 변경 범위에서 제외 |

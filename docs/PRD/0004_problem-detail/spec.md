@@ -63,7 +63,7 @@ Spring Boot 표준 속성 `spring.mvc.problemdetails.enabled=true`를 사용한�
 - `spring.web.error.include-message`, `include-binding-errors`, `include-exception`,
   `include-stacktrace`를 활성화하지 않는다.
 
-## 호환성과 비목표
+## 호환성과 제외 범위
 
 - 기존 요청 오류의 HTTP 상태는 바꾸지 않고 오류 표현만 표준화한다.
 - 계약에 없는 JSON 필드를 보내던 요청은 더 이상 해당 필드를 조용히 무시하지 않고

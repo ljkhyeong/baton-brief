@@ -11,7 +11,7 @@ Docker 실행 권한으로만 실행한다. 실행자, 대상 환경·이미지 
 HTTP 서버를 열지 않고 Flyway를 실행하지 않는다. 애플리케이션 배포로 마이그레이션을 완료한
 뒤 실행하며 조회·재구축은 현재 DB 스키마에 맞는 이미지를 사용한다.
 
-## 수신 기록과 이상 이력
+## 수신 기록 단건·이상 기록 조회
 
 ```shell
 docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps brief \
@@ -48,8 +48,9 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
   --brief.operations.command=REBUILD
 ```
 
-성공하면 `receiptCount`, `itemCount`를 출력하고 종료한다. 기존 전역 잠금·한 트랜잭션을
-사용하며 실패 시 이전 투영으로 롤백한다. 수신 기록과 기존 브리프는 보존한다.
+성공하면 처리한 수신 기록 수(`receiptCount`)와 점검 항목 수(`itemCount`)를 출력하고 종료한다.
+전역 잠금과 한 트랜잭션을 사용하며, 실패하면 재구축 전의 점검 항목으로 롤백한다.
+수신 기록과 기존 브리프는 보존한다.
 
 ## 추가 이용료 없는 지표 수집
 

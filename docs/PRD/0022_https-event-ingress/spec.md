@@ -85,7 +85,7 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
   capability를 제거한 뒤 `NET_BIND_SERVICE`만 보유한다.
 - 검증용 컨테이너·네트워크·볼륨, 내부 CA와 임시 비밀 파일은 검증 뒤 제거한다.
 
-## 비목표
+## 제외 범위
 
 - 실제 공인 DNS 연결, 방화벽 변경과 ACME 인증서 발급 성공
 - 실제 BATON 스테이징 호스트에서 Caddy HTTPS origin으로 보내는 종단 간 전달

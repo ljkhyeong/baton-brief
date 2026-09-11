@@ -45,7 +45,7 @@ surrogate를 거부한다. 조회를 위해 원본 참조를 정규화하거나 
 - 최초 수신 결과가 `APPLIED` 또는 `APPLIED_WITH_GAP`인 기록만 전이로 반환한다.
 - 투영을 바꾸지 않은 `STALE`·`UNSUPPORTED`, 동일 재전달과 충돌 요청은 포함하지 않는다.
 - 원본 상태 순서인 `aggregateRevision` 내림차순으로 정렬한다.
-- `beforeAggregateRevision`은 배타 커서다. `limit + 1`로 다음 페이지를 판단하고 전체 개수는
+- `beforeAggregateRevision`보다 작은 리비전부터 조회한다. `limit + 1`로 다음 페이지를 판단하고 전체 개수는
   조회하지 않는다.
 
 같은 복합 식별자에서 실제 적용된 리비전은 단조 증가하므로 새 전이는 첫 페이지 앞에
@@ -99,7 +99,7 @@ BATON은 응답 필드를 중계하도록 갱신하고, 기존 필드 거부 정
 - 조회는 수신 기록, 현재 투영과 브리프를 변경하지 않는다.
 - v1의 `null`, v2의 `CRITICAL → WARNING`과 해소 이력이 재구축 전후 그대로 유지된다.
 
-## 명시적 비목표
+## 제외 범위
 
 - 규칙 버전별 과거 `AttentionItem` 전체 스냅샷과 당시 심각도 재계산
 - 현재 항목의 누적 `revisionGap`을 각 과거 전이에 역산

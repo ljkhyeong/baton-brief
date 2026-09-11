@@ -1,4 +1,4 @@
-# PRD-0019: BATON 연속성 신호 이벤트 v2 소비 계약
+# PRD-0019: BATON 연속성 신호 이벤트 v2 수신 계약
 
 - 상태: 채택됨
 - 결정일: 2026-08-22
@@ -64,7 +64,7 @@ v2의 `reasonCode`는 수신한 다섯 `eventType` 중 하나이며 v1과 동일
 
 ## 수신 기록과 재생
 
-PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를 같은 안전한 최초
+PRD-0007 단건과 PRD-0011 이상 수신 기록 응답은 nullable `sourceSeverity`를 같은 안전한 최초
 수신 필드로 반환한다. fingerprint와 원문은 계속 노출하지 않는다.
 
 재구축은 `UNSUPPORTED`를 제외한 v1·v2 수신 기록을 `ingestion_sequence` 순서로 읽으며
@@ -128,7 +128,7 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
   PRD-0002·0007·0018이 포함되며, 포함 문서의 상대 링크 대상이 ZIP 안에 존재한다.
 - 전체 테스트와 실행 JAR 생성이 성공한다.
 
-## 명시적 비목표
+## 제외 범위
 
 - 이 BRIEF 저장소에서 BATON 원본 변경 경로와 outbox 송신기를 구현하는 작업
 - 실제 생산자 serializer와 종단 간 전달 성공 주장
@@ -141,6 +141,6 @@ PRD-0007 단건과 PRD-0011 이상 이력 응답은 nullable `sourceSeverity`를
 
 - [MVP 이벤트·투영·브리프 계약](../0002_mvp-contract/spec.md)
 - [이벤트 수신 기록 조회](../0007_event-receipt-query/spec.md)
-- [BATON 생산자 호환성 선행조건](../0018_baton-producer-compatibility/spec.md)
+- [BATON 이벤트 연동 조건](../0018_baton-producer-compatibility/spec.md)
 - [이벤트 계약 팩](../../../contracts/README.md)
 - BATON `PRD-0006: BATON–BRIEF 연속성 신호 생산 계약`

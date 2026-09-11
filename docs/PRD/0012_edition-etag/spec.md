@@ -74,7 +74,7 @@ Spring MVC가 `ResponseEntity`의 `ETag`를 사용해 표준 조건부 요청을
   `304 Not Modified`를 반환한다.
 - 기존 생성 상태, `Location`, 전체 브리프 본문과 미존재 `404` 의미가 유지된다.
 
-## 명시적 비목표
+## 제외 범위
 
 - `Cache-Control` TTL, `Expires`, 브라우저·CDN·공유 캐시 운영 정책
 - 응답 본문 전체의 별도 SHA-256 계산과 캐시 검증자 저장
