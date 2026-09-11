@@ -54,7 +54,7 @@
 
 | 문서 | 상태 | 내용 |
 | --- | --- | --- |
-| [PRD-0003 브리프 이력](PRD/0003_edition-history/spec.md) | 채택됨 | 지정한 `generation`보다 이전인 브리프 이력 조회 |
+| [PRD-0003 브리프 이력](PRD/0003_edition-history/spec.md) | 채택됨 | 전체·주간 이력 필터와 생성 번호 커서 조회 |
 | [PRD-0005 브리프 비교](PRD/0005_edition-comparison/spec.md) | 채택됨 | 추가·제거·변경과 기준·대상 순서 |
 | [PRD-0009 주간 범위 최신](PRD/0009_weekly-latest-edition/spec.md) | 채택됨 | 주간·시간대가 일치하는 최신 저장 브리프 |
 | [PRD-0010 브리프 리비전 근거](PRD/0010_edition-revision-evidence/spec.md) | 채택됨 | 집계 리비전·공백 고정과 이전 항목 `null` 호환성 |
