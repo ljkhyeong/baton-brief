@@ -21,4 +21,4 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: 'BRIEF 이벤트 수신에서 {{ $labels.outcome }} 결과가 발생했습니다.'
+          summary: 'BRIEF 이벤트 수신 거부: {{ $labels.outcome }}'

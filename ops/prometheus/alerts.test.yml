@@ -92,12 +92,12 @@ tests:
               outcome: CONFLICT
               severity: warning
             exp_annotations:
-              summary: BRIEF 이벤트 수신에서 CONFLICT 결과가 발생했습니다.
+              summary: 'BRIEF 이벤트 수신 거부: CONFLICT'
           - exp_labels:
               outcome: UNSUPPORTED
               severity: warning
             exp_annotations:
-              summary: BRIEF 이벤트 수신에서 UNSUPPORTED 결과가 발생했습니다.
+              summary: 'BRIEF 이벤트 수신 거부: UNSUPPORTED'
       - eval_time: 7m
         alertname: BriefEventRejected
         exp_alerts: []

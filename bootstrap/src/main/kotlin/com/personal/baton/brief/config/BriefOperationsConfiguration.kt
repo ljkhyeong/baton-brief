@@ -56,8 +56,8 @@ class BriefOperationsConfiguration {
                         "before-ingestion-sequence는 양수여야 합니다"
                     }
                     brief.findEventReceiptAnomalies(
-                        requireNotNull(properties.workspaceId) { "이상 이력 조회에는 workspace-id가 필요합니다" },
-                        requireNotNull(properties.seasonId) { "이상 이력 조회에는 season-id가 필요합니다" },
+                        requireNotNull(properties.workspaceId) { "이상 수신 기록 조회에는 workspace-id가 필요합니다" },
+                        requireNotNull(properties.seasonId) { "이상 수신 기록 조회에는 season-id가 필요합니다" },
                         properties.beforeIngestionSequence,
                         properties.limit,
                     )
