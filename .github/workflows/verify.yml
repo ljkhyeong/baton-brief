@@ -49,6 +49,7 @@ jobs:
             --volume "$PWD/ops/prometheus:/etc/prometheus:ro" --workdir /etc/prometheus \
             "$prometheus_image" test rules alerts.test.yml
           bash -n ops/backup-postgresql.sh
+          bash -n ops/verify-postgresql-backup.sh
 
       - name: 스테이징 PostgreSQL 이미지 확인
         run: >-
