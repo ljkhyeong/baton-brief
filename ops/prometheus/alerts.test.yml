@@ -129,3 +129,53 @@ tests:
       - eval_time: 5m
         alertname: BriefEventRejected
         exp_alerts: []
+  - name: DB 연결 대기가 지속되면 풀별로 경보하고 대기가 끝나면 해제한다
+    interval: 30s
+    input_series:
+      - series: 'hikaricp_connections_pending{job="brief",instance="127.0.0.1:9091",pool="HikariPool-1"}'
+        values: '1x4 0x2'
+      - series: 'hikaricp_connections_pending{job="brief",instance="127.0.0.1:9091",pool="HikariPool-2"}'
+        values: '0x6'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts:
+          - exp_labels:
+              job: brief
+              instance: 127.0.0.1:9091
+              pool: HikariPool-1
+              severity: warning
+            exp_annotations:
+              summary: BRIEF의 DB 연결 대기가 2분 이상 지속되고 있습니다.
+      - eval_time: 2m30s
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+  - name: 짧거나 간헐적인 DB 대기와 다른 서비스의 대기로는 경보하지 않는다
+    interval: 30s
+    input_series:
+      - series: 'hikaricp_connections_pending{job="brief",pool="HikariPool-1"}'
+        values: '1x2 0 1x2 0 1x2 0'
+      - series: 'hikaricp_connections_pending{job="other",pool="HikariPool-1"}'
+        values: '1x12'
+      - series: 'hikaricp_connections_active{job="brief",pool="HikariPool-2"}'
+        values: '10x12'
+      - series: 'hikaricp_connections_max{job="brief",pool="HikariPool-2"}'
+        values: '10x12'
+      - series: 'hikaricp_connections_pending{job="brief",pool="HikariPool-2"}'
+        values: '0x12'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []

@@ -22,3 +22,10 @@ groups:
           severity: warning
         annotations:
           summary: 'BRIEF 이벤트 수신 거부: {{ $labels.outcome }}'
+      - alert: BriefDatabaseConnectionWait
+        expr: hikaricp_connections_pending{job="brief"} > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: BRIEF의 DB 연결 대기가 2분 이상 지속되고 있습니다.
