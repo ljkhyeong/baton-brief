@@ -58,7 +58,8 @@ BATON 화면은 조회 중 선택한 조건을 유지하며, 선택한 브리프
 
 - `(workspaceId, seasonId, eventType, sourceReference)`를 복합 식별자로 사용한다.
 - 현재 단건과 `ACTIVE`·`RESOLVED` 상태별 키셋 목록을 조회하고,
-  [심각도·리비전 공백 필터](docs/PRD/0028_attention-item-filters/spec.md)로 목록을 좁힌다.
+  [업무 종류·심각도·리비전 공백 필터](docs/PRD/0028_attention-item-filters/spec.md)로 목록을 좁힌다.
+  예: `?eventType=ROLE_UNASSIGNED&severity=HIGH`는 심각도가 높은 역할 미배정 항목만 조회한다.
 - 작업공간·시즌별 활성 `HIGH`·`MEDIUM` 개수와 리비전 공백이 기록된 활성 항목 수를
   [요약 API](docs/PRD/0027_attention-item-summary/spec.md)로 조회한다.
 - [주간 해소 요약](docs/PRD/0030_weekly-resolution-summary/spec.md)은 해당 주에 해소된 뒤 현재도
