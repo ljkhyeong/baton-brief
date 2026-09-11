@@ -195,6 +195,7 @@ interface BriefQueries {
         workspaceId: UUID,
         seasonId: UUID,
         status: SourceEventState,
+        eventType: SourceEventType?,
         severity: Severity?,
         revisionGap: Boolean?,
         after: AttentionItemCursor?,

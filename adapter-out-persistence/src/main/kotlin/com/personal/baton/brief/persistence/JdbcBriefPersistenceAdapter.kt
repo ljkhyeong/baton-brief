@@ -184,12 +184,16 @@ class JdbcBriefPersistenceAdapter(
         workspaceId: UUID,
         seasonId: UUID,
         status: SourceEventState,
+        eventType: SourceEventType?,
         severity: Severity?,
         revisionGap: Boolean?,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage {
         val additionalConditions = buildList {
+            if (eventType != null) {
+                add("AND event_type = :eventType")
+            }
             if (after != null) {
                 add("AND (event_type, source_reference) > (:afterEventType, :afterSourceReference)")
             }
@@ -214,6 +218,7 @@ class JdbcBriefPersistenceAdapter(
         ).param("workspaceId", workspaceId)
             .param("seasonId", seasonId)
             .param("status", status.name)
+            .param("eventType", eventType?.name)
             .param("severity", severity?.name)
             .param("revisionGap", revisionGap)
             .param("afterEventType", after?.eventType?.name)

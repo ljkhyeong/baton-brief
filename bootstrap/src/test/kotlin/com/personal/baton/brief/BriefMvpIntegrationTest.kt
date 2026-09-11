@@ -593,11 +593,101 @@ class BriefMvpIntegrationTest(
                 .param("afterEventType", "HANDOFF_BLOCKED"),
         ).andExpect(status().isBadRequest)
 
-        mapOf("severity" to "UNKNOWN", "revisionGap" to "invalid").forEach { (name, value) ->
+        mapOf("eventType" to "UNKNOWN", "severity" to "UNKNOWN", "revisionGap" to "invalid").forEach { (name, value) ->
             mockMvc.perform(get(attentionItemsPath).param(name, value))
                 .andExpect(status().isBadRequest)
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
         }
+    }
+
+    @Test
+    fun `업무 종류 필터는 기존 조건과 페이지 및 상태 변경에 적용된다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000001"
+        val seasonId = "20000000-0000-0000-0000-000000000001"
+        seedCurrentAttentionScenario(workspaceId, seasonId)
+        listOf(
+            Triple("role:1", 3L, "CRITICAL"),
+            Triple("role:2", 3L, "CRITICAL"),
+            Triple("role:3", 3L, "WARNING"),
+            Triple("role:4", 1L, "CRITICAL"),
+        ).forEach { (reference, revision, severity) ->
+            postEvent(eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, reference, revision,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = severity,
+            ))
+        }
+        listOf(
+            UUID.randomUUID().toString() to seasonId,
+            workspaceId to UUID.randomUUID().toString(),
+        ).forEach { (otherWorkspace, otherSeason) ->
+            postEvent(eventJson(
+                UUID.randomUUID().toString(), otherWorkspace, otherSeason, "role:0", 3,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
+            ))
+        }
+
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        mockMvc.perform(get(path).param("eventType", "ROLE_UNASSIGNED"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:1", "role:2", "role:3", "role:4")))
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("afterEventType", "HANDOFF_BLOCKED").param("afterSourceReference", "handoff:1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:1", "role:2", "role:3", "role:4")))
+        mockMvc.perform(get(path).param("eventType", "HANDOFF_BLOCKED"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("handoff:1")))
+        mockMvc.perform(get(path).param("eventType", "ROLE_SUCCESSOR_MISSING"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("severity", "HIGH").param("revisionGap", "true").param("limit", "1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:1")))
+            .andExpect(jsonPath("$.nextCursor.eventType").value("ROLE_UNASSIGNED"))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("role:1"))
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("severity", "HIGH").param("revisionGap", "true").param("limit", "1")
+                .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "role:1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:2")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("severity", "HIGH").param("revisionGap", "true")
+                .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "role:2"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+
+        postEvent(eventJson(
+            UUID.randomUUID().toString(), workspaceId, seasonId, "role:1", 4,
+            state = "RESOLVED", type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
+        ))
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("severity", "HIGH").param("revisionGap", "true"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:2")))
+        val resolved = mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED").param("status", "RESOLVED")
+                .param("severity", "HIGH").param("revisionGap", "true"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:1")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+            .andReturn().response.contentAsString
+
+        mockMvc.perform(post("/api/v1/projections/rebuild")).andExpect(status().isOk)
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED").param("status", "RESOLVED")
+                .param("severity", "HIGH").param("revisionGap", "true"),
+        ).andExpect(status().isOk)
+            .andExpect(content().json(resolved))
     }
 
     @Test
