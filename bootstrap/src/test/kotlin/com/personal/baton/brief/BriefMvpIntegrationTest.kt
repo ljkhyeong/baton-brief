@@ -2414,7 +2414,7 @@ class BriefMvpIntegrationTest(
                 sourceSeverity = if (type == "ROLE_UNASSIGNED") "WARNING" else null,
             )).andExpect(status().isAccepted)
         }
-        listOf("a" to "ROLE_UNASSIGNED", "b" to "ROLE_UNASSIGNED", "a" to "HANDOFF_BLOCKED").forEach { (ref, type) ->
+        listOf("b" to "ROLE_UNASSIGNED", "a" to "ROLE_UNASSIGNED", "a" to "HANDOFF_BLOCKED").forEach { (ref, type) ->
             deliver(ref, 1, "ACTIVE", type)
             deliver(ref, 2, "RESOLVED", type)
         }
@@ -2433,7 +2433,22 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(request())
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.resolvedCount").value(3))
-            .andExpect(jsonPath("$.items.length()").value(3))
+            .andExpect(jsonPath("$.items[*].reasonCode").value(contains("HANDOFF_BLOCKED", "ROLE_UNASSIGNED", "ROLE_UNASSIGNED")))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("a", "a", "b")))
+        mockMvc.perform(request().param("limit", "2"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(3))
+            .andExpect(jsonPath("$.items[*].reasonCode").value(contains("HANDOFF_BLOCKED", "ROLE_UNASSIGNED")))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("a", "a")))
+            .andExpect(jsonPath("$.nextCursor.eventType").value("ROLE_UNASSIGNED"))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("a"))
+        mockMvc.perform(request().param("limit", "2")
+            .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "a"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(3))
+            .andExpect(jsonPath("$.items[*].reasonCode").value(contains("ROLE_UNASSIGNED")))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("b")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
         mockMvc.perform(request("ROLE_UNASSIGNED").param("limit", "1"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.resolvedCount").value(2))

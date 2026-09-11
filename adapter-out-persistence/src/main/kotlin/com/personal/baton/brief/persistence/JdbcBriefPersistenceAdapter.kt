@@ -311,6 +311,7 @@ class JdbcBriefPersistenceAdapter(
               ORDER BY reason_code, source_reference
               LIMIT :fetchLimit
           ) page ON TRUE
+         ORDER BY page.reason_code, page.source_reference
             """.trimIndent(),
         ).param("workspaceId", workspaceId)
             .param("seasonId", seasonId)
