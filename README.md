@@ -13,7 +13,7 @@ Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.6 기반의 로컬 MVP를 구현
 - 월요일 기준 주간 브리프 생성·조회·이력·비교
 - 표준 오류 응답(`ProblemDetail`)과 애플리케이션·DB 상태 확인
 - 이벤트 수신 지표와 선택적 Prometheus의 수집 실패·서버 오류·이벤트 거부·DB 연결 대기 경보. 외부 알림은 미연결
-- PostgreSQL 기본 도구를 사용한 백업과 Linux 정기 실행 예시
+- PostgreSQL 백업·격리 복원 확인과 Linux 정기 실행 예시
 - BATON 전용 Bearer와 파일 기반 비밀을 사용하는 스테이징 컨테이너
 - 선택적 Caddy HTTPS 프록시: 이벤트 수신 경로만 공개
 - BATON 백엔드용 비공개 HTTPS 조회·생성 API와 별도 Bearer 인증
@@ -235,6 +235,7 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 
 백업과 빈 DB 복원은 [PostgreSQL 백업·복원 절차](docs/operations/postgresql-backup-restore.md)를
 따른다. 추가 이용료 없이 기존 서버에서 실행하며 Linux 정기 백업 타이머를 제공한다.
+`ops/verify-postgresql-backup.sh`로 백업 파일을 임시 DB에 복원해 확인할 수 있다.
 외부 보관소와 운영 DB 전환은 포함하지 않는다.
 
 호스트 실행 권한으로 수신 기록·이상 수신 기록을 조회하거나 전체 재구축을 수행하려면

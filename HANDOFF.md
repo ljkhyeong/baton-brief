@@ -14,7 +14,7 @@ BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함
 공개 이벤트 수신 주소는 `brief.b4ton.com`으로 설정했지만 서버는 미구축이다.
 DNS 연결·공인 인증서 발급·원격 배포는 실행하지 않았다.
 배포에 필요한 정보는 서버 위치·접속 방법·실제 IP다. 추가 이용료 없는 자체 Prometheus와
-PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치와 외부 경보 수신처는 미정이다.
+PostgreSQL 백업·격리 복원 확인·Linux 타이머 예시를 준비했다. 실제 서버 설치와 외부 경보 수신처는 미정이다.
 
 ## 재사용할 검증 근거
 
@@ -31,7 +31,7 @@ PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치�
 | BRIEF `943ddac` 비교 조건부 조회, 2026-09-12 | `:bootstrap:test`에서 `BriefMvpIntegrationTest`의 비교 1건과 `BriefServiceApiSecurityIntegrationTest` 1건 통과(16초). JDK 21.0.10·PostgreSQL 18.6. 로그 `/tmp/brief-comparison-etag-20260912.log` | 동일 비교 `304`, 기준·대상·방향 변경 `200`, 재구축 후 불변성, 인증·범위·미존재 오류 확인. 웹 비교 응답만 변경해 그 외 범위는 `42b744f`의 `test :bootstrap:bootJar` 성공(bootstrap 38건·도메인 6건 재사용) 근거를 유지한다. 이전 전체 로그는 `/tmp/brief-summary-filter-20260912.log`. 실패·제외 없음. 이번 전체 테스트·JAR 생성은 생략했으며 기존 JAR는 `42b744f` 기준이다. BATON 연결·원격 배포는 미실행, 계약 ZIP 입력은 변경 없음 |
 | BRIEF `c1e68a1` 오류 문구, 2026-09-08 | `:bootstrap:test` 선택 4건과 `contractsZip` 성공. 수신 조회·이벤트 입력 형식·브리프 조회·비교 오류 확인. 백업 경로 안내·문서 링크 163개·ZIP 내 문서 5개 확인 | 코드 변경은 안내 문자열에 한정. API 필드·상태 코드·검증 조건 유지. 전체 테스트·JAR 생성·컨테이너 재기동은 문구 변경 범위에서 제외 |
 | BRIEF `f2f34ab` 지표 수집, 2026-09-07 | `docker build --tag baton-brief:no-fee-verify .`, Compose 설정·격리 기동, Prometheus 3.14.0 `promtool check config`·`test rules` 4개 시나리오 성공. 실제 수집·경보 API·비루트·읽기 전용·비공개 네트워크·파일 Bearer·비밀 로그 비노출 확인 | Docker Compose 5.5.0·PostgreSQL 18.6. 원격 배포·외부 알림은 미실행. 제품 소스·의존성은 `5e7cd53`과 같아 아래 Gradle 결과 재사용 |
-| BRIEF `f2f34ab` 백업, 2026-09-07 | `bash ops/backup-postgresql.sh`의 파일 권한·실패한 임시 파일 제거·기존 백업 보존 확인. 별도 빈 PostgreSQL에 복원해 Flyway 포함 6개 테이블 일치 | 계약 예시 1건 기준. Linux 타이머 설치·대용량·외부 보관·서버 장애 복구는 미실행 |
+| BRIEF `93345fc` 백업 복원 확인, 2026-09-12 | 두 백업 스크립트의 `bash -n` 성공. `BRIEF_BACKUP_FILE=… bash ops/verify-postgresql-backup.sh`를 PostgreSQL 18.6에서 실행해 정상 복원, 목차만 읽히는 손상 파일·외래 키 오류의 실패, 잘못된 경로 거부 확인. 공백 경로·`0600` 권한·원본 보존, 비루트·네트워크/포트 비공개, 임시 컨테이너·볼륨 정리 확인. 로그 `/tmp/brief-backup-verify-20260912.log` | 대표 테이블 2개·행 20,001개 기준. 백업 생성은 변경 없어 `f2f34ab`의 권한·실패 파일 정리·기존 백업 보존·Flyway 포함 6개 테이블 복원 근거 유지. 앱·계약·DB 스키마 변경이 없어 Gradle·JAR·계약 ZIP 검증 제외. Linux 타이머 설치·대용량·외부 보관·서버 장애 복구는 미실행 |
 | BRIEF `5e7cd53` 조회 위임 정리, 2026-09-05 | `./gradlew test :bootstrap:bootJar` 성공. `bootstrap` 35건 실행·통과, 도메인 6건 기존 결과 재사용. 실패·제외 없음. JDK 21·PostgreSQL 18.6 | 동일한 조회 10개의 선언을 `BriefQueries`에 모으고 서비스의 단순 전달을 Kotlin 위임으로 대체. 기존 RowMapper 교체를 포함해 조회·페이지·인증·재구축·계약 검증. 원격·교차 서비스 검증은 미실행 |
 | BATON `1916d8c8` | `build checkApiContract`, 후속 계약 문서 수정의 `generateApiContract checkApiContract`, 최종 프런트 빌드 성공 | 병합한 코드·API 계약·프런트 빌드. 원격 배포 근거는 아님 |
 | BATON 병합 중 전체 브라우저 실행 | API 대역 환경에서 614건 통과·기존 조건에 따라 43건 제외 | 이후 열람자 제한 보완이 있어 최종 코드 전체 재실행 결과는 아님 |
