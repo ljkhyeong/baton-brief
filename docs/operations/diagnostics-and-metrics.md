@@ -98,10 +98,17 @@ docker compose --env-file .env.staging -f compose.staging.yml -f compose.observa
 | `BriefServerErrors` | 최근 5분의 HTTP `5xx` 발생 건수가 5건 이상인 상태가 1분간 지속 |
 | `BriefEventRejected` | 최근 5분의 `CONFLICT` 또는 `UNSUPPORTED` 카운터 증가가 감지된 상태가 1분간 지속 |
 | `BriefDatabaseConnectionWait` | DB 연결을 기다리는 요청이 있는 상태가 연결 풀별로 2분간 지속 |
+| `BriefEventRevisionGap` | 최근 5분의 `APPLIED_WITH_GAP` 카운터 증가가 감지된 상태가 1분간 지속 |
 
 이벤트 거부 경보는 `outcome`으로 충돌과 미지원을 구분한다. HTTP `409`·`422`도 확인할 수
 있으며, BATON의 이벤트 버전·본문과 BRIEF 수신 기록을 조사한다. 정상 적용·중복·오래된 리비전은
 이 경보에 포함하지 않는다. 최근 5분에 증가가 없으면 해제되며 미해결 오류 목록을 뜻하지 않는다.
+
+변경 번호 공백 경보는 HTTP `202`로 적용한 이벤트 중 앞선 원본 변경 번호를 받지 못한 경우를 알린다.
+이상 수신 기록의 `APPLIED_WITH_GAP`과 BATON의 outbox 전달 상태를 확인해 전달 지연·역순 도착·누락을
+구분한다. 경보 자체에는 작업공간이나 원본 참조를 넣지 않는다.
+최근 5분에 새 공백 탐지가 없으면 경보가 해제된다. 이미 기록된 공백이 해소됐거나 모든 이벤트가
+전달됐다는 뜻은 아니며, 재구축으로 누락된 이벤트를 복구할 수도 없다.
 
 DB 연결 대기는 기본 HikariCP 지표인 `hikaricp_connections_pending`으로 확인한다.
 경보의 `instance`·`pool`로 대기 중인 연결 풀을 찾고, DB 상태·장기 쿼리·잠금을 확인한다.
@@ -114,7 +121,7 @@ DB 연결 대기는 기본 HikariCP 지표인 `hikaricp_connections_pending`으�
 
 `brief_events_received_total{outcome="..."}`은 결과별 요청 수이며 고유 이벤트 수가 아니다.
 기동 시 여섯 결과를 `0`으로 등록한다. 재시작 초기화·수집 실패·업무 이벤트 없음은
-서로 다르게 다뤄야 한다. `CONFLICT`·`UNSUPPORTED` 증가와 HTTP 인증 실패·`5xx`·지연을
+서로 다르게 다뤄야 한다. `CONFLICT`·`UNSUPPORTED`·`APPLIED_WITH_GAP` 증가와 HTTP 인증 실패·`5xx`·지연을
 운영 조사 근거로 수집한다. 경보 주기·임계값은 실제 트래픽과 운영 목표에 맞춰 설정한다.
 
 BATON 호스트에서는 기존 `ops/check-integration-delivery.sh`로 영구 실패·만료된 처리 임대·
