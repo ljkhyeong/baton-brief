@@ -97,10 +97,16 @@ docker compose --env-file .env.staging -f compose.staging.yml -f compose.observa
 | `BriefMetricsUnavailable` | 수집 실패 또는 `brief` 수집 대상 지표 누락이 2분간 지속 |
 | `BriefServerErrors` | 최근 5분의 HTTP `5xx` 발생 건수가 5건 이상인 상태가 1분간 지속 |
 | `BriefEventRejected` | 최근 5분의 `CONFLICT` 또는 `UNSUPPORTED` 카운터 증가가 감지된 상태가 1분간 지속 |
+| `BriefDatabaseConnectionWait` | DB 연결을 기다리는 요청이 있는 상태가 연결 풀별로 2분간 지속 |
 
 이벤트 거부 경보는 `outcome`으로 충돌과 미지원을 구분한다. HTTP `409`·`422`도 확인할 수
 있으며, BATON의 이벤트 버전·본문과 BRIEF 수신 기록을 조사한다. 정상 적용·중복·오래된 리비전은
 이 경보에 포함하지 않는다. 최근 5분에 증가가 없으면 해제되며 미해결 오류 목록을 뜻하지 않는다.
+
+DB 연결 대기는 기본 HikariCP 지표인 `hikaricp_connections_pending`으로 확인한다.
+경보의 `instance`·`pool`로 대기 중인 연결 풀을 찾고, DB 상태·장기 쿼리·잠금을 확인한다.
+연결이 모두 사용 중이어도 대기 요청이 없으면 경보하지 않으며, 대기가 없어지면 해제한다.
+이 값만으로 원인을 DB 장애나 연결 수 부족으로 단정하지 않는다.
 
 수집 시작 전의 오류나 수집 사이에 프로세스가 재시작되며 사라진 오류는 놓칠 수 있다.
 외부 알림 발송은 미연결이며, 같은 서버의 Prometheus로 서버 전체 장애를 감지할 수는 없다.
