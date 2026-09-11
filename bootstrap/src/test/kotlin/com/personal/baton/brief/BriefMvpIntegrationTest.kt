@@ -601,7 +601,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `업무 종류 필터는 기존 조건과 페이지 및 상태 변경에 적용된다`() {
+    fun `업무 종류 필터는 목록과 요약 및 상태 변경에 적용된다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000001"
         val seasonId = "20000000-0000-0000-0000-000000000001"
         seedCurrentAttentionScenario(workspaceId, seasonId)
@@ -627,6 +627,28 @@ class BriefMvpIntegrationTest(
         }
 
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        val summaryPath = "$path/summary"
+        mockMvc.perform(get(summaryPath))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.highCount").value(4))
+            .andExpect(jsonPath("$.mediumCount").value(3))
+            .andExpect(jsonPath("$.revisionGapCount").value(4))
+        mapOf(
+            "ROLE_UNASSIGNED" to Triple(3, 1, 3),
+            "HANDOFF_BLOCKED" to Triple(1, 0, 1),
+            "ROUTINE_MISSED" to Triple(0, 1, 0),
+            "ROLE_SUCCESSOR_MISSING" to Triple(0, 0, 0),
+        ).forEach { (eventType, counts) ->
+            mockMvc.perform(get(summaryPath).param("eventType", eventType))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.highCount").value(counts.first))
+                .andExpect(jsonPath("$.mediumCount").value(counts.second))
+                .andExpect(jsonPath("$.revisionGapCount").value(counts.third))
+        }
+        mockMvc.perform(get(summaryPath).param("eventType", "UNKNOWN"))
+            .andExpect(status().isBadRequest)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+
         mockMvc.perform(get(path).param("eventType", "ROLE_UNASSIGNED"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:1", "role:2", "role:3", "role:4")))
@@ -682,7 +704,21 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.nextCursor").value(nullValue()))
             .andReturn().response.contentAsString
 
+        postEvent(eventJson(
+            UUID.randomUUID().toString(), workspaceId, seasonId, "role:2", 4,
+            type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "WARNING",
+        ))
+        val summary = mockMvc.perform(get(summaryPath).param("eventType", "ROLE_UNASSIGNED"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.highCount").value(1))
+            .andExpect(jsonPath("$.mediumCount").value(2))
+            .andExpect(jsonPath("$.revisionGapCount").value(2))
+            .andReturn().response.contentAsString
+
         mockMvc.perform(post("/api/v1/projections/rebuild")).andExpect(status().isOk)
+        mockMvc.perform(get(summaryPath).param("eventType", "ROLE_UNASSIGNED"))
+            .andExpect(status().isOk)
+            .andExpect(content().json(summary))
         mockMvc.perform(
             get(path).param("eventType", "ROLE_UNASSIGNED").param("status", "RESOLVED")
                 .param("severity", "HIGH").param("revisionGap", "true"),

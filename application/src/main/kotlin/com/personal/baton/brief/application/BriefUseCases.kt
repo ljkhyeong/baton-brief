@@ -202,7 +202,11 @@ interface BriefQueries {
         limit: Int,
     ): CurrentAttentionItemPage
 
-    fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary
+    fun findAttentionItemSummary(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType? = null,
+    ): CurrentAttentionItemSummary
 
     fun findAttentionItemTransitions(
         workspaceId: UUID,

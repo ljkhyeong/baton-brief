@@ -132,7 +132,8 @@ class BriefController(
     fun findAttentionItemSummary(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
-    ): CurrentAttentionItemSummary = brief.findAttentionItemSummary(workspaceId, seasonId)
+        @RequestParam("eventType", required = false) eventType: SourceEventType?,
+    ): CurrentAttentionItemSummary = brief.findAttentionItemSummary(workspaceId, seasonId, eventType)
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions")
     fun summarizeWeeklyResolutions(

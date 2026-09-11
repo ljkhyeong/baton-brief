@@ -237,7 +237,11 @@ class JdbcBriefPersistenceAdapter(
         )
     }
 
-    override fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary = jdbc.sql(
+    override fun findAttentionItemSummary(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType?,
+    ): CurrentAttentionItemSummary = jdbc.sql(
         """
         SELECT COUNT(*) FILTER (WHERE severity = 'HIGH') AS high_count,
                COUNT(*) FILTER (WHERE severity = 'MEDIUM') AS medium_count,
@@ -246,9 +250,11 @@ class JdbcBriefPersistenceAdapter(
          WHERE workspace_id = :workspaceId
            AND season_id = :seasonId
            AND item_status = 'ACTIVE'
+           ${if (eventType == null) "" else "AND event_type = :eventType"}
         """.trimIndent(),
     ).param("workspaceId", workspaceId)
         .param("seasonId", seasonId)
+        .param("eventType", eventType?.name)
         .query(ATTENTION_ITEM_SUMMARY_MAPPER)
         .single()
 
