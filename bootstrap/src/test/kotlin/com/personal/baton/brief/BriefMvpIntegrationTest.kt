@@ -2394,6 +2394,93 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `주간 해소 업무 종류 필터는 전체 건수와 페이지 및 재활성화에 적용된다`() {
+        val workspace = UUID.randomUUID()
+        val season = UUID.randomUUID()
+        val command = GenerateEditionCommand(workspace, season, LocalDate.parse("2026-08-24"), ZoneId.of("Asia/Seoul"))
+        val service = BriefService(persistence, Clock.fixed(Instant.parse("2026-08-30T12:00:00Z"), ZoneOffset.UTC))
+        fun deliver(
+            reference: String,
+            revision: Long,
+            state: String,
+            type: String = "ROLE_UNASSIGNED",
+            targetWorkspace: UUID = workspace,
+            targetSeason: UUID = season,
+        ) {
+            postEvent(eventJson(
+                UUID.randomUUID().toString(), targetWorkspace.toString(), targetSeason.toString(), reference, revision,
+                state, type, occurredAt = "2026-08-25T00:00:00Z",
+                eventVersion = if (type == "ROLE_UNASSIGNED") 2 else 1,
+                sourceSeverity = if (type == "ROLE_UNASSIGNED") "WARNING" else null,
+            )).andExpect(status().isAccepted)
+        }
+        listOf("a" to "ROLE_UNASSIGNED", "b" to "ROLE_UNASSIGNED", "a" to "HANDOFF_BLOCKED").forEach { (ref, type) ->
+            deliver(ref, 1, "ACTIVE", type)
+            deliver(ref, 2, "RESOLVED", type)
+        }
+        listOf(UUID.randomUUID() to season, workspace to UUID.randomUUID()).forEach { (otherWorkspace, otherSeason) ->
+            deliver("a", 1, "ACTIVE", targetWorkspace = otherWorkspace, targetSeason = otherSeason)
+            deliver("a", 2, "RESOLVED", targetWorkspace = otherWorkspace, targetSeason = otherSeason)
+        }
+        deliver("gap", 1, "ACTIVE")
+        deliver("gap", 3, "RESOLVED")
+
+        val path = "/api/v1/workspaces/$workspace/seasons/$season/attention-items/resolutions"
+        fun request(type: String? = null) = get(path)
+            .param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul")
+            .apply { type?.let { param("eventType", it) } }
+
+        mockMvc.perform(request())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(3))
+            .andExpect(jsonPath("$.items.length()").value(3))
+        mockMvc.perform(request("ROLE_UNASSIGNED").param("limit", "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(2))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("a")))
+            .andExpect(jsonPath("$.items[0].reasonCode").value("ROLE_UNASSIGNED"))
+            .andExpect(jsonPath("$.nextCursor.eventType").value("ROLE_UNASSIGNED"))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("a"))
+        mockMvc.perform(request("ROLE_UNASSIGNED").param("limit", "1")
+            .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "a"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(2))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("b")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        mockMvc.perform(request("ROLE_UNASSIGNED")
+            .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "b"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(2))
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        mockMvc.perform(request("ROLE_UNASSIGNED")
+            .param("afterEventType", "HANDOFF_BLOCKED").param("afterSourceReference", "a"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(2))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("a", "b")))
+        mockMvc.perform(request("HANDOFF_BLOCKED"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(1))
+            .andExpect(jsonPath("$.items[*].reasonCode").value(contains("HANDOFF_BLOCKED")))
+        mockMvc.perform(request("ROLE_SUCCESSOR_MISSING"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(0))
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        mockMvc.perform(request("UNKNOWN"))
+            .andExpect(status().isBadRequest)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+
+        deliver("a", 3, "ACTIVE")
+        val remaining = service.summarizeWeeklyResolutions(command, eventType = SourceEventType.ROLE_UNASSIGNED)
+        assertThat(remaining.resolvedCount).isEqualTo(1)
+        assertThat(remaining.items.map { it.sourceReference }).containsExactly("b")
+        service.rebuild()
+        assertThat(service.summarizeWeeklyResolutions(command, eventType = SourceEventType.ROLE_UNASSIGNED))
+            .isEqualTo(remaining)
+    }
+
+    @Test
     fun `주간 해소 구간은 DST 전환 주의 실제 자정 경계를 따른다`() {
         val workspace = UUID.randomUUID()
         val season = UUID.randomUUID()

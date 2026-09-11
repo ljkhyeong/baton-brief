@@ -142,8 +142,9 @@ class BriefController(
         @Valid @ModelAttribute request: EditionWeekRequest,
         @Valid @ModelAttribute cursor: AttentionItemCursorRequest,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
+        @RequestParam("eventType", required = false) eventType: SourceEventType?,
     ): WeeklyResolutionSummary = brief.summarizeWeeklyResolutions(
-        request.toCommand(workspaceId, seasonId), cursor.toCursor(), limit,
+        request.toCommand(workspaceId, seasonId), cursor.toCursor(), limit, eventType,
     )
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions")

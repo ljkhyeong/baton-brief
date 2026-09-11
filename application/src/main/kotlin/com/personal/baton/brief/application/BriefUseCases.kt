@@ -242,6 +242,7 @@ interface BriefUseCases : BriefQueries {
         command: GenerateEditionCommand,
         after: AttentionItemCursor? = null,
         limit: Int = 20,
+        eventType: SourceEventType? = null,
     ): WeeklyResolutionSummary
 
     fun rebuild(): RebuildResult
@@ -277,6 +278,7 @@ interface BriefPersistencePort : BriefQueries {
         evaluatedAt: Instant,
         after: AttentionItemCursor?,
         limit: Int,
+        eventType: SourceEventType?,
     ): WeeklyResolutionSummary
 
     fun rebuild(project: (SourceEvent, AttentionItem?) -> ProjectionDecision): RebuildResult

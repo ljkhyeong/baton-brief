@@ -265,6 +265,7 @@ class JdbcBriefPersistenceAdapter(
         evaluatedAt: Instant,
         after: AttentionItemCursor?,
         limit: Int,
+        eventType: SourceEventType?,
     ): WeeklyResolutionSummary {
         val afterClause = if (after == null) "" else
             "WHERE (reason_code, source_reference) > (:afterEventType, :afterSourceReference)"
@@ -275,6 +276,7 @@ class JdbcBriefPersistenceAdapter(
               FROM source_event_receipt
              WHERE workspace_id = :workspaceId AND season_id = :seasonId
                AND processing_outcome IN ('APPLIED', 'APPLIED_WITH_GAP')
+               ${if (eventType == null) "" else "AND event_type = :eventType"}
         ), latest_active AS (
             SELECT event_type, source_reference, MAX(aggregate_revision) AS revision
               FROM applied WHERE event_state = 'ACTIVE'
@@ -315,6 +317,7 @@ class JdbcBriefPersistenceAdapter(
             .param("windowStart", window.start.jdbcValue())
             .param("windowEnd", window.end.jdbcValue())
             .param("evaluatedAt", evaluatedAt.jdbcValue())
+            .param("eventType", eventType?.name)
             .param("afterEventType", after?.eventType?.name)
             .param("afterSourceReference", after?.sourceReference)
             .param("fetchLimit", limit + 1)

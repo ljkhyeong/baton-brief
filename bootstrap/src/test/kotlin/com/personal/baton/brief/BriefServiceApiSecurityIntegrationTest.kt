@@ -41,7 +41,8 @@ class BriefServiceApiSecurityIntegrationTest(
         val seasonId = "20000000-0000-0000-0000-000000000051"
         val editionPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         val summaryPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/summary"
-        val resolutionsPath = summaryPath.removeSuffix("summary") + "resolutions?weekStart=2026-08-24&zoneId=Asia/Seoul"
+        val resolutionsPath = summaryPath.removeSuffix("summary") +
+            "resolutions?weekStart=2026-08-24&zoneId=Asia/Seoul&eventType=ROLE_UNASSIGNED"
         mockMvc.perform(get(resolutionsPath)).andExpect(status().isUnauthorized)
         mockMvc.perform(get(resolutionsPath).header(HttpHeaders.AUTHORIZATION, "Bearer $SECURITY_EVENT_TOKEN"))
             .andExpect(status().isUnauthorized)
