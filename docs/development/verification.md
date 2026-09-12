@@ -126,6 +126,12 @@ JSON 필드·값의 계약 일치는 기존 JSON Schema·통합 테스트에서 
 테스트용 Bearer는 컨테이너 기동 전에 [GitHub 로그 마스킹](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#masking-a-value-in-a-log)에
 등록한다. 이 마스킹은 GitHub Actions 출력에 적용되며 컨테이너 원본 로그의 비밀 비노출 검사는 유지한다.
 
+Gradle 검증이 실패하면 도메인·통합·ArchUnit의 HTML 보고서와 JUnit XML을
+`brief-test-reports-<실행 시도 번호>` 산출물로 3일간 보관한다.
+[해당 Actions 실행의 Artifacts](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts)에서
+내려받아 각 모듈의 `build/reports/tests/<태스크>/index.html`을 열면 오류 상세를 확인할 수 있다.
+컴파일 단계에서 실패해 보고서가 없으면 업로드를 생략한다.
+
 ## 다음 세션에 남길 근거
 
 인수인계에는 현재 재사용할 결과만 남기고 오래된 실행 목록은 Git 이력으로 보관한다.
