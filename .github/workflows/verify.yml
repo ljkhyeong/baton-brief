@@ -33,7 +33,19 @@ jobs:
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
       - name: Gradle 검증
+        id: gradle-verification
         run: ./gradlew --no-daemon test :bootstrap:bootJar contractsZip
+
+      - name: 실패한 테스트 보고서 보관
+        if: ${{ failure() && steps.gradle-verification.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: brief-test-reports-${{ github.run_attempt }}
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**/*.xml
+          retention-days: 3
+          if-no-files-found: ignore
 
       - name: Compose 설정 검증
         run: |
