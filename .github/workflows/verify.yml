@@ -121,6 +121,12 @@ jobs:
             local cleanup_status=0
             trap - EXIT
             set +e
+            if ((original_status != 0)); then
+              echo "::group::스테이징 실패 진단"
+              "${compose[@]}" ps --all
+              "${compose[@]}" logs --no-color --tail 100
+              echo "::endgroup::"
+            fi
             "${compose[@]}" down --volumes --remove-orphans || cleanup_status=$?
             docker network rm "$service_network" >/dev/null || cleanup_status=$?
             rm -rf "$staging_dir" || cleanup_status=$?
@@ -133,6 +139,8 @@ jobs:
 
           event_token="ci-event-token-000000000000000000000000"
           service_token="ci-service-token-0000000000000000000000"
+          echo "::add-mask::$event_token"
+          echo "::add-mask::$service_token"
           curl_image="curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6"
           printf '%s' "ci-database-password" > "$staging_dir/database-password"
           printf '%s' "$event_token" > "$staging_dir/event-bearer-token"
