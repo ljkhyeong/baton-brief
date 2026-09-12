@@ -62,6 +62,7 @@ BRIEF 지표 → 기존 Prometheus 경보 → 공용 Alertmanager → Slack·Dis
 | --- | --- | --- |
 | Slack | [brief-slack.example.yml](../../ops/alertmanager/brief-slack.example.yml) | `/run/secrets/brief-slack-webhook-url` |
 | Discord | [brief-discord.example.yml](../../ops/alertmanager/brief-discord.example.yml) | `/run/secrets/brief-discord-webhook-url` |
+| Slack·Discord 동시 수신 | [brief-slack-discord.example.yml](../../ops/alertmanager/brief-slack-discord.example.yml) | 위 두 파일 |
 
 1. Slack은 기존 앱의 [Incoming Webhooks](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/)에서,
    Discord는 운영 텍스트 채널의 [채널 편집 → 연동 → 웹훅](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks)에서 주소를 만든다.
@@ -69,9 +70,8 @@ BRIEF 지표 → 기존 Prometheus 경보 → 공용 Alertmanager → Slack·Dis
    위 경로에 읽기 전용으로 연결한다. 실행 사용자만 읽게 한다.
 2. 선택한 예시의 `route.routes` 항목과 채널 수신처를 공용 Alertmanager 설정에 합친다.
    BRIEF 경로는 먼저 일치하는 포괄 경로보다 앞에 둔다. `unmatched`는 예시 검사용이므로
-   기존 기본 수신처를 덮어쓰지 않는다. **두 채널을 함께 쓰려면** 기존 `brief-slack` 수신처 안에서
-   `slack_configs`와 같은 수준에 Discord 예시의 `discord_configs`를 추가하고 두 비밀 파일을 연결한다.
-   이때 BRIEF 경로는 하나만 유지한다. 같은 조건의 경로를 두 개 나란히 두면 기본적으로 첫 경로만 선택된다.
+   기존 기본 수신처를 덮어쓰지 않는다. 두 채널을 함께 쓰려면 동시 수신 예시와 두 비밀 파일을 사용한다.
+   이 예시는 한 BRIEF 경로의 수신처에 두 채널을 포함한다. 단독 채널 경로를 함께 추가하지 않는다.
 3. [Prometheus 연결 대상](../../ops/prometheus/alertmanager-targets.yml)의 빈 목록을 실제 비공개
    Alertmanager 주소로 바꾼다. `targets`에는 URL 경로 없이 `호스트:포트`를 넣는다.
 
@@ -112,7 +112,7 @@ Slack Incoming Webhook·Discord 채널 웹훅과 자체 호스팅 Alertmanager�
 Discord는 별도 봇 서버나 유료 발송 상품 없이 기본 웹훅을 사용한다. 홈서버 자원·네트워크 사용과
 각 채널의 요청 제한은 적용된다.
 
-CI는 Prometheus 설정·경보 규칙과 Alertmanager 설정·서비스별 분기를 검사한다.
+CI는 Prometheus 설정·경보 규칙과 Alertmanager의 단독·동시 수신 예시 3개, 서비스별 분기를 검사한다.
 실제 워크스페이스·서버의 채널 권한과 도착 여부는 웹훅을 연결한 뒤 확인한다.
 현재 검증 결과는 [HANDOFF](../../HANDOFF.md)를 따른다.
 
