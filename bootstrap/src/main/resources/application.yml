@@ -6,6 +6,8 @@ spring:
     username: brief
     password: brief
   jackson:
+    read:
+      strict-duplicate-detection: true
     deserialization:
       accept-float-as-int: false
       fail-on-unknown-properties: true

@@ -1841,6 +1841,31 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `중복 JSON 필드는 이벤트와 에디션 저장 전에 거부한다`() {
+        val workspace = UUID.randomUUID().toString()
+        val season = UUID.randomUUID().toString()
+        val event = eventJson(UUID.randomUUID().toString(), workspace, season, "duplicate-field", 1)
+        val body = JSON.writeValueAsString(event)
+        val duplicateId = """{"eventId":"${UUID.randomUUID()}",${body.drop(1)}"""
+        val withoutState = event.deepCopy().apply { remove("state") }
+        val duplicateState = """{"state":"ACTIVE","state":"RESOLVED",${JSON.writeValueAsString(withoutState).drop(1)}"""
+        listOf(duplicateId, duplicateState).forEach { request ->
+            postEvent(request)
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+        postEdition(
+            "/api/v1/workspaces/$workspace/seasons/$season/editions",
+            """{"weekStart":"2026-08-03","weekStart":"2026-08-10","zoneId":"Asia/Seoul"}""",
+        ).andExpect(status().isBadRequest)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+
+        listOf("source_event_receipt", "source_event_conflict", "attention_item", "brief_edition").forEach { table ->
+            assertThat(jdbc.sql("SELECT COUNT(*) FROM $table").query(Long::class.java).single()).isZero()
+        }
+    }
+
+    @Test
     fun `에디션 요청 오류와 미존재 응답은 ProblemDetail 계약을 따른다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000003"
         val seasonId = "20000000-0000-0000-0000-000000000003"
