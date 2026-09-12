@@ -12,6 +12,7 @@ import com.personal.baton.brief.domain.AttentionProjector
 import com.personal.baton.brief.domain.EditionItemSection
 import com.personal.baton.brief.domain.ProjectionDecision
 import com.personal.baton.brief.domain.SourceEvent
+import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
 import io.micrometer.core.instrument.MeterRegistry
@@ -434,6 +435,57 @@ class BriefMvpIntegrationTest(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.receipts").isEmpty)
+    }
+
+    @Test
+    fun `점검 항목 저장 실패는 수신 기록을 롤백하고 같은 이벤트 재시도를 허용한다`() {
+        val now = Instant.parse("2026-08-12T09:00:00Z")
+        val service = BriefService(persistence, Clock.fixed(now, ZoneOffset.UTC))
+        listOf(1L, 2L).forEach { revision ->
+            val event = SourceEvent(
+                eventId = UUID.randomUUID(),
+                eventType = SourceEventType.ROLE_UNASSIGNED,
+                eventVersion = 2,
+                workspaceId = UUID.randomUUID(),
+                seasonId = UUID.randomUUID(),
+                sourceReference = "role:retry-$revision",
+                aggregateRevision = revision,
+                occurredAt = now,
+                state = if (revision == 1L) SourceEventState.ACTIVE else SourceEventState.RESOLVED,
+                sourceSeverity = SourceEventSeverity.CRITICAL,
+            )
+            if (revision == 2L) {
+                service.ingest(event.copy(
+                    eventId = UUID.randomUUID(), aggregateRevision = 1, state = SourceEventState.ACTIVE,
+                ))
+            }
+            fun currentItem() = persistence.findAttentionItem(
+                event.workspaceId, event.seasonId, event.eventType, event.sourceReference,
+            )
+            val before = currentItem()
+
+            assertThatThrownBy {
+                persistence.processEvent(event, "a".repeat(64), now, { now }) { current ->
+                    val decision = AttentionProjector.project(event, current) as ProjectionDecision.Applied
+                    decision.copy(item = decision.item.copy(ruleVersion = 0))
+                }
+            }.isInstanceOf(DataIntegrityViolationException::class.java)
+                .hasMessageContaining("attention_item_rule_version_positive")
+
+            assertThat(persistence.findEventReceipt(event.eventId)).isNull()
+            assertThat(currentItem()).isEqualTo(before)
+
+            val retried = service.ingest(event)
+            assertThat(retried.status).isEqualTo(IngestStatus.APPLIED)
+            assertThat(currentItem()).isEqualTo(retried.item)
+            assertThat(retried.item?.lastRevision).isEqualTo(revision)
+            assertThat(retried.item?.status).isEqualTo(event.state)
+            val receipt = persistence.findEventReceipt(event.eventId)
+            assertThat(receipt?.processingOutcome).isEqualTo(IngestStatus.APPLIED)
+            assertThat(service.ingest(event).status).isEqualTo(IngestStatus.DUPLICATE)
+            assertThat(persistence.findEventReceipt(event.eventId)).isEqualTo(receipt)
+            assertThat(currentItem()).isEqualTo(retried.item)
+        }
     }
 
     @Test
