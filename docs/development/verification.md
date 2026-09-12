@@ -119,6 +119,11 @@ python3 scripts/verify-feedback.py final <시작-커밋>
 필요한 도구만 임시 환경에 준비한다. 같은 의존성이 없다고 확인한 런타임을 반복해서 시도하지 않는다.
 범위가 넓은 실행과 실패 재현의 로그는 구분해 이전 실패 근거를 덮어쓰지 않는다.
 
+스테이징 CI 실행 단계가 실패하면 컨테이너를 정리하기 전에 상태와 서비스별 최근 로그 100줄을
+`스테이징 실패 진단` 그룹에 출력한다. 진단 수집이 실패해도 원래 검증의 종료 코드를 유지한다.
+테스트용 Bearer는 컨테이너 기동 전에 [GitHub 로그 마스킹](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#masking-a-value-in-a-log)에
+등록한다. 이 마스킹은 GitHub Actions 출력에 적용되며 컨테이너 원본 로그의 비밀 비노출 검사는 유지한다.
+
 ## 다음 세션에 남길 근거
 
 인수인계에는 현재 재사용할 결과만 남기고 오래된 실행 목록은 Git 이력으로 보관한다.

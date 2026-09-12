@@ -9,8 +9,8 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 2026-09-12 조회·운영 연동과 입력 검증 개선을 원격 `main`의 `791c8f4`에 병합했다
 ([PR #17](https://github.com/ljkhyeong/baton-brief/pull/17)). 해당 PR의
 [필수 CI](https://github.com/ljkhyeong/baton-brief/actions/runs/34675956047)는 통과했다.
-이후 보안 수정 `fbea014`·DB 준비 검사 `522ff3c`·운영 명령 누락 처리 `3bcaaf7`을
-로컬 커밋했으며 원격 반영 전이다.
+이후 보안 수정·DB 준비 검사·운영 명령 누락 처리·CI 실패 진단을 로컬 커밋했으며 원격 반영 전이다.
+각 변경의 기준 커밋과 검증 범위는 아래 표를 따른다.
 BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
 이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
@@ -31,6 +31,7 @@ BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `53a6aa1` CI 실패 진단, 2026-09-12 | actionlint 1.7.12·워크플로 전체 Bash 구문 검사 통과. 기존 cleanup의 진단 누락을 재현한 뒤 성공·검증 실패·진단 실패·정리 실패 조합 6건으로 수집 순서·원래 종료 코드 보존·임시 디렉터리 삭제 확인 | 워크플로에서 추출한 실제 cleanup을 Docker 명령 대역으로 실행. 기동 전 GitHub 마스킹 등록 확인. 로그 `/tmp/brief-ci-cleanup-before-20260912.log`·`/tmp/brief-ci-cleanup-after-20260912.log`, 검사 도구 `/tmp/brief-ci-diagnostics-tools-20260912/actionlint`. 전체 diff·문서 링크 확인. 제품 입력 불변으로 기존 Gradle·JAR 근거 유지. 실제 Actions의 로그 수집·마스킹·전체 CI·배포는 미실행 |
 | BRIEF `3bcaaf7` 운영 명령 누락 처리, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefOperationsConfigurationTest' :bootstrap:bootJar` 성공(3초), 설정 테스트 3건·ArchUnit 4건 통과. 실제 JAR에서 명령 누락이 출력 없이 성공 종료하는 문제 재현 후, 활성·기본 운영 프로필 모두 실패 종료·표준 출력 없음·DB/웹 미기동 확인. 각 프로필의 REBUILD는 정상 JSON 출력·수신 기록 보존·Flyway 미실행 확인 | JDK 21.0.10·PostgreSQL 18.6의 임시 DB, 정리 완료. 프로필 판정 방식은 실제 JAR의 기본 프로필 변환에서 누락을 놓쳐 제거하고, 운영 YAML의 빈 명령과 기존 필수 열거형 바인딩 사용. 기존 false/FALSE 거부·일반 설정의 명령 생략·웹/Flyway 초기 검사도 테스트에 포함. 로그 `/tmp/brief-missing-command-verified-build-20260912.log`·`/tmp/brief-missing-command-runtime-20260912.log`. 전체 diff·구조·문서 링크 확인. 운영 설정만 바꿔 전체 제품 테스트·계약 ZIP·원격 CI·배포는 미실행 |
 | BRIEF `522ff3c` PostgreSQL 준비 검사, 2026-09-12 | 개발용·스테이징과 HTTPS·서비스 API·지표 Compose 조합 5개 구문 확인. PostgreSQL 18.6의 초기화를 지연해 기존 검사가 TCP 접속 불가 상태를 `healthy`로 표시하는 문제 재현. 수정 후 초기화 중 `starting`, 완료 후 `healthy`·TCP SQL 성공, 기존 DB 재시작 확인 | 네트워크·호스트 포트 없는 임시 컨테이너, 검사 간격만 1초로 단축. 초기 검증용 파일 마운트 권한과 Compose 달러 이스케이프 처리 오류를 수정한 뒤 통과·정리. 로그 `/tmp/brief-postgres-readiness-before-20260912.log`·`/tmp/brief-postgres-readiness-after-20260912.log`. 전체 diff·문서 링크 확인. 앱·빌드·스키마 불변으로 `fbea014`의 테스트·JAR 근거 재사용. 전체 서비스 재기동·원격 CI·배포 미실행 |
 | BRIEF `fbea014` Kotlin·Tomcat 보안 수정, 2026-09-12 | `./gradlew test :bootstrap:bootJar buildEnvironment` 성공(16초), bootstrap 42건·도메인 6건 통과. 최종 구조 검사 4건 통과 후 전체 실행에서는 결과 재사용. 실제 JAR로 DB health·이벤트/서비스 인증 분리·정상 및 중복 수신·현재 항목 조회·잘못된 JSON 거부 확인 | JDK 21.0.10·PostgreSQL 18.6·Kotlin 2.4.20·Tomcat 11.0.25. JAR의 stdlib/reflect와 Tomcat 3개 버전 정렬·Commons Lang 미포함 확인. 로그 `/tmp/brief-security-full-20260912.log`·`/tmp/brief-security-http-20260912.log`. 최초 임시 HTTP 검사에서 경로·필수 조건을 잘못 지정해 수정했으며 제품 오류는 없었음. 비밀 로그 비노출·임시 앱/DB 정리·전체 diff·문서 링크 확인. 원격 CI·HTTPS·배포 미실행. 계약 ZIP 입력 변경 없음 |
