@@ -11,6 +11,7 @@
 *.pfx
 .gradle/
 .kotlin/
+__pycache__/
 build/
 out/
 node_modules/

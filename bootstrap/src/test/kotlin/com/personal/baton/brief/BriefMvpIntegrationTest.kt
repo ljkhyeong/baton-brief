@@ -115,7 +115,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `V2와 V7 대표 데이터를 최신 마이그레이션까지 보존한다`() {
+    fun `V2와 V7 대표 데이터를 V9와 최신 마이그레이션까지 보존한다`() {
         val schema = "brief_migration_upgrade"
         jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         jdbc.sql("CREATE SCHEMA $schema").update()
@@ -143,7 +143,18 @@ class BriefMvpIntegrationTest(
                     }
                 }
             }
+            flywayConfiguration.target("9").load().migrate()
+            val tables = listOf(
+                "source_event_receipt", "source_event_conflict", "attention_item",
+                "brief_edition", "brief_edition_item",
+            )
+            fun storedRows() = tables.associateWith { table ->
+                jdbc.sql("SELECT to_jsonb(stored)::text FROM $schema.$table stored ORDER BY 1")
+                    .query(String::class.java).list()
+            }
+            val previousRows = storedRows()
             flywayConfiguration.target(MigrationVersion.LATEST).load().migrate()
+            assertThat(storedRows()).isEqualTo(previousRows)
 
             assertThat(
                 jdbc.sql("SELECT COUNT(*) FROM $schema.attention_item")
@@ -593,11 +604,137 @@ class BriefMvpIntegrationTest(
                 .param("afterEventType", "HANDOFF_BLOCKED"),
         ).andExpect(status().isBadRequest)
 
-        mapOf("severity" to "UNKNOWN", "revisionGap" to "invalid").forEach { (name, value) ->
+        mapOf("eventType" to "UNKNOWN", "severity" to "UNKNOWN", "revisionGap" to "invalid").forEach { (name, value) ->
             mockMvc.perform(get(attentionItemsPath).param(name, value))
                 .andExpect(status().isBadRequest)
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
         }
+    }
+
+    @Test
+    fun `업무 종류 필터는 목록과 요약 및 상태 변경에 적용된다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000001"
+        val seasonId = "20000000-0000-0000-0000-000000000001"
+        seedCurrentAttentionScenario(workspaceId, seasonId)
+        listOf(
+            Triple("role:1", 3L, "CRITICAL"),
+            Triple("role:2", 3L, "CRITICAL"),
+            Triple("role:3", 3L, "WARNING"),
+            Triple("role:4", 1L, "CRITICAL"),
+        ).forEach { (reference, revision, severity) ->
+            postEvent(eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, reference, revision,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = severity,
+            ))
+        }
+        listOf(
+            UUID.randomUUID().toString() to seasonId,
+            workspaceId to UUID.randomUUID().toString(),
+        ).forEach { (otherWorkspace, otherSeason) ->
+            postEvent(eventJson(
+                UUID.randomUUID().toString(), otherWorkspace, otherSeason, "role:0", 3,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
+            ))
+        }
+
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        val summaryPath = "$path/summary"
+        mockMvc.perform(get(summaryPath))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.highCount").value(4))
+            .andExpect(jsonPath("$.mediumCount").value(3))
+            .andExpect(jsonPath("$.revisionGapCount").value(4))
+        mapOf(
+            "ROLE_UNASSIGNED" to Triple(3, 1, 3),
+            "HANDOFF_BLOCKED" to Triple(1, 0, 1),
+            "ROUTINE_MISSED" to Triple(0, 1, 0),
+            "ROLE_SUCCESSOR_MISSING" to Triple(0, 0, 0),
+        ).forEach { (eventType, counts) ->
+            mockMvc.perform(get(summaryPath).param("eventType", eventType))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.highCount").value(counts.first))
+                .andExpect(jsonPath("$.mediumCount").value(counts.second))
+                .andExpect(jsonPath("$.revisionGapCount").value(counts.third))
+        }
+        mockMvc.perform(get(summaryPath).param("eventType", "UNKNOWN"))
+            .andExpect(status().isBadRequest)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+
+        mockMvc.perform(get(path).param("eventType", "ROLE_UNASSIGNED"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:1", "role:2", "role:3", "role:4")))
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("afterEventType", "HANDOFF_BLOCKED").param("afterSourceReference", "handoff:1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:1", "role:2", "role:3", "role:4")))
+        mockMvc.perform(get(path).param("eventType", "HANDOFF_BLOCKED"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("handoff:1")))
+        mockMvc.perform(get(path).param("eventType", "ROLE_SUCCESSOR_MISSING"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("severity", "HIGH").param("revisionGap", "true").param("limit", "1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:1")))
+            .andExpect(jsonPath("$.nextCursor.eventType").value("ROLE_UNASSIGNED"))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("role:1"))
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("severity", "HIGH").param("revisionGap", "true").param("limit", "1")
+                .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "role:1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:2")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("severity", "HIGH").param("revisionGap", "true")
+                .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "role:2"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+
+        postEvent(eventJson(
+            UUID.randomUUID().toString(), workspaceId, seasonId, "role:1", 4,
+            state = "RESOLVED", type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
+        ))
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED")
+                .param("severity", "HIGH").param("revisionGap", "true"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:2")))
+        val resolved = mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED").param("status", "RESOLVED")
+                .param("severity", "HIGH").param("revisionGap", "true"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:1")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+            .andReturn().response.contentAsString
+
+        postEvent(eventJson(
+            UUID.randomUUID().toString(), workspaceId, seasonId, "role:2", 4,
+            type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "WARNING",
+        ))
+        val summary = mockMvc.perform(get(summaryPath).param("eventType", "ROLE_UNASSIGNED"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.highCount").value(1))
+            .andExpect(jsonPath("$.mediumCount").value(2))
+            .andExpect(jsonPath("$.revisionGapCount").value(2))
+            .andReturn().response.contentAsString
+
+        mockMvc.perform(post("/api/v1/projections/rebuild")).andExpect(status().isOk)
+        mockMvc.perform(get(summaryPath).param("eventType", "ROLE_UNASSIGNED"))
+            .andExpect(status().isOk)
+            .andExpect(content().json(summary))
+        mockMvc.perform(
+            get(path).param("eventType", "ROLE_UNASSIGNED").param("status", "RESOLVED")
+                .param("severity", "HIGH").param("revisionGap", "true"),
+        ).andExpect(status().isOk)
+            .andExpect(content().json(resolved))
     }
 
     @Test
@@ -1081,6 +1218,87 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `주간 이력은 주차와 시간대를 먼저 걸러 기존 생성 번호로 페이지를 조회한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000002"
+        val seasonId = "20000000-0000-0000-0000-000000000002"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val request = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        val otherZoneRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Tokyo"}"""
+        seedWeeklyEditionScenario(workspaceId, seasonId)
+        val first = postEdition(path, request)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(1))
+            .andReturn()
+        val firstEditionId = JsonPath.read<String>(first.response.contentAsString, "$.editionId")
+        postEdition(path, otherZoneRequest).andExpect(status().isCreated)
+        postEdition(path, """{"weekStart":"2026-08-17","zoneId":"Asia/Seoul"}""")
+            .andExpect(status().isCreated)
+
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000004",
+                workspaceId, seasonId, "handoff:weekly", 2, state = "RESOLVED",
+            ),
+        ).andExpect(status().isAccepted)
+        postEdition(path, request)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(4))
+        postEdition(path, otherZoneRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(5))
+
+        val otherWorkspacePath =
+            "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/editions"
+        val otherSeasonPath =
+            "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/editions"
+        listOf(otherWorkspacePath, otherSeasonPath).forEach {
+            postEdition(it, request).andExpect(status().isCreated)
+        }
+
+        mockMvc.perform(get(path).param("limit", "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions[0].generation").value(5))
+        val firstPage = mockMvc.perform(
+            get(path).param("weekStart", "2026-08-10").param("zoneId", "Asia/Seoul")
+                .param("limit", "1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions.length()").value(1))
+            .andExpect(jsonPath("$.editions[0].generation").value(4))
+            .andExpect(jsonPath("$.editions[0].weekStart").value("2026-08-10"))
+            .andExpect(jsonPath("$.editions[0].zoneId").value("Asia/Seoul"))
+            .andExpect(jsonPath("$.editions[0].itemCount").value(1))
+            .andExpect(jsonPath("$.nextBeforeGeneration").value(4))
+            .andReturn()
+        val cursor = JsonPath.read<Int>(firstPage.response.contentAsString, "$.nextBeforeGeneration")
+
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000005",
+                workspaceId, seasonId, "routine:weekly", 2, state = "RESOLVED", type = "ROUTINE_MISSED",
+            ),
+        ).andExpect(status().isAccepted)
+        postEdition(path, request)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(6))
+
+        mockMvc.perform(
+            get(path).param("weekStart", "2026-08-10").param("zoneId", "Asia/Seoul")
+                .param("beforeGeneration", cursor.toString()).param("limit", "1"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions.length()").value(1))
+            .andExpect(jsonPath("$.editions[0].editionId").value(firstEditionId))
+            .andExpect(jsonPath("$.editions[0].generation").value(1))
+            .andExpect(jsonPath("$.editions[0].itemCount").value(2))
+            .andExpect(jsonPath("$.nextBeforeGeneration").value(nullValue()))
+
+        mockMvc.perform(
+            get(path).param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.editions").isEmpty)
+            .andExpect(jsonPath("$.nextBeforeGeneration").value(nullValue()))
+    }
+
+    @Test
     fun `재구축 실패는 현재 투영을 롤백하고 성공 뒤에도 기존 에디션을 보존한다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000002"
         val seasonId = "20000000-0000-0000-0000-000000000002"
@@ -1361,10 +1579,32 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.changed[0].after.aggregateRevision").value(3))
             .andExpect(jsonPath("$.changed[0].after.revisionGap").value(true))
             .andReturn()
+        val changesEtag = checkNotNull(changes.response.getHeader(HttpHeaders.ETAG))
+        mockMvc.perform(
+            get(changesPath).param("fromEditionId", baseEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
+        ).andExpect(status().isNotModified)
+            .andExpect(header().string(HttpHeaders.ETAG, changesEtag))
+            .andExpect(content().string(""))
+
+        mockMvc.perform(
+            get(changesPath).param("fromEditionId", revisionEvidenceEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.from.editionId").value(revisionEvidenceEditionId))
+            .andExpect(jsonPath("$.changed").isEmpty)
+        mockMvc.perform(
+            get("/api/v1/editions/$revisionEvidenceEditionId/changes").param("fromEditionId", baseEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.to.editionId").value(revisionEvidenceEditionId))
+            .andExpect(jsonPath("$.added").isEmpty)
+            .andExpect(jsonPath("$.removed").isEmpty)
 
         mockMvc.perform(
             get("/api/v1/editions/$baseEditionId/changes")
-                .param("fromEditionId", targetEditionId),
+                .param("fromEditionId", targetEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.from.editionId").value(targetEditionId))
             .andExpect(jsonPath("$.to.editionId").value(baseEditionId))
@@ -1395,6 +1635,12 @@ class BriefMvpIntegrationTest(
             .andReturn()
         assertThat(rebuiltChanges.response.contentAsString)
             .isEqualTo(changes.response.contentAsString)
+        mockMvc.perform(
+            get(changesPath).param("fromEditionId", baseEditionId)
+                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
+        ).andExpect(status().isNotModified)
+            .andExpect(header().string(HttpHeaders.ETAG, changesEtag))
+            .andExpect(content().string(""))
 
         val otherWorkspaceId = "10000000-0000-0000-0000-000000000099"
         val otherGenerationPath =
@@ -1407,12 +1653,19 @@ class BriefMvpIntegrationTest(
             "$.editionId",
         )
 
-        mockMvc.perform(get(changesPath).param("fromEditionId", otherEditionId))
+        mockMvc.perform(
+            get(changesPath).param("fromEditionId", otherEditionId).header(HttpHeaders.IF_NONE_MATCH, "*"),
+        )
             .andExpect(status().isBadRequest)
 
         mockMvc.perform(
             get(changesPath)
-                .param("fromEditionId", "50000000-0000-0000-0000-000000000099"),
+                .param("fromEditionId", "50000000-0000-0000-0000-000000000099")
+                .header(HttpHeaders.IF_NONE_MATCH, "*"),
+        ).andExpect(status().isNotFound)
+        mockMvc.perform(
+            get("/api/v1/editions/50000000-0000-0000-0000-000000000099/changes")
+                .param("fromEditionId", baseEditionId).header(HttpHeaders.IF_NONE_MATCH, "*"),
         ).andExpect(status().isNotFound)
     }
 
@@ -1588,6 +1841,63 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `문자열과 열거형 필드에 다른 JSON 타입을 보내면 저장 전에 거부한다`() {
+        val workspace = UUID.randomUUID().toString()
+        val season = UUID.randomUUID().toString()
+        listOf(
+            "sourceReference" to "123",
+            "sourceReference" to "1.5",
+            "sourceReference" to "true",
+            "eventType" to "3",
+            "sourceSeverity" to "0",
+            "state" to "0",
+            "state" to "1",
+        ).forEach { (field, value) ->
+            val event = eventJson(
+                UUID.randomUUID().toString(), workspace, season, "invalid-type", 1,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
+            ).putRawValue(field, RawValue(value))
+            postEvent(event)
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+        listOf("source_event_receipt", "source_event_conflict", "attention_item").forEach { table ->
+            assertThat(jdbc.sql("SELECT COUNT(*) FROM $table").query(Long::class.java).single()).isZero()
+        }
+
+        val valid = eventJson(UUID.randomUUID().toString(), workspace, season, "123", 1)
+        postEvent(valid).andExpect(status().isAccepted)
+            .andExpect(jsonPath("$.item.sourceReference").value("123"))
+        postEvent(valid).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("DUPLICATE"))
+    }
+
+    @Test
+    fun `중복 JSON 필드는 이벤트와 에디션 저장 전에 거부한다`() {
+        val workspace = UUID.randomUUID().toString()
+        val season = UUID.randomUUID().toString()
+        val event = eventJson(UUID.randomUUID().toString(), workspace, season, "duplicate-field", 1)
+        val body = JSON.writeValueAsString(event)
+        val duplicateId = """{"eventId":"${UUID.randomUUID()}",${body.drop(1)}"""
+        val withoutState = event.deepCopy().apply { remove("state") }
+        val duplicateState = """{"state":"ACTIVE","state":"RESOLVED",${JSON.writeValueAsString(withoutState).drop(1)}"""
+        listOf(duplicateId, duplicateState).forEach { request ->
+            postEvent(request)
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+        postEdition(
+            "/api/v1/workspaces/$workspace/seasons/$season/editions",
+            """{"weekStart":"2026-08-03","weekStart":"2026-08-10","zoneId":"Asia/Seoul"}""",
+        ).andExpect(status().isBadRequest)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+
+        listOf("source_event_receipt", "source_event_conflict", "attention_item", "brief_edition").forEach { table ->
+            assertThat(jdbc.sql("SELECT COUNT(*) FROM $table").query(Long::class.java).single()).isZero()
+        }
+    }
+
+    @Test
     fun `에디션 요청 오류와 미존재 응답은 ProblemDetail 계약을 따른다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000003"
         val seasonId = "20000000-0000-0000-0000-000000000003"
@@ -1613,6 +1923,24 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isBadRequest)
         mockMvc.perform(get(path).param("limit", "101"))
             .andExpect(status().isBadRequest)
+
+        listOf(
+            mapOf("weekStart" to "2026-08-10"),
+            mapOf("zoneId" to "Asia/Seoul"),
+            mapOf("weekStart" to "", "zoneId" to "Asia/Seoul"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to ""),
+            mapOf("weekStart" to "2026-02-30", "zoneId" to "Asia/Seoul"),
+            mapOf("weekStart" to "2026-08-11", "zoneId" to "Asia/Seoul"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to "+09:00"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to "Invalid/Zone"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to "Asia/Seoul", "beforeGeneration" to "0"),
+            mapOf("weekStart" to "2026-08-10", "zoneId" to "Asia/Seoul", "limit" to "101"),
+        ).forEach { params ->
+            mockMvc.perform(get(path).apply { params.forEach { (name, value) -> param(name, value) } })
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+        }
 
         mockMvc.perform(get("$path/latest")).andExpect(status().isNotFound)
         mockMvc.perform(get("/api/v1/editions/50000000-0000-0000-0000-000000000001"))
@@ -1677,6 +2005,12 @@ class BriefMvpIntegrationTest(
                 .andExpect(jsonPath("$.weekStart").value(weekStart))
                 .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
 
+            mockMvc.perform(get(path).param("weekStart", weekStart).param("zoneId", "UTC"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.editions.length()").value(1))
+                .andExpect(jsonPath("$.editions[0].editionId").value(editionId))
+                .andExpect(jsonPath("$.editions[0].weekStart").value(weekStart))
+
             mockMvc.perform(post("/api/v1/projections/rebuild"))
                 .andExpect(status().isOk)
             postEdition(path, request)
@@ -1698,6 +2032,9 @@ class BriefMvpIntegrationTest(
                         .param("weekStart", weekStart)
                         .param("zoneId", "UTC"),
                 ).andExpect(status().isBadRequest)
+                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                mockMvc.perform(get(path).param("weekStart", weekStart).param("zoneId", "UTC"))
+                    .andExpect(status().isBadRequest)
                     .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
             }
     }
@@ -2122,6 +2459,118 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.resolvedCount").value(0))
             .andExpect(jsonPath("$.items").isEmpty)
             .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+
+        deliver("later-gap", 5, "ACTIVE")
+        deliver("later-gap", 6, "RESOLVED", "2026-08-26T00:00:00Z")
+        val recovered = service.summarizeWeeklyResolutions(command)
+        assertThat(recovered.resolvedCount).isEqualTo(2)
+        val recoveredItem = recovered.items.single { it.sourceReference == "later-gap" }
+        assertThat(recoveredItem.resolvedRevision).isEqualTo(6)
+        assertThat(recoveredItem.resolvedAt).isEqualTo(Instant.parse("2026-08-26T00:00:00Z"))
+        service.rebuild()
+        assertThat(service.summarizeWeeklyResolutions(command)).isEqualTo(recovered)
+    }
+
+    @Test
+    fun `주간 해소 업무 종류 필터는 전체 건수와 페이지 및 재활성화에 적용된다`() {
+        val workspace = UUID.randomUUID()
+        val season = UUID.randomUUID()
+        val command = GenerateEditionCommand(workspace, season, LocalDate.parse("2026-08-24"), ZoneId.of("Asia/Seoul"))
+        val service = BriefService(persistence, Clock.fixed(Instant.parse("2026-08-30T12:00:00Z"), ZoneOffset.UTC))
+        fun deliver(
+            reference: String,
+            revision: Long,
+            state: String,
+            type: String = "ROLE_UNASSIGNED",
+            targetWorkspace: UUID = workspace,
+            targetSeason: UUID = season,
+        ) {
+            postEvent(eventJson(
+                UUID.randomUUID().toString(), targetWorkspace.toString(), targetSeason.toString(), reference, revision,
+                state, type, occurredAt = "2026-08-25T00:00:00Z",
+                eventVersion = if (type == "ROLE_UNASSIGNED") 2 else 1,
+                sourceSeverity = if (type == "ROLE_UNASSIGNED") "WARNING" else null,
+            )).andExpect(status().isAccepted)
+        }
+        listOf("b" to "ROLE_UNASSIGNED", "a" to "ROLE_UNASSIGNED", "a" to "HANDOFF_BLOCKED").forEach { (ref, type) ->
+            deliver(ref, 1, "ACTIVE", type)
+            deliver(ref, 2, "RESOLVED", type)
+        }
+        listOf(UUID.randomUUID() to season, workspace to UUID.randomUUID()).forEach { (otherWorkspace, otherSeason) ->
+            deliver("a", 1, "ACTIVE", targetWorkspace = otherWorkspace, targetSeason = otherSeason)
+            deliver("a", 2, "RESOLVED", targetWorkspace = otherWorkspace, targetSeason = otherSeason)
+        }
+        deliver("gap", 1, "ACTIVE")
+        deliver("gap", 3, "RESOLVED")
+
+        val path = "/api/v1/workspaces/$workspace/seasons/$season/attention-items/resolutions"
+        fun request(type: String? = null) = get(path)
+            .param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul")
+            .apply { type?.let { param("eventType", it) } }
+
+        mockMvc.perform(request())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(3))
+            .andExpect(jsonPath("$.items[*].reasonCode").value(contains("HANDOFF_BLOCKED", "ROLE_UNASSIGNED", "ROLE_UNASSIGNED")))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("a", "a", "b")))
+        mockMvc.perform(request().param("limit", "2"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(3))
+            .andExpect(jsonPath("$.items[*].reasonCode").value(contains("HANDOFF_BLOCKED", "ROLE_UNASSIGNED")))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("a", "a")))
+            .andExpect(jsonPath("$.nextCursor.eventType").value("ROLE_UNASSIGNED"))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("a"))
+        mockMvc.perform(request().param("limit", "2")
+            .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "a"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(3))
+            .andExpect(jsonPath("$.items[*].reasonCode").value(contains("ROLE_UNASSIGNED")))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("b")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        mockMvc.perform(request("ROLE_UNASSIGNED").param("limit", "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(2))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("a")))
+            .andExpect(jsonPath("$.items[0].reasonCode").value("ROLE_UNASSIGNED"))
+            .andExpect(jsonPath("$.nextCursor.eventType").value("ROLE_UNASSIGNED"))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("a"))
+        mockMvc.perform(request("ROLE_UNASSIGNED").param("limit", "1")
+            .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "a"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(2))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("b")))
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        mockMvc.perform(request("ROLE_UNASSIGNED")
+            .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "b"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(2))
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        mockMvc.perform(request("ROLE_UNASSIGNED")
+            .param("afterEventType", "HANDOFF_BLOCKED").param("afterSourceReference", "a"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(2))
+            .andExpect(jsonPath("$.items[*].sourceReference").value(contains("a", "b")))
+        mockMvc.perform(request("HANDOFF_BLOCKED"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(1))
+            .andExpect(jsonPath("$.items[*].reasonCode").value(contains("HANDOFF_BLOCKED")))
+        mockMvc.perform(request("ROLE_SUCCESSOR_MISSING"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resolvedCount").value(0))
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        mockMvc.perform(request("UNKNOWN"))
+            .andExpect(status().isBadRequest)
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+
+        deliver("a", 3, "ACTIVE")
+        val remaining = service.summarizeWeeklyResolutions(command, eventType = SourceEventType.ROLE_UNASSIGNED)
+        assertThat(remaining.resolvedCount).isEqualTo(1)
+        assertThat(remaining.items.map { it.sourceReference }).containsExactly("b")
+        service.rebuild()
+        assertThat(service.summarizeWeeklyResolutions(command, eventType = SourceEventType.ROLE_UNASSIGNED))
+            .isEqualTo(remaining)
     }
 
     @Test

@@ -6,6 +6,11 @@ spring:
     username: brief
     password: brief
   jackson:
+    read:
+      strict-duplicate-detection: true
+    datatype:
+      enum:
+        fail-on-numbers-for-enums: true
     deserialization:
       accept-float-as-int: false
       fail-on-unknown-properties: true

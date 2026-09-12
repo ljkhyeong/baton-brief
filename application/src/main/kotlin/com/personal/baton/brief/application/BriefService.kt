@@ -7,6 +7,7 @@ import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.EditionItemSection
 import com.personal.baton.brief.domain.SourceEvent
 import com.personal.baton.brief.domain.SourceEventState
+import com.personal.baton.brief.domain.SourceEventType
 import com.personal.baton.brief.domain.WeeklyWindow
 import java.io.DataOutputStream
 import java.io.OutputStream
@@ -39,9 +40,10 @@ class BriefService(
         command: GenerateEditionCommand,
         after: AttentionItemCursor?,
         limit: Int,
+        eventType: SourceEventType?,
     ): WeeklyResolutionSummary = persistence.findWeeklyResolutions(
         command.workspaceId, command.seasonId, WeeklyWindow.startingOn(command.weekStart, command.zoneId),
-        clock.instant().truncatedTo(ChronoUnit.MICROS), after, limit,
+        clock.instant().truncatedTo(ChronoUnit.MICROS), after, limit, eventType,
     )
 
     override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)

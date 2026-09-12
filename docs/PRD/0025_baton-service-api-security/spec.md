@@ -19,7 +19,7 @@ BATON 사용자 계정이나 멤버십을 복제하지 않는다.
 - 브리프 전역 최신·주간 최신·단건·이력·비교 `GET`
 - `POST /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions`
 
-이벤트 수신·수신 기록·이상 이력·투영 재구축·Actuator는 서비스 API 권한에 포함하지
+이벤트 수신·수신 기록·이상 수신 기록·투영 재구축·Actuator는 서비스 API 권한에 포함하지
 않는다. 브리프 생성은 새 경로를 만들지 않고 PRD-0024의 기존 명령을 사용한다.
 
 ## 인증
@@ -86,7 +86,7 @@ BRIEF 서비스 전용 Caddy만 연결한다.
 - 공개 Caddy는 계속 정확한 `POST /api/v1/events`만 전달한다.
 - 새·직전 token 교체 구간과 직전 token 제거 뒤 거부를 컨테이너 실행 시나리오로 확인한다.
 
-## 비목표
+## 제외 범위
 
 - BRIEF 사용자 계정·세션·멤버십·CORS
 - 공개 Caddy의 조회·생성 허용 목록 확장

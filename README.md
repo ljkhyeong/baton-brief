@@ -12,8 +12,9 @@ Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.6 기반의 로컬 MVP를 구현
 - 점검 항목 조회·필터·상태 변경 이력과 전체 재구축
 - 월요일 기준 주간 브리프 생성·조회·이력·비교
 - 표준 오류 응답(`ProblemDetail`)과 애플리케이션·DB 상태 확인
-- 이벤트 수신 결과별 지표와 선택적 Prometheus의 수집 실패·서버 오류·이벤트 거부 경보. 외부 알림은 미연결
-- PostgreSQL 기본 도구를 사용한 백업과 Linux 정기 실행 예시
+- 이벤트 수신 지표와 선택적 Prometheus 경보. 공용 Alertmanager·Slack·Discord 연결 설정 제공, 실제 수신처는 미연결
+- Prometheus 기본 지표로 Alertmanager 전달 오류·경보 유실 진단
+- PostgreSQL 백업·격리 복원 확인과 Linux 정기 실행 예시
 - BATON 전용 Bearer와 파일 기반 비밀을 사용하는 스테이징 컨테이너
 - 선택적 Caddy HTTPS 프록시: 이벤트 수신 경로만 공개
 - BATON 백엔드용 비공개 HTTPS 조회·생성 API와 별도 Bearer 인증
@@ -24,17 +25,15 @@ Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.6 기반의 로컬 MVP를 구현
 ## 동작 구조
 
 ```text
-BATON 도메인 이벤트 ──> BRIEF 수신 기록 ──> AttentionItem 현재 투영
-                                                │
-                                                └─> 불변 BriefEdition
+BATON 업무 변경 이벤트 ──> BRIEF 수신 기록 ──> 현재 점검 항목 ──> 브리프 저장
 
 구현하고 로컬 교차 검증한 백엔드 연결:
 BATON 사용자 API ──> 세션·멤버십·접근 키 판정 ──> 서비스 Caddy ──> BRIEF 내부 조회
-BATON 대상·시점·전달 경계 결정 ────────────────> 서비스 Caddy ──> BRIEF 브리프 생성
+BATON 생성 대상·시점 결정, 이벤트 전달 확인 ──> 서비스 Caddy ──> BRIEF 브리프 생성
 ```
 
 BRIEF는 WATCH·RELAY·GO의 데이터베이스를 직접 읽지 않는다. 업무 데이터 관리와 상태 판정은 원본
-서비스가 담당하고 BRIEF는 커밋 후 전달된 이벤트만 소비한다. 사용자 조회는
+서비스가 담당하고 BRIEF는 커밋 후 전달된 이벤트만 처리한다. 사용자 조회는
 [PRD-0023](docs/PRD/0023_baton-mediated-brief-query/spec.md), 브리프 생성 실행은
 [PRD-0024](docs/PRD/0024_baton-driven-edition-generation/spec.md), 서비스 인증과 비공개 연결은
 [PRD-0025](docs/PRD/0025_baton-service-api-security/spec.md)를 따른다.
@@ -50,7 +49,8 @@ BATON 화면은 조회 중 선택한 조건을 유지하며, 선택한 브리프
 ### 이벤트 수신 기록
 
 - `POST /api/v1/events`는 이벤트 식별자·버전·본문 지문으로 동일 재전달과 충돌을 구분한다.
-- 집계 리비전으로 오래된 전달과 공백을 판정하며 수신과 현재 투영을 한 트랜잭션에서 처리한다.
+- 원본 변경 번호(`aggregateRevision`)로 오래된 이벤트와 리비전 공백을 판정한다.
+  수신 기록 저장과 현재 점검 항목 갱신은 한 트랜잭션에서 처리한다.
 - 최초 수신 결과 단건과 작업공간·시즌별 이상 수신 기록을 읽기 전용으로 조회한다.
 - 대체 보존 계약 전에는 `UNSUPPORTED`를 포함한 수신 기록과 이벤트별 최초 충돌 한 건을
   삭제·압축하지 않는다.
@@ -59,60 +59,66 @@ BATON 화면은 조회 중 선택한 조건을 유지하며, 선택한 브리프
 
 - `(workspaceId, seasonId, eventType, sourceReference)`를 복합 식별자로 사용한다.
 - 현재 단건과 `ACTIVE`·`RESOLVED` 상태별 키셋 목록을 조회하고,
-  [심각도·리비전 공백 필터](docs/PRD/0028_attention-item-filters/spec.md)로 목록을 좁힌다.
+  [업무 종류·심각도·리비전 공백 필터](docs/PRD/0028_attention-item-filters/spec.md)로 목록을 좁힌다.
+  예: `?eventType=ROLE_UNASSIGNED&severity=HIGH`는 심각도가 높은 역할 미배정 항목만 조회한다.
 - 작업공간·시즌별 활성 `HIGH`·`MEDIUM` 개수와 리비전 공백이 기록된 활성 항목 수를
   [요약 API](docs/PRD/0027_attention-item-summary/spec.md)로 조회한다.
+  `eventType`을 지정하면 선택한 업무 종류만 집계한다.
 - [주간 해소 요약](docs/PRD/0030_weekly-resolution-summary/spec.md)은 해당 주에 해소된 뒤 현재도
   해소 상태인 항목 수와 목록을 반환한다. 연속된 활성→해소 리비전으로 해소 시점을 확인하며,
   재활성화됐거나 이후 기록에 공백이 생긴 항목은 제외한다. 목록은 커서로 다음 페이지를 조회한다.
+  `eventType`을 지정하면 해당 업무 종류의 해소 건수와 목록만 반환한다.
 - 실제 적용된 리비전의 상태 이력을 최신 리비전부터 조회한다. 상태가 같아도 갱신 이력은
   포함하며, 해당 리비전에서 탐지한 공백과 현재의 누적 공백을 구분한다.
   v2 이력에는 원본 심각도도 제공하며 v1은 `null`을 유지한다.
-- 단건 응답은 현재 규칙 버전과 마지막 적용 리비전에 결합한 `ETag`를 제공한다.
+- 단건 응답은 규칙 버전과 마지막 적용 리비전으로 만든 `ETag`를 제공한다.
 
 ### 브리프
 
-- 월요일 시작 IANA 시간대 주간과 로컬 수신 `sourceCursor`를 기준으로 결정적으로 생성한다.
-- 같은 범위의 직전 상태는 멱등하게 재사용하고 `A → B → A`처럼 과거 상태로 돌아오면 새
+- 지정한 IANA 시간대의 월요일부터 한 주를 기준으로 생성하고, BRIEF 수신 순번을 `sourceCursor`에 기록한다.
+  같은 조회 조건·선정 규칙·점검 항목 상태이면 같은 내용을 만든다.
+- 같은 범위에서 직전 생성 상태가 같으면 기존 브리프를 재사용하고, `A → B → A`처럼 과거 상태로 돌아오면 새
   `generation`으로 기록한다.
-- 전역 최신·주간 범위 최신·단건·이력·비교 조회를 제공한다.
+- 작업공간·시즌 내 최신·주간 최신·단건·이력·비교 조회를 제공한다.
+  [이력 조회](docs/PRD/0003_edition-history/spec.md)에 `weekStart`와 `zoneId`를 함께 지정하면
+  선택한 주간의 이전 생성본을 찾을 수 있다.
 - 생성 당시 항목과 집계 리비전·리비전 공백을 함께 고정하며 기존 브리프를 수정하지 않는다.
 - [선정 규칙 v2](docs/PRD/0029_edition-carry-over/spec.md)는 이번 주 변경과 이전부터 미해소인
   항목을 `section`으로 구분한다. 이전 브리프의 미기록 분류는 `null`이다.
-- 전체 브리프 응답은 선택된 브리프를 나타내는 `ETag`를 제공한다.
+- 브리프 본문과 비교 결과는 `ETag`를 제공한다. 같은 결과의 조건부 조회는 본문 없이 `304`를 반환한다.
 
-### 실행 경계
+### 실행 구성과 접근 제한
 
-- `/actuator/health`는 Spring Boot 표준 aggregate 상태와 자동 구성된 DB contributor만
-  사용한다.
+- `/actuator/health`는 Spring Boot가 애플리케이션과 DB 상태를 종합한 결과를 반환한다.
 - 로컬 실행의 이벤트 수신 인증은 기본 비활성이며, 스테이징은 BATON 전용 Bearer를 파일로
   주입한다.
 - Caddy는 외부에서 정확한 `POST /api/v1/events`만 전달하고 다른 경로는 `404`로 종료한다.
 - BRIEF는 내부 `data`·`proxy` 네트워크에만 참여하고 외부 송신용 `egress`에는 Caddy만
   연결된다.
-- 스테이징 BRIEF는 호스트 포트를 직접 게시하지 않으며 공개 이벤트 인입은 Caddy만
+- 스테이징 BRIEF는 호스트 포트를 직접 게시하지 않으며 외부 이벤트 수신은 Caddy만
   담당한다.
 - 서비스 Caddy는 이벤트와 다른 Bearer로 허용한 조회·생성만 비공개 HTTPS로 전달하며
   호스트 포트를 게시하지 않는다.
 
-정확한 경로, 필드, 상태와 비목표는 [문서 색인](docs/README.md)의 해당 PRD를 따른다.
+경로·필드·응답 상태와 제외 범위는 [문서 색인](docs/README.md)의 해당 PRD를 따른다.
 
-## 서비스 경계
+## 서비스별 담당 범위
 
-BRIEF가 소유한다.
+BRIEF가 담당한다.
 
 - 멱등 수신 기록과 이벤트별 최초 충돌 기록
-- 작업공간·시즌별 점검 항목 투영
-- 결정적 생성 커서와 브리프
+- 작업공간·시즌별 현재 점검 항목
+- 생성 시점의 BRIEF 수신 순번과 브리프 저장
 - 재구축·조회에 필요한 서비스 내부 처리 기록
 
-BRIEF가 소유하지 않는다.
+다른 서비스가 담당한다.
 
 - 팀·시즌·역할·루틴·결정·인수인계와 최종 권한: BATON
 - URL 점검과 상태 원본: BATON WATCH
-- 구독·제공자 전달과 재시도 생명주기: BATON RELAY
+- 구독·외부 발송과 재시도: BATON RELAY
 - 링크 코드·만료·폐기·리디렉션: BATON GO
-- AI 요약을 근거로 한 업무 상태 판정
+
+AI 요약으로 업무 상태를 판정하지 않는다.
 
 ## 이벤트 v2 계약 팩
 
@@ -231,13 +237,17 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https up
 
 백업과 빈 DB 복원은 [PostgreSQL 백업·복원 절차](docs/operations/postgresql-backup-restore.md)를
 따른다. 추가 이용료 없이 기존 서버에서 실행하며 Linux 정기 백업 타이머를 제공한다.
+`ops/verify-postgresql-backup.sh`로 백업 파일을 임시 DB에 복원해 확인할 수 있다.
 외부 보관소와 운영 DB 전환은 포함하지 않는다.
 
-호스트 실행 권한으로 수신 기록·이상 이력을 조회하거나 전체 재구축을 수행하려면
-[운영 명령과 지표 조회 절차](docs/operations/diagnostics-and-metrics.md)를 따른다. 선택적인
+호스트 실행 권한으로 수신 기록·이상 수신 기록을 조회하거나 전체 재구축을 수행하려면
+[운영 명령과 지표 조회 절차](docs/operations/diagnostics-and-metrics.md)를 따른다.
+운영 명령은 결과 JSON과 로그를 분리해 출력한다. 선택적인
 `compose.observability.yml`은 컨테이너 내부 `127.0.0.1:9091`에서 health·Prometheus 지표만
 제공하고 같은 서버의 Prometheus로 수집한다. 별도 계정·API 키는 필요 없다.
 공개·서비스 Caddy 허용 경로는 유지한다.
+경보를 Slack·Discord로 받으려면 [외부 연동 검토와 연결 절차](docs/operations/external-integrations.md)를 따른다.
+공휴일·캘린더·백업·DNS 등 기존 BATON 서비스에서 재사용할 연동도 이 문서에 정리했다.
 
 ## 문서
 

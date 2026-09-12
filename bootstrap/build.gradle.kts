@@ -11,10 +11,11 @@ dependencies {
     implementation(project(":adapter-in-web"))
     implementation(project(":adapter-out-persistence"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("tools.jackson.core:jackson-databind")
+    implementation("org.springframework.boot:spring-boot-jackson")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    testImplementation(libs.archunit)
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("com.networknt:json-schema-validator:3.0.6") {
@@ -30,4 +31,17 @@ tasks.named<ProcessResources>("processTestResources") {
     from(rootProject.layout.projectDirectory.dir("contracts")) {
         into("contracts")
     }
+}
+
+val architectureTest by tasks.registering(Test::class) {
+    group = "verification"
+    description = "DB 없이 모듈과 저장 포트의 의존 규칙을 검사합니다."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    include("**/BriefArchitectureTest.class")
+}
+
+tasks.named<Test>("test") {
+    dependsOn(architectureTest)
+    exclude("**/BriefArchitectureTest.class")
 }

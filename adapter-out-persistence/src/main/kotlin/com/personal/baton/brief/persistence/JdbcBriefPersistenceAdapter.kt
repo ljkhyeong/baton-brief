@@ -184,12 +184,16 @@ class JdbcBriefPersistenceAdapter(
         workspaceId: UUID,
         seasonId: UUID,
         status: SourceEventState,
+        eventType: SourceEventType?,
         severity: Severity?,
         revisionGap: Boolean?,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage {
         val additionalConditions = buildList {
+            if (eventType != null) {
+                add("AND event_type = :eventType")
+            }
             if (after != null) {
                 add("AND (event_type, source_reference) > (:afterEventType, :afterSourceReference)")
             }
@@ -214,6 +218,7 @@ class JdbcBriefPersistenceAdapter(
         ).param("workspaceId", workspaceId)
             .param("seasonId", seasonId)
             .param("status", status.name)
+            .param("eventType", eventType?.name)
             .param("severity", severity?.name)
             .param("revisionGap", revisionGap)
             .param("afterEventType", after?.eventType?.name)
@@ -232,7 +237,11 @@ class JdbcBriefPersistenceAdapter(
         )
     }
 
-    override fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary = jdbc.sql(
+    override fun findAttentionItemSummary(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType?,
+    ): CurrentAttentionItemSummary = jdbc.sql(
         """
         SELECT COUNT(*) FILTER (WHERE severity = 'HIGH') AS high_count,
                COUNT(*) FILTER (WHERE severity = 'MEDIUM') AS medium_count,
@@ -241,9 +250,11 @@ class JdbcBriefPersistenceAdapter(
          WHERE workspace_id = :workspaceId
            AND season_id = :seasonId
            AND item_status = 'ACTIVE'
+           ${if (eventType == null) "" else "AND event_type = :eventType"}
         """.trimIndent(),
     ).param("workspaceId", workspaceId)
         .param("seasonId", seasonId)
+        .param("eventType", eventType?.name)
         .query(ATTENTION_ITEM_SUMMARY_MAPPER)
         .single()
 
@@ -254,41 +265,36 @@ class JdbcBriefPersistenceAdapter(
         evaluatedAt: Instant,
         after: AttentionItemCursor?,
         limit: Int,
+        eventType: SourceEventType?,
     ): WeeklyResolutionSummary {
         val afterClause = if (after == null) "" else
             "WHERE (reason_code, source_reference) > (:afterEventType, :afterSourceReference)"
         val rows = jdbc.sql(
             """
         WITH applied AS (
-            SELECT event_type, source_reference, aggregate_revision, event_state, occurred_at, processing_outcome
+            SELECT event_type, source_reference, aggregate_revision, event_state, occurred_at,
+                   MAX(aggregate_revision) FILTER (WHERE event_state = 'ACTIVE') OVER item AS latest_active_revision,
+                   MAX(aggregate_revision) FILTER (WHERE processing_outcome = 'APPLIED_WITH_GAP')
+                       OVER item AS latest_gap_revision
               FROM source_event_receipt
              WHERE workspace_id = :workspaceId AND season_id = :seasonId
                AND processing_outcome IN ('APPLIED', 'APPLIED_WITH_GAP')
-        ), latest_active AS (
-            SELECT event_type, source_reference, MAX(aggregate_revision) AS revision
-              FROM applied WHERE event_state = 'ACTIVE'
-             GROUP BY event_type, source_reference
+               ${if (eventType == null) "" else "AND event_type = :eventType"}
+            WINDOW item AS (PARTITION BY event_type, source_reference)
         ), resolutions AS (
         SELECT resolved.event_type AS reason_code, resolved.source_reference,
                resolved.occurred_at AS resolved_at, resolved.aggregate_revision AS resolved_revision
-          FROM latest_active active
-          JOIN applied resolved ON resolved.event_type = active.event_type
-                               AND resolved.source_reference = active.source_reference
-                               AND resolved.aggregate_revision - 1 = active.revision
-                               AND resolved.event_state = 'RESOLVED'
+          FROM applied resolved
           JOIN attention_item current ON current.workspace_id = :workspaceId
                                      AND current.season_id = :seasonId
-                                     AND current.event_type = active.event_type
-                                     AND current.source_reference = active.source_reference
+                                     AND current.event_type = resolved.event_type
+                                     AND current.source_reference = resolved.source_reference
                                      AND current.item_status = 'RESOLVED'
          WHERE resolved.occurred_at >= :windowStart AND resolved.occurred_at < :windowEnd
            AND resolved.occurred_at <= :evaluatedAt
-           AND NOT EXISTS (
-               SELECT 1 FROM applied later
-                WHERE later.event_type = active.event_type AND later.source_reference = active.source_reference
-                  AND later.aggregate_revision > resolved.aggregate_revision
-                  AND later.processing_outcome = 'APPLIED_WITH_GAP'
-           )
+           AND resolved.event_state = 'RESOLVED'
+           AND resolved.aggregate_revision - 1 = resolved.latest_active_revision
+           AND (resolved.latest_gap_revision IS NULL OR resolved.latest_gap_revision <= resolved.aggregate_revision)
         )
         SELECT total.resolved_count, page.*
           FROM (SELECT COUNT(*) AS resolved_count FROM resolutions) total
@@ -298,12 +304,14 @@ class JdbcBriefPersistenceAdapter(
               ORDER BY reason_code, source_reference
               LIMIT :fetchLimit
           ) page ON TRUE
+         ORDER BY page.reason_code, page.source_reference
             """.trimIndent(),
         ).param("workspaceId", workspaceId)
             .param("seasonId", seasonId)
             .param("windowStart", window.start.jdbcValue())
             .param("windowEnd", window.end.jdbcValue())
             .param("evaluatedAt", evaluatedAt.jdbcValue())
+            .param("eventType", eventType?.name)
             .param("afterEventType", after?.eventType?.name)
             .param("afterSourceReference", after?.sourceReference)
             .param("fetchLimit", limit + 1)
@@ -478,11 +486,17 @@ class JdbcBriefPersistenceAdapter(
         seasonId: UUID,
         beforeGeneration: Long?,
         limit: Int,
+        window: WeeklyWindow?,
     ): EditionHistoryResult {
         val beforeClause = if (beforeGeneration == null) {
             ""
         } else {
             "AND edition.generation < :beforeGeneration"
+        }
+        val weekClause = if (window == null) {
+            ""
+        } else {
+            "AND edition.week_start = :weekStart AND edition.zone_id = :zoneId"
         }
         val summaries = jdbc.sql(
             """
@@ -497,12 +511,15 @@ class JdbcBriefPersistenceAdapter(
              WHERE edition.workspace_id = :workspaceId
                AND edition.season_id = :seasonId
                $beforeClause
+               $weekClause
              ORDER BY edition.generation DESC
              LIMIT :fetchLimit
             """.trimIndent(),
         ).param("workspaceId", workspaceId)
             .param("seasonId", seasonId)
             .param("beforeGeneration", beforeGeneration)
+            .param("weekStart", window?.weekStart)
+            .param("zoneId", window?.zoneId?.id)
             .param("fetchLimit", limit + 1)
             .query(EDITION_SUMMARY_MAPPER)
             .list()

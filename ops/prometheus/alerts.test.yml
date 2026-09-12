@@ -2,6 +2,73 @@ rule_files:
   - alerts.yml
 evaluation_interval: 30s
 tests:
+  - name: 첫 경보 전달 오류를 탐지하고 증가가 멈추면 해제한다
+    interval: 30s
+    input_series:
+      - series: 'prometheus_notifications_errors_total{job="brief-prometheus",alertmanager="https://alertmanager.internal:9093/api/v2/alerts"}'
+        values: '0 0 1x12'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: BRIEF 경보의 Alertmanager 전달 오류 또는 유실이 발생했습니다.
+      - eval_time: 7m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
+  - name: 전송 오류 카운터 없이 유실만 증가해도 경보한다
+    interval: 30s
+    input_series:
+      - series: 'prometheus_notifications_dropped_total{job="brief-prometheus",alertmanager="primary"}'
+        values: '0 0 1x12'
+      - series: 'prometheus_notifications_dropped_total{job="brief-prometheus",alertmanager="secondary"}'
+        values: '0 0 1x12'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: BRIEF 경보의 Alertmanager 전달 오류 또는 유실이 발생했습니다.
+  - name: 수신처 미등록으로 지표가 없어도 전달 오류를 만들지 않는다
+    interval: 30s
+    input_series: []
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
+  - name: 정상 전송과 다른 수집기의 오류는 제외한다
+    interval: 30s
+    input_series:
+      - series: 'prometheus_notifications_errors_total{job="brief-prometheus"}'
+        values: '0x12'
+      - series: 'prometheus_notifications_dropped_total{job="brief-prometheus"}'
+        values: '0x12'
+      - series: 'prometheus_notifications_errors_total{job="other"}'
+        values: '0+1x12'
+      - series: 'prometheus_notifications_dropped_total{job="other"}'
+        values: '0+1x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
+  - name: 전달 카운터의 재시작 초기화는 실패 증가가 아니다
+    interval: 30s
+    input_series:
+      - series: 'prometheus_notifications_errors_total{job="brief-prometheus"}'
+        values: '20 20 0x12'
+      - series: 'prometheus_notifications_dropped_total{job="brief-prometheus"}'
+        values: '20 20 0x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
   - name: 짧은 수집 실패는 기다리고 지속 실패만 경보한다
     interval: 30s
     input_series:
@@ -31,6 +98,9 @@ tests:
         exp_alerts: []
       - eval_time: 5m
         alertname: BriefServerErrors
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BriefEventRevisionGap
         exp_alerts: []
   - name: 서버 오류 증가와 재시작 초기화를 구분한다
     interval: 30s
@@ -92,12 +162,12 @@ tests:
               outcome: CONFLICT
               severity: warning
             exp_annotations:
-              summary: BRIEF 이벤트 수신에서 CONFLICT 결과가 발생했습니다.
+              summary: 'BRIEF 이벤트 수신 거부: CONFLICT'
           - exp_labels:
               outcome: UNSUPPORTED
               severity: warning
             exp_annotations:
-              summary: BRIEF 이벤트 수신에서 UNSUPPORTED 결과가 발생했습니다.
+              summary: 'BRIEF 이벤트 수신 거부: UNSUPPORTED'
       - eval_time: 7m
         alertname: BriefEventRejected
         exp_alerts: []
@@ -128,4 +198,103 @@ tests:
     alert_rule_test:
       - eval_time: 5m
         alertname: BriefEventRejected
+        exp_alerts: []
+  - name: DB 연결 대기가 지속되면 풀별로 경보하고 대기가 끝나면 해제한다
+    interval: 30s
+    input_series:
+      - series: 'hikaricp_connections_pending{job="brief",instance="127.0.0.1:9091",pool="HikariPool-1"}'
+        values: '1x4 0x2'
+      - series: 'hikaricp_connections_pending{job="brief",instance="127.0.0.1:9091",pool="HikariPool-2"}'
+        values: '0x6'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts:
+          - exp_labels:
+              job: brief
+              instance: 127.0.0.1:9091
+              pool: HikariPool-1
+              severity: warning
+            exp_annotations:
+              summary: BRIEF의 DB 연결 대기가 2분 이상 지속되고 있습니다.
+      - eval_time: 2m30s
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+  - name: 짧거나 간헐적인 DB 대기와 다른 서비스의 대기로는 경보하지 않는다
+    interval: 30s
+    input_series:
+      - series: 'hikaricp_connections_pending{job="brief",pool="HikariPool-1"}'
+        values: '1x2 0 1x2 0 1x2 0'
+      - series: 'hikaricp_connections_pending{job="other",pool="HikariPool-1"}'
+        values: '1x12'
+      - series: 'hikaricp_connections_active{job="brief",pool="HikariPool-2"}'
+        values: '10x12'
+      - series: 'hikaricp_connections_max{job="brief",pool="HikariPool-2"}'
+        values: '10x12'
+      - series: 'hikaricp_connections_pending{job="brief",pool="HikariPool-2"}'
+        values: '0x12'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BriefDatabaseConnectionWait
+        exp_alerts: []
+  - name: 첫 변경 번호 공백을 경보하고 최근 증가가 없으면 해제한다
+    interval: 30s
+    input_series:
+      - series: 'brief_events_received_total{job="brief",outcome="APPLIED_WITH_GAP"}'
+        values: '0 0 1x12'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: BriefEventRevisionGap
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefEventRevisionGap
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: BRIEF 이벤트에서 원본 변경 번호의 공백을 탐지했습니다.
+      - eval_time: 7m
+        alertname: BriefEventRevisionGap
+        exp_alerts: []
+  - name: 정상 수신과 재전달 및 다른 서비스의 공백으로는 경보하지 않는다
+    interval: 30s
+    input_series:
+      - series: 'brief_events_received_total{job="brief",outcome="APPLIED"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="brief",outcome="DUPLICATE"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="brief",outcome="STALE"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="brief",outcome="CONFLICT"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="brief",outcome="UNSUPPORTED"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="other",outcome="APPLIED_WITH_GAP"}'
+        values: '0+1x12'
+      - series: 'brief_events_received_total{job="brief",outcome="APPLIED_WITH_GAP"}'
+        values: '20x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefEventRevisionGap
+        exp_alerts: []
+  - name: 변경 번호 공백 카운터의 재시작 초기화만으로는 경보하지 않는다
+    interval: 30s
+    input_series:
+      - series: 'brief_events_received_total{job="brief",outcome="APPLIED_WITH_GAP"}'
+        values: '20 20 0x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefEventRevisionGap
         exp_alerts: []

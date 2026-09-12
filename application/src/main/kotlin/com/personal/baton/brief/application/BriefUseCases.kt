@@ -195,13 +195,18 @@ interface BriefQueries {
         workspaceId: UUID,
         seasonId: UUID,
         status: SourceEventState,
+        eventType: SourceEventType?,
         severity: Severity?,
         revisionGap: Boolean?,
         after: AttentionItemCursor?,
         limit: Int,
     ): CurrentAttentionItemPage
 
-    fun findAttentionItemSummary(workspaceId: UUID, seasonId: UUID): CurrentAttentionItemSummary
+    fun findAttentionItemSummary(
+        workspaceId: UUID,
+        seasonId: UUID,
+        eventType: SourceEventType? = null,
+    ): CurrentAttentionItemSummary
 
     fun findAttentionItemTransitions(
         workspaceId: UUID,
@@ -226,6 +231,7 @@ interface BriefQueries {
         seasonId: UUID,
         beforeGeneration: Long?,
         limit: Int,
+        window: WeeklyWindow? = null,
     ): EditionHistoryResult
 }
 
@@ -236,6 +242,7 @@ interface BriefUseCases : BriefQueries {
         command: GenerateEditionCommand,
         after: AttentionItemCursor? = null,
         limit: Int = 20,
+        eventType: SourceEventType? = null,
     ): WeeklyResolutionSummary
 
     fun rebuild(): RebuildResult
@@ -271,6 +278,7 @@ interface BriefPersistencePort : BriefQueries {
         evaluatedAt: Instant,
         after: AttentionItemCursor?,
         limit: Int,
+        eventType: SourceEventType?,
     ): WeeklyResolutionSummary
 
     fun rebuild(project: (SourceEvent, AttentionItem?) -> ProjectionDecision): RebuildResult

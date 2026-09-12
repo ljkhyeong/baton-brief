@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-11
-- 수정일: 2026-08-30
+- 수정일: 2026-09-12
 
 ## 맥락
 
@@ -38,6 +38,11 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   catalog에서 한 번만 관리한다.
 - BRIEF 전용 데이터베이스는 PostgreSQL 18.6을 사용한다.
 - 영속성 구현은 Spring JDBC의 `JdbcClient`와 Flyway 마이그레이션을 사용한다.
+- V10은 수신 기록에 `(workspace_id, season_id, ingestion_sequence DESC)` B-tree 인덱스 하나를 추가한다.
+  작업공간·시즌별 수신 조회와 에디션의 생성 기준 조회가 다른 범위의 기록까지 읽는 비용을 줄인다.
+  미지원 기록과 뒤늦게 충돌이 발견된 기록도 조회하므로 처리 결과로 인덱스 대상을 제한하지 않는다.
+  100개 작업공간·10만 건의 합성 데이터에서 기존 조회 SQL의 실행 계획과 결과를 비교해 적용했다.
+  실제 운영 성능 보장은 아니며 API·저장 데이터·선정 규칙을 바꾸지 않는다.
 - 단순 행 매핑은 Spring `DataClassRowMapper`를 사용하되 `Instant` 열 읽기만 확장한다.
   PostgreSQL `TIMESTAMPTZ`는 JDBC 4.2의 `OffsetDateTime`으로 읽고 `toInstant()`로 변환해
   구형 `Timestamp` 경유 시 과거 날짜가 달라지는 문제를 피한다. 생성자·필드 매핑은 Spring에
@@ -95,6 +100,13 @@ bootstrap ─┬─> adapter-in-web ──────────> application 
 의존한다. 두 어댑터는 서로 의존하지 않으며 `application`이 정의한 포트 경계를 넘지
 않는다. `bootstrap`은 모듈을 조립하되 비즈니스 규칙을 소유하지 않는다. 안쪽 모듈은
 어댑터나 `bootstrap`을 참조하지 않는다.
+
+이 경계는 `bootstrap`의 `BriefArchitectureTest`에서
+[ArchUnit](https://www.archunit.org/userguide/html/000_Index.html)으로 검사한다. 웹 어댑터의 저장
+포트 직접 사용과 도메인·유스케이스의 프레임워크 의존도 금지한다. ArchUnit core는 BOM 관리 대상이
+아니므로 version catalog에 버전을 고정하고 테스트에서만 사용한다. 별도 JUnit 엔진은 추가하지 않는다.
+`:bootstrap:architectureTest`는 DB 없이 실행하며 `test`에 연결한다. 파일별 검사와 종료 전 전체 diff
+검토는 [검증 절차](../../development/verification.md)를 따른다.
 
 ### 이번 결정에서 제외하는 항목
 

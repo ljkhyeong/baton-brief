@@ -3,12 +3,14 @@ package com.personal.baton.brief.config
 import com.personal.baton.brief.application.BriefUseCases
 import java.util.UUID
 import org.springframework.boot.ApplicationRunner
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Condition
+import org.springframework.context.annotation.ConditionContext
+import org.springframework.context.annotation.Conditional
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.env.Environment
+import org.springframework.core.type.AnnotatedTypeMetadata
 import tools.jackson.databind.json.JsonMapper
 
 @ConfigurationProperties("brief.operations")
@@ -28,22 +30,15 @@ data class BriefOperationsProperties(
 }
 
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty("brief.operations.command")
+@Conditional(OperationsCommandPresent::class)
 @EnableConfigurationProperties(BriefOperationsProperties::class)
 class BriefOperationsConfiguration {
     @Bean
     fun briefOperationsRunner(
         properties: BriefOperationsProperties,
-        environment: Environment,
         brief: BriefUseCases,
         json: JsonMapper,
     ): ApplicationRunner {
-        require(environment.getProperty("spring.main.web-application-type").equals("none", ignoreCase = true)) {
-            "운영 명령은 spring.main.web-application-type=none으로 실행해야 합니다"
-        }
-        require(environment.getProperty("spring.flyway.enabled", Boolean::class.java) == false) {
-            "운영 명령은 spring.flyway.enabled=false로 실행해야 합니다"
-        }
         return ApplicationRunner {
             val result = when (properties.command) {
                 BriefOperationsProperties.Command.RECEIPT -> brief.findEventReceipt(
@@ -56,8 +51,8 @@ class BriefOperationsConfiguration {
                         "before-ingestion-sequence는 양수여야 합니다"
                     }
                     brief.findEventReceiptAnomalies(
-                        requireNotNull(properties.workspaceId) { "이상 이력 조회에는 workspace-id가 필요합니다" },
-                        requireNotNull(properties.seasonId) { "이상 이력 조회에는 season-id가 필요합니다" },
+                        requireNotNull(properties.workspaceId) { "이상 수신 기록 조회에는 workspace-id가 필요합니다" },
+                        requireNotNull(properties.seasonId) { "이상 수신 기록 조회에는 season-id가 필요합니다" },
                         properties.beforeIngestionSequence,
                         properties.limit,
                     )
@@ -68,4 +63,9 @@ class BriefOperationsConfiguration {
             println(json.writeValueAsString(result))
         }
     }
+}
+
+private class OperationsCommandPresent : Condition {
+    override fun matches(context: ConditionContext, metadata: AnnotatedTypeMetadata): Boolean =
+        context.environment.containsProperty("brief.operations.command")
 }

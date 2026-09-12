@@ -20,8 +20,10 @@
 
 - 요청 본문·모델 속성의 Bean Validation 검증 실패
 - 요청 매개변수의 Bean Validation 검증 실패
-- JSON, enum과 타입 역직렬화 실패. 소수를 정수로 바꾸지 않는다.
+- JSON, enum과 타입 역직렬화 실패. 소수를 정수로, 숫자·불리언을 문자열로 바꾸지 않는다.
+- 열거형 필드의 숫자 입력. `state: 0`처럼 선언 순번을 보내는 요청은 거부한다.
 - 대상 요청 DTO에 선언하지 않은 JSON 필드
+- 같은 JSON 객체 안에 반복된 필드명. 값이 같아도 `400 Bad Request`로 거부한다.
 - UUID·숫자 경로 또는 요청 매개변수 변환 실패
 - 필수 요청 매개변수 누락
 - 명시적인 `ResponseStatusException` 기반 `404 Not Found`
@@ -29,6 +31,11 @@
 
 Spring Boot 표준 속성 `spring.mvc.problemdetails.enabled=true`를 사용한다. 프로젝트 전용
 오류 DTO나 `ResponseEntityExceptionHandler` 하위 클래스를 만들지 않는다.
+중복 필드는 `spring.jackson.read.strict-duplicate-detection=true`로 JSON 해석 단계에서 검사한다.
+DTO 검증·이벤트 처리·브리프 생성 전에 거부하며 별도 본문 검사기를 만들지 않는다.
+숫자 열거형은 `spring.jackson.datatype.enum.fail-on-numbers-for-enums=true`로 거부한다.
+문자열 자동 변환은 `JsonMapperBuilderCustomizer`의 `LogicalType.Textual` 설정으로 차단한다.
+기존 `allow-coercion-of-scalars=false`만으로는 이 두 변환을 막을 수 없다.
 
 ## 응답 의미
 
@@ -50,6 +57,8 @@ Spring Boot 표준 속성 `spring.mvc.problemdetails.enabled=true`를 사용한�
 - 이벤트 처리의 `CONFLICT` `409`, `UNSUPPORTED` `422`, `DUPLICATE`, `STALE`, `APPLIED`와
   `APPLIED_WITH_GAP`은 오류 예외가 아니라 PRD-0002가 정의한 도메인 처리 결과다. 기존
   `IngestResponse`를 유지한다.
+- 본문 안의 중복 필드 거부는 같은 이벤트의 재전달과 다르다. 정상 본문을 다시 보내는 기존
+  `DUPLICATE`·`CONFLICT` 판정은 유지한다.
 - 브리프 생성의 `200`·`201`, 조회의 성공 본문과 PRD-0003 이력 응답은 바꾸지 않는다.
 - 예상하지 못한 `DataAccessException`과 애플리케이션 `RuntimeException`은 이번
   `ProblemDetail` 자동 처리 범위가 아니다. 기본 500 응답의 예외명·메시지·스택 비노출
@@ -63,7 +72,7 @@ Spring Boot 표준 속성 `spring.mvc.problemdetails.enabled=true`를 사용한�
 - `spring.web.error.include-message`, `include-binding-errors`, `include-exception`,
   `include-stacktrace`를 활성화하지 않는다.
 
-## 호환성과 비목표
+## 호환성과 제외 범위
 
 - 기존 요청 오류의 HTTP 상태는 바꾸지 않고 오류 표현만 표준화한다.
 - 계약에 없는 JSON 필드를 보내던 요청은 더 이상 해당 필드를 조용히 무시하지 않고
@@ -77,6 +86,9 @@ Spring Boot 표준 속성 `spring.mvc.problemdetails.enabled=true`를 사용한�
 - 대표적인 Bean Validation `400`과 없는 브리프 `404`가
   `application/problem+json`으로 응답한다.
 - 대표 요청에서 정수가 아닌 숫자와 선언하지 않은 JSON 필드를 `400`으로 거부한다.
+- 중복 `eventId`·`state`·`weekStart`를 `400`으로 거부하고 수신 기록·투영·브리프를 저장하지 않는다.
+- 숫자·불리언 `sourceReference`와 숫자 `eventType`·`sourceSeverity`·`state`는 `400`이며 저장하지 않는다.
+  정상 문자열 `"123"`은 원문대로 수신하고 같은 이벤트의 재전달은 `DUPLICATE`다.
 - 응답에 `title`, `status`, `detail`, `instance`가 있고 상태와 요청 경로가 일치한다.
   `type`은 별도 문제 유형이 있을 때만 포함하며, 생략된 경우 `about:blank`로 해석한다.
 - 기존 이벤트 도메인 결과와 성공 응답 본문은 바뀌지 않는다.

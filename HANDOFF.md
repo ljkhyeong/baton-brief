@@ -4,17 +4,19 @@
 
 BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [README](README.md),
 계약·구조 결정은 [문서 색인](docs/README.md), 계약 버전은 [VERSION](contracts/VERSION)을 따른다.
-현재 마이그레이션은 V9이며 계약 팩은 원격 호환 검증 전인 RC 상태다.
+현재 마이그레이션은 V10이며 계약 팩은 원격 호환 검증 전인 RC 상태다.
 
-2026-09-08 BRIEF 기능·운영·문구 개선을 원격 `main`의 `a4eb076`에 병합했다.
+2026-09-08 조회 코드·수신 경보·인증 개선을 원격 `main`의 `5b7d880`에 병합했다(PR #14).
 조회 매개변수·수신 경보·토큰 캐시 정리의 구현 기준은 `7e1a054`다.
 BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
 이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
-공개 이벤트 수신 주소는 `brief.b4ton.com`으로 설정했지만 서버는 미구축이다.
-DNS 연결·공인 인증서 발급·원격 배포는 실행하지 않았다.
-다음 배포 입력은 서버 위치·접속 방법·실제 IP다. 추가 이용료 없는 자체 Prometheus와
-PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치와 외부 경보 수신처는 미정이다.
+공개 이벤트 수신 주소는 `brief.b4ton.com`이다. 사용자는 Cloudflare DNS·Ubuntu 홈서버·공인 IP·인증서와
+공유기 80·443 포트포워딩을 준비했다. k3s는 아직 구축하지 않았다. 이번 요청은 외부 연동 검토이며
+홈서버 설치가 아니다. 실제 DNS 변경·인증서 적용·원격 배포는 실행하지 않았다.
+추가 이용료 없는 Prometheus와 PostgreSQL 백업·격리 복원 확인을 제공한다. 운영 알림은 Slack·Discord를
+선택하거나 함께 사용할 수 있다. 공용 Alertmanager 연결 대상과 실제 웹훅은 미등록이다.
+[외부 연동 검토](docs/operations/external-integrations.md)를 따른다.
 
 ## 재사용할 검증 근거
 
@@ -26,11 +28,17 @@ PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치�
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
-| BRIEF `7e1a054` 수신 지표·인증, 2026-09-08 | `:bootstrap:test`에서 `BriefEventMetricsTest`·`BriefSecurityConfigurationTest`·`BriefServiceApiSecurityIntegrationTest`와 `BriefMvpIntegrationTest`의 수신·Bearer·상태 확인 3건을 선택해 총 7건 통과(11초). JDK 21.0.10·PostgreSQL 18.6. Prometheus 3.14.0의 `promtool check config`·`test rules`로 규칙 3개·시나리오 8개 통과 | 카운터 초기 등록·첫 충돌/미지원 증가·수집 대상 누락과 복구·정상 결과 제외·카운터 초기화 확인. 토큰 검증·교체 유지. 실패·제외 없음. 단일 웹 어댑터와 경보 규칙 변경으로 전체 테스트·JAR 생성·컨테이너 재기동·계약 ZIP 재생성은 생략. 외부 알림은 미연결 |
-| BRIEF `f2000ae` 조회 매개변수, 2026-09-08 | `:bootstrap:test`의 `BriefMvpIntegrationTest`에서 조회 관련 7건 선택 실행·통과(8초). 이상 수신 기록·목록 필터·상태 이력·브리프 이력·주간 해소·DST·NBSP 참조 확인. JDK 21.0.10·PostgreSQL 18.6 | JDBC 조회 5곳의 수동 가변 맵을 제거하고 SQL·선택 조건·정렬·페이지 계산 유지. 실패·제외 없음. 단일 어댑터 변경으로 전체 테스트·JAR 생성·스테이징 재기동·계약 ZIP 재생성은 생략 |
+| BRIEF `216d73d` JSON 타입·중복 필드 거부, 2026-09-12 | `./gradlew test :bootstrap:bootJar contractsZip` 성공(54초), bootstrap 41건 통과·ArchUnit 4건 및 도메인 6건 성공 결과 재사용. 숫자 sourceReference가 문자열로 변환되어 `202 APPLIED`로 저장되는 문제 재현 후, 문자열·열거형의 잘못된 타입 7가지가 `400 ProblemDetail`이며 저장 0건임을 확인. 정상 문자열 `"123"` 수신·재전달 및 기존 중복 필드 거부 포함. 로그 `/tmp/brief-scalar-before-20260912.log`·`/tmp/brief-scalar-after-20260912.log`·`/tmp/brief-scalar-full-20260912.log` | MockMvc·PostgreSQL 18.6·JDK 21.0.10·Jackson 3.1.5. `JsonMapperBuilderCustomizer`의 Textual coercion과 `spring.jackson.datatype.enum.fail-on-numbers-for-enums` 사용. 기존 scalar 옵션만으로 문자열·숫자 열거형 변환을 막을 수 없음. 최초 컴파일 의존성 누락과 Jackson 2 방식 설정 경로를 수정한 뒤 전체 검증 통과. 배포 JAR 라이브러리 84개는 이전과 동일하며 설정 반영 확인. 전체 diff·구조·문서 링크와 ZIP 문서 5개·내부 링크 8개 확인. 이벤트 스키마·계약 버전 유지. 원격 생산자·실제 HTTP 서버·배포 검증은 미실행 |
+| BRIEF `1669d91` 운영 명령 선택·초기화 검사, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefOperationsConfigurationTest' :bootstrap:bootJar` 성공(3초), 설정 테스트 2건·ArchUnit 4건 통과. 이전 JAR의 `command=false`가 출력 없이 종료 코드 0을 반환함을 재현. 변경 후 실제 JAR에서 false·FALSE·UNKNOWN·빈 값 4건 실패와 RECEIPT·ANOMALIES·REBUILD·rebuild 정상 종료 확인. 로그 `/tmp/brief-operations-false-before-20260912.stderr`·`/tmp/brief-operations-condition-after-20260912.log`·`/tmp/brief-operations-command-runtime-20260912.log` | JDK 21.0.10·PostgreSQL 18.6의 격리 DB. 잘못된 명령은 표준 출력·테이블 생성·DB 연결·웹 기동 없음. 정상 명령은 JSON 출력·수신 기록 보존·Flyway 미실행, 임시 DB 정리 확인. 명령 속성의 존재 여부는 Spring Condition에서 판정하며 값 검증은 기존 열거형 바인딩 사용. 빈 등록 전 환경에 접근해야 하므로 환경 빈을 참조하는 SpEL 대신 ConditionContext.environment 사용. 기존 웹·Flyway 비활성 초기 검사 4조건과 명령 미지정 시 비활성 확인. 전체 diff·구조·문서 링크 확인. 운영 명령만 바꿔 전체 테스트·계약 ZIP·원격 CI·배포는 미실행. 앞선 JSON 검증 범위는 `216d73d` 행 참조 |
+| BRIEF `6902274` 주간 해소 집계, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefMvpIntegrationTest.주간 해소*'` 3건·ArchUnit 4건 통과(7초). 필터·페이지·DST·재활성화·공백 이후 새 해소와 재구축 확인. 파일 검사·전체 diff 검토 통과. 로그 `/tmp/brief-resolution-tests-20260912.log` | PostgreSQL 18.6·JDK 21.0.10. V10 인덱스를 적용한 동일 합성 DB(전체 10만 건, 대상 작업공간 1만 건)에서 기존/변경 SQL 결과 일치, 1730.794→21.300ms 확인. 기록 재조회 5천 회를 윈도 집계 1회로 대체. `/tmp/brief-resolution-plans-20260912.json`·`/tmp/brief-resolution-benchmark-20260912.log`, 임시 DB 정리 완료. 단일 데이터의 비교이며 운영 성능 보장은 아님. 주간 SQL만 변경해 전체 테스트·JAR 재생성·계약 ZIP·배포는 제외. 당시 JAR는 `99e9579` 기준으로 이 변경 미포함. 최신 JAR는 운영 명령 초기화 검사 행 참조 |
+| BRIEF `99e9579` 수신 기록 조회 인덱스, 2026-09-12 | `./gradlew test :bootstrap:bootJar` 성공(18초). bootstrap 39건 통과, ArchUnit 4건·도메인 6건 성공 결과 재사용. V2·V7 대표 데이터의 V9→V10 업그레이드 전후 전체 행 보존, JAR의 V10 포함 확인. 로그 `/tmp/brief-receipt-index-tests-20260912.log` | PostgreSQL 18.6·JDK 21.0.10. 100개 작업공간·수신 10만 건·현재 항목 5만 건·충돌 2천 건의 격리 DB에서 기존 SQL 4개의 결과 일치와 조회 계획 개선 확인. 생성 기준 9.327→0.035ms, 이상 수신 7.516→0.428ms, 전이 8.646→0.181ms, 주간 해소 33.288→20.131ms, 인덱스 약 5.7MiB. 단일 합성 데이터의 비교이며 운영 지연 보장·쓰기 처리량 검증은 아님. 근거 `/tmp/brief-receipt-index-plans-20260912.json`·`/tmp/brief-receipt-index-20260912-retry.log`. 첫 실측은 임시 DB 초기화 완료 오인으로 실패해 TCP 준비 확인으로 수정한 뒤 통과·정리. 전체 diff·구조 검사 통과. 원격 CI·배포 미실행. V10 생성 중 쓰기 대기는 배포 문서 참고 |
+| BRIEF `9d6e9f2` 운영 안내·경보 문구, 2026-09-12 | `:bootstrap:test`에서 `BriefOperationsConfigurationTest` 1건과 `contractsZip` 성공. Prometheus 경보 시나리오 8개 통과. 계약 ZIP의 문서 5개·내부 링크 8개 확인 | 오류·경보 문자열만 변경. 검증 조건·경보 규칙·API·실행 예시는 유지. 문서 로컬 링크 177개 확인. 전체 테스트·JAR 생성·배포는 문구 수정 범위에서 제외 |
+| BRIEF `2d2521d` 운영·전달 경보, 2026-09-12 | Prometheus 3.14.0 `promtool check config`·`test rules`로 규칙 6개·시나리오 18개 통과. 실제 Alertmanager 중단으로 전송 오류 증가·전달 실패 경보를 확인하고 재시작 후 HTTPS 전달·Slack 수신 대역의 경보/해제 확인. 기본 대상 `[]`에서 업무 경보가 발생해도 전송 오류·유실 지표와 전달 실패 경보가 없음을 별도 확인. 로그 `/tmp/brief-notification-rules-20260912.log`·`/tmp/brief-notification-runtime-20260912.log`·`/tmp/brief-notification-disabled-20260912.log` | Alertmanager 0.32.1·Python 3.14.7, 비루트·읽기 전용·외부 네트워크/호스트 포트 없는 임시 환경. 시험에만 간격 단축·임시 CA 사용 후 정리. 실패 없음. 유실 카운터 증가·5분 후 해제·재시작 초기화는 규칙 시나리오로 검증. 앱·빌드 입력 불변으로 `6ed7922`의 Gradle·JAR 근거 재사용. 기존 DB 대기 실측은 `7d54ba6`·`42b744f` JAR의 `/tmp/brief-db-wait-runtime-20260912-retry.log` 근거 유지. 실제 Slack·Discord 수신·원격 배포·CI는 미실행 |
+| BRIEF `6ed7922` 파일·구조 검증 루프, 2026-09-12 | `./gradlew test :bootstrap:bootJar` 성공(14초). bootstrap 39건 통과, ArchUnit 4건·도메인 6건 기존 결과 재사용. 검사 도구 테스트 5건·actionlint 1.7.12 통과. Controller의 저장 포트/구현체 참조, Domain의 구성·SQL 참조, Service의 JDBC 구현체 참조를 임시로 넣어 네 규칙의 실패를 확인한 뒤 제거. 로그 `/tmp/brief-feedback-build-20260912.log`·`/tmp/brief-architecture-probes-20260912.log` | JDK 21.0.10·PostgreSQL 18.6·Python 3.14.7. 전체 diff·구조 검사 2초, DB 기동 없음. 중간 커밋·staged/unstaged·새 파일·삭제·한글 공백 경로와 문서만 변경 시 Gradle 생략 확인. 주간 해소 정렬을 포함한 현재 코드 검증과 JAR 생성 완료. JAR에 ArchUnit·임시 위반 코드 없음. 자동화는 프로젝트 지침·검사 명령·CI 기준이며 앱 전역 저장 훅은 미설치. 원격 CI·배포·계약 ZIP은 미실행 |
+| BRIEF `ae06f1c` 운영 출력 분리, 2026-09-12 | `./gradlew test :bootstrap:bootJar` 성공(15초). bootstrap 39건 통과, 도메인 6건 기존 결과 재사용. JDK 21.0.10·PostgreSQL 18.6. 실제 JAR로 단건·이상 기록 2페이지·재구축과 미존재·필수 입력 누락을 실행해 JSON/로그 분리·종료 코드 확인. 로그 `/tmp/brief-ops-output-build-20260912.log`·`/tmp/brief-ops-output-runtime-20260912.log` | 운영 프로필에만 적용. 포트 점유 상태에서도 정상 실행하고 검증용 미적용 마이그레이션을 실행하지 않음을 확인. 웹 기본 로그, 수신·충돌·브리프·Flyway 이력 보존과 임시 앱·DB 정리 확인. 실행 JAR는 이 커밋 기준. 실패·제외 없음. 기존 주간 해소 필터·비교 조건부 조회 포함 전체 테스트 통과. 원격 배포·운영 Compose 실행은 미실행. 계약 ZIP 입력 변경 없음 |
 | BRIEF `c1e68a1` 오류 문구, 2026-09-08 | `:bootstrap:test` 선택 4건과 `contractsZip` 성공. 수신 조회·이벤트 입력 형식·브리프 조회·비교 오류 확인. 백업 경로 안내·문서 링크 163개·ZIP 내 문서 5개 확인 | 코드 변경은 안내 문자열에 한정. API 필드·상태 코드·검증 조건 유지. 전체 테스트·JAR 생성·컨테이너 재기동은 문구 변경 범위에서 제외 |
-| BRIEF `f2f34ab` 지표 수집, 2026-09-07 | `docker build --tag baton-brief:no-fee-verify .`, Compose 설정·격리 기동, Prometheus 3.14.0 `promtool check config`·`test rules` 4개 시나리오 성공. 실제 수집·경보 API·비루트·읽기 전용·비공개 네트워크·파일 Bearer·비밀 로그 비노출 확인 | Docker Compose 5.5.0·PostgreSQL 18.6. 원격 배포·외부 알림은 미실행. 제품 소스·의존성은 `5e7cd53`과 같아 아래 Gradle 결과 재사용 |
-| BRIEF `f2f34ab` 백업, 2026-09-07 | `bash ops/backup-postgresql.sh`의 파일 권한·실패한 임시 파일 제거·기존 백업 보존 확인. 별도 빈 PostgreSQL에 복원해 Flyway 포함 6개 테이블 일치 | 계약 예시 1건 기준. Linux 타이머 설치·대용량·외부 보관·서버 장애 복구는 미실행 |
+| BRIEF `adae4e0` Slack·Discord 경보 연동, 2026-09-12 | Alertmanager 0.32.1의 채널 설정 2개·서비스 분기 4건, actionlint 1.7.12 통과. 문서대로 두 채널 설정을 한 수신처에 합쳐 실제 Alertmanager와 Python 수신 대역에서 양쪽 경보·해제 4건, 제목·본문·내부 URL 비노출 확인. 로그 `/tmp/brief-discord-config-check-20260912.log`·`/tmp/brief-discord-runtime-20260912.log` | 비루트·읽기 전용·외부 네트워크 및 호스트 포트 없는 임시 환경, 시험 발송 간격만 단축. 실패 없음·임시 환경 정리. 변경 없는 Prometheus 설정·경보 13개 시나리오·HTTPS 전달은 `0d9b064` 근거(`/tmp/brief-slack-config-check-20260912.log`·`/tmp/brief-slack-runtime-20260912-retry.log`) 재사용. 앱·빌드·계약 입력은 `6ed7922`와 같아 Gradle·JAR 재검증 제외. 실제 채널·공용 Alertmanager·원격 CI·배포는 미연결·미실행 |
+| BRIEF `5e2f5ae` 백업 자동 검증, 스크립트 `93345fc`, 2026-09-12 | actionlint 1.7.12와 CI에 추가한 Bash 블록 실행 성공. 기존 `ae06f1c` JAR·JDK 21.0.10·PostgreSQL 18.6으로 V9 스키마와 계약 이벤트를 준비해 백업 생성·격리 복원·손상 파일 실패 확인. 원본 DB·`0700`/`0600` 권한 보존과 임시 앱·DB·볼륨 정리 확인. 로그 `/tmp/brief-backup-ci-20260912-retry.log` | 최초 로컬 시도는 내부 네트워크의 호스트 접속 불가로 준비 중 실패해 검증 환경에만 loopback 접속 경로를 추가했다. CI 추가 블록만 실행했으며 전체 Actions·원격 실행은 미실행. 기존 `93345fc`의 20,001행·외래 키 오류·공백 경로·격리 조건 검증은 유지. 앱·스키마·스크립트 변경이 없어 Gradle·JAR·계약 ZIP 재검증 제외. Linux 타이머 설치·대용량·외부 보관·서버 장애 복구는 미실행 |
 | BRIEF `5e7cd53` 조회 위임 정리, 2026-09-05 | `./gradlew test :bootstrap:bootJar` 성공. `bootstrap` 35건 실행·통과, 도메인 6건 기존 결과 재사용. 실패·제외 없음. JDK 21·PostgreSQL 18.6 | 동일한 조회 10개의 선언을 `BriefQueries`에 모으고 서비스의 단순 전달을 Kotlin 위임으로 대체. 기존 RowMapper 교체를 포함해 조회·페이지·인증·재구축·계약 검증. 원격·교차 서비스 검증은 미실행 |
 | BATON `1916d8c8` | `build checkApiContract`, 후속 계약 문서 수정의 `generateApiContract checkApiContract`, 최종 프런트 빌드 성공 | 병합한 코드·API 계약·프런트 빌드. 원격 배포 근거는 아님 |
 | BATON 병합 중 전체 브라우저 실행 | API 대역 환경에서 614건 통과·기존 조건에 따라 43건 제외 | 이후 열람자 제한 보완이 있어 최종 코드 전체 재실행 결과는 아님 |
@@ -71,8 +79,9 @@ PostgreSQL 백업·Linux 타이머 예시를 준비했다. 실제 서버 설치�
 
 ## 다음 작업
 
-1. 서버 위치·접속 정보·IP를 확인하고 [배포 준비](docs/operations/brief-b4ton-com-deployment.md)를 따른다.
-   같은 서버면 공개 Caddy의 80·443 포트를 통합하고, 여러 서버면 Docker 공유 네트워크 대신 비공개 경로를 준비한다.
+1. 사용할 채널의 웹훅과 공용 Alertmanager의 비공개 HTTPS 주소가 준비되면 [연결 절차](docs/operations/external-integrations.md)를 적용한다.
+   서버 설치 요청이 있을 때만 k3s 배포를 진행한다. [기존 배포 참고](docs/operations/brief-b4ton-com-deployment.md)의
+   Compose 연결을 k3s에 그대로 적용한 것으로 간주하지 않는다.
 2. 주간 분류·해소 상세 응답을 제공하는 BRIEF를 먼저 배포하고 BATON을 연결한다.
    서비스 인증서·truststore와 이벤트/서비스별 현재 Bearer를 주입한다. 직전 token은 교체할 때만 사용한다.
 3. 실제 BATON serializer의 현재 계약 본문으로 공인 HTTPS 이벤트 수신을 확인한다.

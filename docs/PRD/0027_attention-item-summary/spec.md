@@ -2,7 +2,8 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-31
-- 범위: 작업공간·시즌별 활성 항목 집계(심각도별 개수, 리비전 공백이 기록된 항목 수)
+- 확장일: 2026-09-12 — 업무 종류별 요약 추가
+- 범위: 작업공간·시즌별 활성 항목 집계와 선택적 업무 종류 필터
 
 ## 목적
 
@@ -15,8 +16,12 @@ BRIEF가 활성 항목 수를 집계해 제공한다. BATON은 목록 전체를 
 GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary
 ```
 
-`workspaceId`와 `seasonId`는 UUID이며 질의 매개변수는 정의하지 않는다. 성공 시 `200 OK`와
-다음 JSON 객체를 반환한다.
+`workspaceId`와 `seasonId`는 UUID다. 선택적 `eventType`에 v1·v2 이벤트 종류를 지정하면
+해당 업무 종류만 집계한다. 생략하면 작업공간·시즌의 전체 활성 항목을 집계한다.
+예: `?eventType=ROLE_UNASSIGNED`는 역할 미배정 항목의 요약을 반환한다.
+알 수 없는 종류는 Spring MVC 변환에 따라 `400 Bad Request`·`ProblemDetail`로 거부한다.
+
+성공 시 `200 OK`와 다음 JSON 객체를 반환한다.
 
 ```json
 {
@@ -35,7 +40,8 @@ GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary
 `highCount + mediumCount`이며, 여기에 `revisionGapCount`를 더하지 않는다.
 
 해당 항목의 목록은 [PRD-0028](../0028_attention-item-filters/spec.md)의 기존 목록 필터로
-조회한다. 요약에는 필터 매개변수를 추가하지 않는다.
+조회한다. 목록과 요약에 같은 `eventType`을 전달해 업무 종류를 맞춘다.
+요약은 선택한 종류의 심각도별·공백 개수를 함께 제공하므로 `severity`·`revisionGap` 필터는 받지 않는다.
 
 활성 항목이 없는 범위는 세 값 모두 `0`으로 반환한다. BRIEF는 작업공간·시즌의 원본 존재나
 사용자 권한을 판정하지 않으므로 빈 요약을 `404`로 바꾸지 않는다. 잘못된 UUID는 기존
@@ -44,6 +50,7 @@ Spring MVC 변환과 PRD-0004의 `400 Bad Request`·`ProblemDetail`을 따른다
 ## 집계와 일관성
 
 - 작업공간과 시즌이 모두 일치하는 현재 `attention_item`의 `ACTIVE` 행만 집계한다.
+- `eventType`을 지정하면 해당 종류의 행을 고른 뒤 세 개수를 집계한다.
 - `RESOLVED`, 수신 기록 행과 브리프 항목은 집계하지 않는다.
 - 심각도가 바뀌거나 항목이 해소되면 다음 조회는 변경된 현재 상태를 반영한다.
 - 중복·충돌·오래된 이벤트·미지원 이벤트의 수신 횟수를 항목 수에 더하지 않는다.
@@ -60,6 +67,7 @@ Spring MVC 변환과 PRD-0004의 `400 Bad Request`·`ProblemDetail`을 따른다
 - Spring Security와 서비스 Caddy의 정확한 `GET` 허용 경로에만 추가한다. 공개 Caddy의
   이벤트 수신 한 경로 계약은 바꾸지 않는다.
 - 기존 목록의 응답·커서·정렬과 단건 `ETag`는 바꾸지 않는다. 요약에는 `ETag`를 추가하지 않는다.
+- `eventType`을 생략한 요약 호출은 기존 전체 집계와 응답 필드를 유지한다.
 - 기존 투영과 Spring JDBC 집계를 사용하며 새 테이블·열·인덱스·캐시를 만들지 않는다.
 - 이벤트 계약 팩, 투영·브리프 `ruleVersion`과 기존 브리프는 바꾸지 않는다.
 
@@ -67,15 +75,16 @@ Spring MVC 변환과 PRD-0004의 `400 Bad Request`·`ProblemDetail`을 따른다
 
 - 활성 `HIGH`·`MEDIUM`과 공백 항목이 섞인 범위에서 세 개수가 정확하다.
 - 다른 작업공간이나 시즌의 항목이 섞이지 않으며 빈 범위는 세 값 모두 `0`이다.
+- 업무 종류를 지정하면 v1·v2 모두 해당 종류만 집계하며, 일치하는 활성 항목이 없으면 세 값 모두 `0`이다.
 - 심각도 변경과 해소를 반영하고 재구축으로 같은 요약을 재현한다.
 - 이벤트 수신 결과가 항목 수로 중복 집계되지 않는다.
 - 서비스 인증이 활성화된 환경에서 무인증·이벤트 Bearer는 거부하고 서비스 Bearer는 허용한다.
 - 신뢰한 서비스 HTTPS에서 조회되며 공개 HTTPS에서는 같은 경로가 `404`다.
 
-## 비목표
+## 제외 범위
 
 - BATON 저장소의 사용자 API·client·화면 구현과 교차 서비스 검증
-- `RESOLVED` 요약, 이벤트 종류·기간·주간 필터와 브리프 통계
+- `RESOLVED` 요약, 심각도·공백·기간·주간 필터와 브리프 통계
 - 페이지 응답의 전체 개수, 자유 집계·검색과 새 정렬
 - 수신 요청 지표·원본 이벤트의 전달 완료 판정·운영자 수신 기록 조회
 - 집계 전용 저장소·scheduler·캐시·변경 알림과 외부 지표 수집

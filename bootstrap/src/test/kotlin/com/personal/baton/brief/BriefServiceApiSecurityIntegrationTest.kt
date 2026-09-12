@@ -1,5 +1,6 @@
 package com.personal.baton.brief
 
+import com.jayway.jsonpath.JsonPath
 import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
@@ -11,6 +12,7 @@ import org.springframework.test.context.TestConstructor
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -39,7 +41,8 @@ class BriefServiceApiSecurityIntegrationTest(
         val seasonId = "20000000-0000-0000-0000-000000000051"
         val editionPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         val summaryPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/summary"
-        val resolutionsPath = summaryPath.removeSuffix("summary") + "resolutions?weekStart=2026-08-24&zoneId=Asia/Seoul"
+        val resolutionsPath = summaryPath.removeSuffix("summary") +
+            "resolutions?weekStart=2026-08-24&zoneId=Asia/Seoul&eventType=ROLE_UNASSIGNED"
         mockMvc.perform(get(resolutionsPath)).andExpect(status().isUnauthorized)
         mockMvc.perform(get(resolutionsPath).header(HttpHeaders.AUTHORIZATION, "Bearer $SECURITY_EVENT_TOKEN"))
             .andExpect(status().isUnauthorized)
@@ -60,7 +63,7 @@ class BriefServiceApiSecurityIntegrationTest(
             get(summaryPath).header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"),
         ).andExpect(status().isOk)
 
-        mockMvc.perform(
+        val createdEdition = mockMvc.perform(
             post(editionPath)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -72,7 +75,29 @@ class BriefServiceApiSecurityIntegrationTest(
                     }
                     """.trimIndent(),
                 ),
-        ).andExpect(status().isCreated)
+        ).andExpect(status().isCreated).andReturn()
+        val editionId = JsonPath.read<String>(createdEdition.response.contentAsString, "$.editionId")
+        val comparisonPath = "/api/v1/editions/$editionId/changes"
+        val comparison = mockMvc.perform(
+            get(comparisonPath).param("fromEditionId", editionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"),
+        ).andExpect(status().isOk).andReturn()
+        val comparisonEtag = checkNotNull(comparison.response.getHeader(HttpHeaders.ETAG))
+        mockMvc.perform(
+            get(comparisonPath).param("fromEditionId", editionId)
+                .header(HttpHeaders.IF_NONE_MATCH, comparisonEtag),
+        ).andExpect(status().isUnauthorized)
+        mockMvc.perform(
+            get(comparisonPath).param("fromEditionId", editionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $SECURITY_EVENT_TOKEN")
+                .header(HttpHeaders.IF_NONE_MATCH, comparisonEtag),
+        ).andExpect(status().isUnauthorized)
+        mockMvc.perform(
+            get(comparisonPath).param("fromEditionId", editionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $PREVIOUS_SERVICE_API_TOKEN")
+                .header(HttpHeaders.IF_NONE_MATCH, comparisonEtag),
+        ).andExpect(status().isNotModified)
+            .andExpect(content().string(""))
 
         mockMvc.perform(
             get("$editionPath/latest")

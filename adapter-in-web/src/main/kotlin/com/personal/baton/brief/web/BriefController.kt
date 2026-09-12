@@ -15,6 +15,7 @@ import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
+import com.personal.baton.brief.domain.WeeklyWindow
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
@@ -110,6 +111,7 @@ class BriefController(
         @PathVariable("seasonId") seasonId: UUID,
         @Valid @ModelAttribute request: AttentionItemCursorRequest,
         @RequestParam("status", defaultValue = "ACTIVE") status: SourceEventState,
+        @RequestParam("eventType", required = false) eventType: SourceEventType?,
         @RequestParam("severity", required = false) severity: Severity?,
         @RequestParam("revisionGap", required = false) revisionGap: Boolean?,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
@@ -118,6 +120,7 @@ class BriefController(
             workspaceId,
             seasonId,
             status,
+            eventType,
             severity,
             revisionGap,
             request.toCursor(),
@@ -129,7 +132,8 @@ class BriefController(
     fun findAttentionItemSummary(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
-    ): CurrentAttentionItemSummary = brief.findAttentionItemSummary(workspaceId, seasonId)
+        @RequestParam("eventType", required = false) eventType: SourceEventType?,
+    ): CurrentAttentionItemSummary = brief.findAttentionItemSummary(workspaceId, seasonId, eventType)
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions")
     fun summarizeWeeklyResolutions(
@@ -138,8 +142,9 @@ class BriefController(
         @Valid @ModelAttribute request: EditionWeekRequest,
         @Valid @ModelAttribute cursor: AttentionItemCursorRequest,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
+        @RequestParam("eventType", required = false) eventType: SourceEventType?,
     ): WeeklyResolutionSummary = brief.summarizeWeeklyResolutions(
-        request.toCommand(workspaceId, seasonId), cursor.toCursor(), limit,
+        request.toCommand(workspaceId, seasonId), cursor.toCursor(), limit, eventType,
     )
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions")
@@ -197,13 +202,37 @@ class BriefController(
             ?.toResponse()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
 
-    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions")
+    @GetMapping(
+        "/workspaces/{workspaceId}/seasons/{seasonId}/editions",
+        params = ["!weekStart", "!zoneId"],
+    )
     fun findEditionHistory(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
         @RequestParam("beforeGeneration", required = false) @Positive beforeGeneration: Long?,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
     ): EditionHistoryResult = brief.findEditionHistory(workspaceId, seasonId, beforeGeneration, limit)
+
+    @GetMapping(
+        "/workspaces/{workspaceId}/seasons/{seasonId}/editions",
+        params = ["weekStart", "zoneId"],
+    )
+    fun findEditionHistoryForWeek(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @Valid @ModelAttribute request: EditionWeekRequest,
+        @RequestParam("beforeGeneration", required = false) @Positive beforeGeneration: Long?,
+        @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
+    ): EditionHistoryResult {
+        val command = request.toCommand(workspaceId, seasonId)
+        return brief.findEditionHistory(
+            workspaceId,
+            seasonId,
+            beforeGeneration,
+            limit,
+            WeeklyWindow.startingOn(command.weekStart, command.zoneId),
+        )
+    }
 
     @GetMapping("/editions/{editionId}")
     fun findEdition(
@@ -216,8 +245,10 @@ class BriefController(
     fun compareEditions(
         @PathVariable("targetEditionId") targetEditionId: UUID,
         @RequestParam("fromEditionId") fromEditionId: UUID,
-    ): EditionComparison = when (val result = brief.compareEditions(fromEditionId, targetEditionId)) {
-        is EditionComparisonResult.Found -> result.comparison
+    ): ResponseEntity<EditionComparison> = when (val result = brief.compareEditions(fromEditionId, targetEditionId)) {
+        is EditionComparisonResult.Found -> ResponseEntity.ok()
+            .eTag("brief-edition-comparison-v1-$fromEditionId-$targetEditionId")
+            .body(result.comparison)
         EditionComparisonResult.NotFound ->
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
         EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(

@@ -10,16 +10,20 @@ Docker 실행 권한으로만 실행한다. 실행자, 대상 환경·이미지 
 아래 명령은 실제 대상의 `.env.staging`과 같은 이미지·DB 설정을 사용한다. 운영 명령은
 HTTP 서버를 열지 않고 Flyway를 실행하지 않는다. 애플리케이션 배포로 마이그레이션을 완료한
 뒤 실행하며 조회·재구축은 현재 DB 스키마에 맞는 이미지를 사용한다.
+운영 명령의 웹·Flyway 비활성 설정을 빠뜨리거나 덮어쓰면 DB 연결·마이그레이션·웹 서버 기동 전에
+오류로 종료한다. `operations` 프로필의 기본 설정을 유지한다.
+명령은 `RECEIPT`·`ANOMALIES`·`REBUILD` 중 하나다. `false`를 포함해 목록에 없는 명령은
+0이 아닌 종료 코드로 실패한다.
 
-## 수신 기록과 이상 이력
+## 수신 기록 단건·이상 기록 조회
 
 ```shell
-docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps brief \
+docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps -T brief \
   --spring.profiles.active=operations \
   --brief.operations.command=RECEIPT \
   --brief.operations.event-id=<이벤트-UUID>
 
-docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps brief \
+docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps -T brief \
   --spring.profiles.active=operations \
   --brief.operations.command=ANOMALIES \
   --brief.operations.workspace-id=<작업공간-UUID> \
@@ -27,7 +31,15 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
   --brief.operations.limit=20
 ```
 
-결과는 기존 조회 API와 같은 JSON으로 표준 출력에 기록된다. 과거 페이지는 반환된
+`operations` 프로필은 성공 결과 JSON 한 건만 표준 출력으로 보내고 시작·종료·오류 로그는
+표준 오류로 보낸다. `-T`는 가상 터미널을 끄고 두 출력을 분리한다. 다른 로그 설정을 지정할
+때도 이 구분을 유지한다.
+
+결과를 저장하려면 접근이 제한된 디렉터리에서 `umask 077`을 적용하고 위 명령 끝에
+`> receipt.json 2> receipt.log`를 붙인다. 종료 코드가 `0`일 때만 결과 파일을 사용한다.
+`jq` 등 다른 도구와 연결할 때는 Bash에서 `set -o pipefail`을 켜 명령 실패를 놓치지 않는다.
+
+결과는 기존 조회 API와 같은 JSON이다. 과거 페이지는 반환된
 `nextBeforeIngestionSequence`를 `--brief.operations.before-ingestion-sequence`로 넘긴다.
 첫 페이지를 다시 조회하려면 커서를 생략한다. 조회 결과는 최초 수신 결과를 유지하며
 충돌 지문과 원문 payload를 포함하지 않는다.
@@ -43,13 +55,14 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
 이미 기록된 `revisionGap`도 지우지 않는다. 미지원·충돌 기록은 임의로 재처리하지 않는다.
 
 ```shell
-docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps brief \
+docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps -T brief \
   --spring.profiles.active=operations \
   --brief.operations.command=REBUILD
 ```
 
-성공하면 `receiptCount`, `itemCount`를 출력하고 종료한다. 기존 전역 잠금·한 트랜잭션을
-사용하며 실패 시 이전 투영으로 롤백한다. 수신 기록과 기존 브리프는 보존한다.
+성공하면 처리한 수신 기록 수(`receiptCount`)와 점검 항목 수(`itemCount`)를 출력하고 종료한다.
+전역 잠금과 한 트랜잭션을 사용하며, 실패하면 재구축 전의 점검 항목으로 롤백한다.
+수신 기록과 기존 브리프는 보존한다.
 
 ## 추가 이용료 없는 지표 수집
 
@@ -96,18 +109,44 @@ docker compose --env-file .env.staging -f compose.staging.yml -f compose.observa
 | `BriefMetricsUnavailable` | 수집 실패 또는 `brief` 수집 대상 지표 누락이 2분간 지속 |
 | `BriefServerErrors` | 최근 5분의 HTTP `5xx` 발생 건수가 5건 이상인 상태가 1분간 지속 |
 | `BriefEventRejected` | 최근 5분의 `CONFLICT` 또는 `UNSUPPORTED` 카운터 증가가 감지된 상태가 1분간 지속 |
+| `BriefDatabaseConnectionWait` | DB 연결을 기다리는 요청이 있는 상태가 연결 풀별로 2분간 지속 |
+| `BriefEventRevisionGap` | 최근 5분의 `APPLIED_WITH_GAP` 카운터 증가가 감지된 상태가 1분간 지속 |
+| `BriefAlertDeliveryFailed` | 최근 5분의 Alertmanager 전달 오류 또는 경보 유실 증가가 감지된 상태가 1분간 지속 |
+
+Prometheus는 `brief-prometheus` 작업으로 자신의 loopback 지표 중 경보 전송 오류·유실 카운터만
+수집한다. 별도 exporter나 API 키는 필요 없다. [기본 제공 카운터](https://github.com/prometheus/prometheus/blob/main/notifier/metric.go)는
+`prometheus_notifications_errors_total`과 `prometheus_notifications_dropped_total`이며,
+경보에는 수신처 URL을 포함하지 않는다.
+
+`BriefAlertDeliveryFailed`는 Prometheus에서 Alertmanager까지의 전달 문제다. 해당 경보가 발생하면
+`/api/v1/alertmanagers`의 연결 대상과 인증서·인증·네트워크를 확인한다. Alertmanager가 모든 경보를
+받지 못하는 중에는 이 경보도 외부로 전달되지 않을 수 있으므로 위 로컬 경보 조회에서 확인한다.
+Slack·Discord 웹훅 오류와 실제 메시지 도착은 Alertmanager와 수신 채널에서 별도로 확인한다.
+최근 5분에 새 오류·유실이 없으면 해제되며, 이전에 유실한 경보가 복구됐다는 뜻은 아니다.
+수신처를 등록하지 않아 카운터가 없는 상태나 재시작 초기화만으로는 경보하지 않는다.
 
 이벤트 거부 경보는 `outcome`으로 충돌과 미지원을 구분한다. HTTP `409`·`422`도 확인할 수
 있으며, BATON의 이벤트 버전·본문과 BRIEF 수신 기록을 조사한다. 정상 적용·중복·오래된 리비전은
 이 경보에 포함하지 않는다. 최근 5분에 증가가 없으면 해제되며 미해결 오류 목록을 뜻하지 않는다.
 
+변경 번호 공백 경보는 HTTP `202`로 적용한 이벤트 중 앞선 원본 변경 번호를 받지 못한 경우를 알린다.
+이상 수신 기록의 `APPLIED_WITH_GAP`과 BATON의 outbox 전달 상태를 확인해 전달 지연·역순 도착·누락을
+구분한다. 경보 자체에는 작업공간이나 원본 참조를 넣지 않는다.
+최근 5분에 새 공백 탐지가 없으면 경보가 해제된다. 이미 기록된 공백이 해소됐거나 모든 이벤트가
+전달됐다는 뜻은 아니며, 재구축으로 누락된 이벤트를 복구할 수도 없다.
+
+DB 연결 대기는 기본 HikariCP 지표인 `hikaricp_connections_pending`으로 확인한다.
+경보의 `instance`·`pool`로 대기 중인 연결 풀을 찾고, DB 상태·장기 쿼리·잠금을 확인한다.
+연결이 모두 사용 중이어도 대기 요청이 없으면 경보하지 않으며, 대기가 없어지면 해제한다.
+이 값만으로 원인을 DB 장애나 연결 수 부족으로 단정하지 않는다.
+
 수집 시작 전의 오류나 수집 사이에 프로세스가 재시작되며 사라진 오류는 놓칠 수 있다.
-외부 알림 발송은 미연결이며, 같은 서버의 Prometheus로 서버 전체 장애를 감지할 수는 없다.
-알림 수신 채널이 정해지면 기존 무료 채널에 연결한다. BRIEF 본문 발송은 RELAY가 담당한다.
+외부 알림은 [공용 Alertmanager·Slack·Discord 연결 설정](external-integrations.md)을 제공하며 실제 수신처는
+미연결이다. 같은 서버의 Prometheus로 서버 전체 장애를 감지할 수는 없다. BRIEF 본문 발송은 RELAY가 담당한다.
 
 `brief_events_received_total{outcome="..."}`은 결과별 요청 수이며 고유 이벤트 수가 아니다.
 기동 시 여섯 결과를 `0`으로 등록한다. 재시작 초기화·수집 실패·업무 이벤트 없음은
-서로 다르게 다뤄야 한다. `CONFLICT`·`UNSUPPORTED` 증가와 HTTP 인증 실패·`5xx`·지연을
+서로 다르게 다뤄야 한다. `CONFLICT`·`UNSUPPORTED`·`APPLIED_WITH_GAP` 증가와 HTTP 인증 실패·`5xx`·지연을
 운영 조사 근거로 수집한다. 경보 주기·임계값은 실제 트래픽과 운영 목표에 맞춰 설정한다.
 
 BATON 호스트에서는 기존 `ops/check-integration-delivery.sh`로 영구 실패·만료된 처리 임대·
