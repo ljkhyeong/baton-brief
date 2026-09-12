@@ -272,36 +272,29 @@ class JdbcBriefPersistenceAdapter(
         val rows = jdbc.sql(
             """
         WITH applied AS (
-            SELECT event_type, source_reference, aggregate_revision, event_state, occurred_at, processing_outcome
+            SELECT event_type, source_reference, aggregate_revision, event_state, occurred_at,
+                   MAX(aggregate_revision) FILTER (WHERE event_state = 'ACTIVE') OVER item AS latest_active_revision,
+                   MAX(aggregate_revision) FILTER (WHERE processing_outcome = 'APPLIED_WITH_GAP')
+                       OVER item AS latest_gap_revision
               FROM source_event_receipt
              WHERE workspace_id = :workspaceId AND season_id = :seasonId
                AND processing_outcome IN ('APPLIED', 'APPLIED_WITH_GAP')
                ${if (eventType == null) "" else "AND event_type = :eventType"}
-        ), latest_active AS (
-            SELECT event_type, source_reference, MAX(aggregate_revision) AS revision
-              FROM applied WHERE event_state = 'ACTIVE'
-             GROUP BY event_type, source_reference
+            WINDOW item AS (PARTITION BY event_type, source_reference)
         ), resolutions AS (
         SELECT resolved.event_type AS reason_code, resolved.source_reference,
                resolved.occurred_at AS resolved_at, resolved.aggregate_revision AS resolved_revision
-          FROM latest_active active
-          JOIN applied resolved ON resolved.event_type = active.event_type
-                               AND resolved.source_reference = active.source_reference
-                               AND resolved.aggregate_revision - 1 = active.revision
-                               AND resolved.event_state = 'RESOLVED'
+          FROM applied resolved
           JOIN attention_item current ON current.workspace_id = :workspaceId
                                      AND current.season_id = :seasonId
-                                     AND current.event_type = active.event_type
-                                     AND current.source_reference = active.source_reference
+                                     AND current.event_type = resolved.event_type
+                                     AND current.source_reference = resolved.source_reference
                                      AND current.item_status = 'RESOLVED'
          WHERE resolved.occurred_at >= :windowStart AND resolved.occurred_at < :windowEnd
            AND resolved.occurred_at <= :evaluatedAt
-           AND NOT EXISTS (
-               SELECT 1 FROM applied later
-                WHERE later.event_type = active.event_type AND later.source_reference = active.source_reference
-                  AND later.aggregate_revision > resolved.aggregate_revision
-                  AND later.processing_outcome = 'APPLIED_WITH_GAP'
-           )
+           AND resolved.event_state = 'RESOLVED'
+           AND resolved.aggregate_revision - 1 = resolved.latest_active_revision
+           AND (resolved.latest_gap_revision IS NULL OR resolved.latest_gap_revision <= resolved.aggregate_revision)
         )
         SELECT total.resolved_count, page.*
           FROM (SELECT COUNT(*) AS resolved_count FROM resolutions) total

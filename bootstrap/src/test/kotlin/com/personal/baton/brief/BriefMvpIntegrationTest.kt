@@ -2402,6 +2402,16 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.resolvedCount").value(0))
             .andExpect(jsonPath("$.items").isEmpty)
             .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+
+        deliver("later-gap", 5, "ACTIVE")
+        deliver("later-gap", 6, "RESOLVED", "2026-08-26T00:00:00Z")
+        val recovered = service.summarizeWeeklyResolutions(command)
+        assertThat(recovered.resolvedCount).isEqualTo(2)
+        val recoveredItem = recovered.items.single { it.sourceReference == "later-gap" }
+        assertThat(recoveredItem.resolvedRevision).isEqualTo(6)
+        assertThat(recoveredItem.resolvedAt).isEqualTo(Instant.parse("2026-08-26T00:00:00Z"))
+        service.rebuild()
+        assertThat(service.summarizeWeeklyResolutions(command)).isEqualTo(recovered)
     }
 
     @Test
