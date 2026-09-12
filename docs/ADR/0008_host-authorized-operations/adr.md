@@ -13,6 +13,8 @@
 수신 기록 단건·이상 수신 기록·재구축은 같은 실행 JAR의 단발성 운영 명령으로 실행한다.
 `operations` 프로필은 HTTP 서버와 Flyway를 비활성화하고, 명령은 기존 유스케이스를 호출한
 뒤 종료한다. HTTP 인증 필터는 Servlet 실행에서만 구성하며 평상시 웹 인증은 유지한다.
+`operations` 설정은 `brief.operations.command`를 빈 값으로 선언한다. 실행할 명령을 지정하지
+않으면 기존 필수 열거형 바인딩에서 오류로 종료한다. 활성·기본 프로필 모두 같은 설정을 사용한다.
 운영 명령이 지정되면 `ApplicationContextInitializer`에서 웹·Flyway 비활성 설정을 검사한다.
 `META-INF/spring.factories`로 등록해 빈 생성 전에 실행하며, 옵션을 잘못 덮어쓰거나 빠뜨리면
 DB 연결·마이그레이션·웹 서버 기동 전에 중단한다. 명령 실행기에서는 같은 검사를 반복하지 않는다.
