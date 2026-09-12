@@ -64,7 +64,7 @@ jobs:
             --volume "$PWD/ops/prometheus:/etc/prometheus:ro" --workdir /etc/prometheus \
             "$prometheus_image" test rules alerts.test.yml
           alertmanager_image='prom/alertmanager:v0.32.1@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286'
-          for channel in slack discord; do
+          for channel in slack discord slack-discord; do
             config="/etc/alertmanager/brief-$channel.example.yml"
             docker run --rm --network none --entrypoint /bin/amtool \
               --volume "$PWD/ops/alertmanager:/etc/alertmanager:ro" \
