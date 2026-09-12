@@ -74,6 +74,15 @@ Spring Boot 4.1.1은 health만 기본 웹 endpoint로 노출하고 상세를 기
 Kubernetes나 다른 배포 오케스트레이터를 채택할 때 liveness, readiness, 트래픽 제거와
 외부 의존성 포함 정책을 별도 운영 결정으로 정의한다.
 
+### 독립 실행 환경변수 예시
+
+후속 [.env.runtime.example](../../../.env.runtime.example)은 k3s에 직접 환경변수를 주입할 수 있도록
+probe를 명시적으로 활성화한다. `/actuator/health/liveness`는 애플리케이션 생존 상태만 확인하며,
+`/actuator/health/readiness`에는 `readinessState,db`를 포함한다. DB 장애 때 준비 상태만 `503`이 되어
+새 요청에서 제외할 수 있고, 생존 상태를 이유로 앱을 반복 재시작하지 않는다.
+이 경로는 내부 상태 확인용이며 공개 ingress에 추가하지 않는다. 기본 실행·기존 Compose 설정은 바꾸지 않는다.
+probe 주기·제한 시간·재시작과 트래픽 제거는 운영자가 k3s에서 설정한다.
+
 ## 호환성과 제외 범위
 
 - 기존 `/api/v1` 요청·응답과 PostgreSQL 스키마를 바꾸지 않는 추가 관리 계약이다.

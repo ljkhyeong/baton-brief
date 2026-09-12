@@ -11,7 +11,8 @@ k3s는 도입 예정이다. 이 문서는 연동 선택과 설정을 다루며 �
 | 운영 장애 알림 | Prometheus → Alertmanager → Slack·Discord 웹훅 | BRIEF 경보 전달 설정과 채널별 수신 설정을 제공한다. 공용 Alertmanager와 웹훅을 연결하면 사용한다. |
 | 공휴일 표시 | BATON의 `KasiPublicHolidayClient`가 한국천문연구원 API를 조회하고 1시간 캐시 | 이미 구현돼 있다. BATON의 `BATON_HOLIDAYS_ENABLED`와 서비스 키를 설정한다. BRIEF·CAL에 같은 호출을 추가하지 않는다. |
 | 캘린더 앱 연결 | CAL의 `.ics` 구독, BATON의 Google·Apple·Outlook 등록 안내 | 기존 기능을 사용한다. 앱이 정한 주기로 갱신되며 실시간 양방향 동기화는 아니다. |
-| 업무 알림 발송 | RELAY의 Discord·HTTP 웹훅 어댑터 | 기존 발송·재시도 기능을 사용한다. Slack·Discord 채널 선택은 운영 경보에 적용하며 RELAY의 업무 발송 채널은 바꾸지 않는다. |
+| 업무 알림 발송 | RELAY의 Slack·Discord·HTTP 웹훅 어댑터 | 기존 발송·재시도 기능을 사용한다. 업무 발송은 RELAY, 운영 경보는 Alertmanager에 연결한다. |
+| Slack·Discord 장애 공지 조회 | RELAY의 `ProviderStatusProbe`가 공식 상태 API를 조회 | 전송 장애를 조사할 때 기존 조회 명령을 사용한다. 전체 서비스 공지이며 개별 메시지의 성공 여부를 뜻하지 않는다. |
 | 외부 백업 보관 | BATON은 이미 `rclone crypt`로 외부 저장소를 연결. BRIEF는 PostgreSQL 백업·격리 복원 제공 | 보유한 별도 저장소가 정해지면 rclone으로 연결한다. 저장소별 API 클라이언트를 만들거나 유료 저장소를 추가하지 않는다. |
 | DNS 갱신 | Cloudflare DNS API를 사용하는 ddclient | 공인 IP가 바뀌는 환경에만 필요하다. 고정 IP면 생략한다. 직접 IP 감지·DNS 갱신 코드를 만들지 않는다. |
 | 인증서 갱신 | 기존 Caddy의 ACME, 향후 공용 앞단의 인증서 관리 기능 | 준비된 인증서의 종류·갱신 방식을 따른다. 서비스마다 별도 인증서 발급 코드를 추가하지 않는다. |
@@ -25,6 +26,12 @@ DNS 자동 갱신은 [Cloudflare가 안내하는 ddclient](https://developers.cl
 이미 준비된 공인 IP·포트포워딩 경로에 Tunnel을 추가할 필요는 현재 확인되지 않았다.
 
 ## 남은 연결 조건
+
+BRIEF의 코드·빌드·임시 환경변수 준비와 실제 서버 설정을 구분한다.
+[.env.runtime.example](../../.env.runtime.example)에 Compose와 무관하게 주입할 DB·API 인증·probe 값을
+정리했다. 운영자는 실제 주소와 비밀을 지정하고 이미지 빌드·k3s·DNS·TLS를 적용한다.
+Slack·Discord 웹훅은 아래 Alertmanager의 비밀 파일 또는 RELAY의 채널 설정에 주입하며
+BRIEF 애플리케이션에는 사용하지 않는 웹훅 환경변수를 추가하지 않는다.
 
 후속 검토에서 경보 설정·채널 분기·전달 실패 진단과 백업·복원 스크립트를 대조했다.
 현재 요구를 충족하려고 새 외부 API나 서비스를 추가할 필요는 확인되지 않았다.

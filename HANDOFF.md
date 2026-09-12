@@ -16,7 +16,10 @@ BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함
 
 공개 이벤트 수신 주소는 `brief.b4ton.com`이다. 사용자는 Cloudflare DNS·Ubuntu 홈서버·공인 IP·인증서와
 공유기 80·443 포트포워딩을 준비했다. k3s는 아직 구축하지 않았다. 이번 요청은 외부 연동 검토이며
-홈서버 설치가 아니다. 실제 DNS 변경·인증서 적용·원격 배포는 실행하지 않았다.
+API·웹훅 코드, 빌드와 임시 환경변수까지 준비한다. 이미지 빌드·홈서버·공유기·k3s·DNS·TLS 설정은
+사용자가 직접 수행한다. 실제 DNS 변경·인증서 적용·원격 배포는 실행하지 않았다.
+BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리했다. Git에서 제외한
+`.env.runtime.local`은 권한 `0600`의 로컬 검증용 임시 값이며 운영 비밀로 사용하지 않는다.
 추가 이용료 없는 Prometheus와 PostgreSQL 백업·격리 복원 확인을 제공한다. 운영 알림은 Slack·Discord를
 선택하거나 함께 사용할 수 있다. 공용 Alertmanager 연결 대상과 실제 웹훅은 미등록이다.
 [외부 연동 검토](docs/operations/external-integrations.md)를 따른다.
@@ -31,6 +34,7 @@ BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `98005ac` 독립 실행 환경변수, 2026-09-12 | `:bootstrap:test`의 인증 설정·서비스 인증·이벤트 계약 8건 통과, `:bootstrap:bootJar`는 입력 불변으로 기존 JAR 재사용(13초). 실제 JAR에서 서비스 토큰 누락 기동 실패, 인증 분리·수신 202·중복 200·요약 조회·브리프 생성, DB 중단 시 readiness 503·liveness 200과 앱 재시작 없는 복구 확인 | JDK 21.0.10·PostgreSQL 18.6. 임시 환경의 DB·HTTP 주소는 loopback과 시험 포트 사용. 최초 DB 재시작 때 Docker 자동 포트 재할당으로 복구 확인 실패해 원인 재현 후 고정 포트로 해당 범위만 재검증. 로그 `/tmp/brief-runtime-env-build-20260912.log`·`/tmp/brief-runtime-env-check-20260912.log`·`/tmp/brief-runtime-env-port-check-20260912.log`·`/tmp/brief-runtime-env-recovery-check-20260912.log`. 임시 프로세스·DB·볼륨 정리, 로그 비밀 비노출·문서 링크·전체 diff 확인. 이미지 빌드·k3s·실제 웹훅 발송·공인 HTTPS·원격 CI 미실행 |
 | BRIEF `a9d77e4` 수신 저장 실패·재시도, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefMvpIntegrationTest.점검 항목 저장 실패*'` 성공(12초). 통합 테스트 1건에서 신규 저장·기존 항목 갱신의 실패 2경로와 롤백·같은 이벤트 재시도 APPLIED·이후 DUPLICATE 확인. ArchUnit 4건 통과 | JDK 21.0.10·PostgreSQL 18.6. 영속성 경계에 잘못된 투영 규칙 버전을 주입해 실제 DB 제약 오류 발생. 실패한 수신 기록 없음·기존 항목 전체 값 보존·정상 재시도 뒤 수신 기록과 항목 유지 확인. 임시 DB 정리 완료, 로그 `/tmp/brief-ingest-rollback-tests-20260912.log`. 전체 diff·구조 검사 통과. 테스트만 추가해 전체 제품 테스트·JAR 재생성·계약 ZIP·원격 CI·배포는 제외. 프로세스 강제 종료·네트워크 절단 검증은 아님 |
 | BRIEF `7c02472` CI 실패 보고서·`53a6aa1` 컨테이너 진단, 2026-09-12 | actionlint 1.7.12 통과. 워크플로의 보관 경로로 기존 도메인·통합·ArchUnit 보고서 25개(83,263바이트)를 선택하며 HTML의 CSS/JS 포함·Gradle 바이너리 결과 제외 확인. 로그 `/tmp/brief-ci-test-reports-actionlint-20260912.log`·`/tmp/brief-ci-test-reports-paths-20260912.log` | 공식 upload-artifact v7.0.1 커밋 고정·Gradle 실패 조건·3일 보관 설정 확인. 실제 원격 업로드·전체 CI·배포는 미실행. 기존 cleanup 6개 실패 조합·Bash 검사의 `53a6aa1` 근거(`/tmp/brief-ci-cleanup-before-20260912.log`·`/tmp/brief-ci-cleanup-after-20260912.log`) 유지. 검사 도구 `/tmp/brief-ci-diagnostics-tools-20260912/actionlint`. 전체 diff·문서 링크 확인. 제품 입력 불변으로 Gradle·JAR 검증 재실행 제외 |
 | BRIEF `3bcaaf7` 운영 명령 누락 처리, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefOperationsConfigurationTest' :bootstrap:bootJar` 성공(3초), 설정 테스트 3건·ArchUnit 4건 통과. 실제 JAR에서 명령 누락이 출력 없이 성공 종료하는 문제 재현 후, 활성·기본 운영 프로필 모두 실패 종료·표준 출력 없음·DB/웹 미기동 확인. 각 프로필의 REBUILD는 정상 JSON 출력·수신 기록 보존·Flyway 미실행 확인 | JDK 21.0.10·PostgreSQL 18.6의 임시 DB, 정리 완료. 프로필 판정 방식은 실제 JAR의 기본 프로필 변환에서 누락을 놓쳐 제거하고, 운영 YAML의 빈 명령과 기존 필수 열거형 바인딩 사용. 기존 false/FALSE 거부·일반 설정의 명령 생략·웹/Flyway 초기 검사도 테스트에 포함. 로그 `/tmp/brief-missing-command-verified-build-20260912.log`·`/tmp/brief-missing-command-runtime-20260912.log`. 전체 diff·구조·문서 링크 확인. 운영 설정만 바꿔 전체 제품 테스트·계약 ZIP·원격 CI·배포는 미실행 |
