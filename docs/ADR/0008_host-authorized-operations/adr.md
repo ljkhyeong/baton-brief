@@ -16,6 +16,9 @@
 운영 명령이 지정되면 `ApplicationContextInitializer`에서 웹·Flyway 비활성 설정을 검사한다.
 `META-INF/spring.factories`로 등록해 빈 생성 전에 실행하며, 옵션을 잘못 덮어쓰거나 빠뜨리면
 DB 연결·마이그레이션·웹 서버 기동 전에 중단한다. 명령 실행기에서는 같은 검사를 반복하지 않는다.
+실행기 등록은 `ConditionContext.environment`에서 `brief.operations.command` 속성의 존재 여부로 결정한다.
+빈 등록 전부터 제공되는 설정 환경을 사용한다. `false`를 비활성 값으로
+해석하지 않으며, 잘못된 명령 이름은 기존 `ConfigurationProperties`의 열거형 바인딩에서 거부한다.
 수신 원문·fingerprint를 출력하지 않고 기존 수신 조회 결과와 재구축 건수만 반환한다.
 운영 프로필에서는 성공 결과 JSON만 표준 출력으로 보내고 로그는 표준 오류로 분리한다.
 Spring Boot의 기본 로그 형식과 Logback의 `ConsoleAppender`를 사용한다. Docker 실행 시
@@ -69,6 +72,7 @@ BATON의 outbox 전달 장애는 BATON의 `ops/show-integration-metrics.sh`와
 ## 근거
 
 - [Spring Boot 초기화 전 검사 등록](https://docs.spring.io/spring-boot/how-to/application.html#howto.application.customize-the-environment-or-application-context)
+- [Spring Boot 조건부 속성의 false 처리](https://docs.spring.io/spring-boot/api/java/org/springframework/boot/autoconfigure/condition/ConditionalOnProperty.html)
 - [Spring Boot 관리 서버 주소와 포트](https://docs.spring.io/spring-boot/reference/actuator/monitoring.html)
 - [Spring Boot 지표 registry 자동 구성](https://docs.spring.io/spring-boot/reference/actuator/metrics.html)
 - [Prometheus Docker 실행](https://prometheus.io/docs/prometheus/latest/installation/)
