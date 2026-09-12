@@ -29,6 +29,9 @@ jobs:
         with:
           cache-provider: basic
 
+      - name: 파일 검사 도구 검증
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
       - name: Gradle 검증
         run: ./gradlew --no-daemon test :bootstrap:bootJar contractsZip
 
