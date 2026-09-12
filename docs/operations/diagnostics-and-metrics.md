@@ -124,8 +124,8 @@ DB 연결 대기는 기본 HikariCP 지표인 `hikaricp_connections_pending`으�
 이 값만으로 원인을 DB 장애나 연결 수 부족으로 단정하지 않는다.
 
 수집 시작 전의 오류나 수집 사이에 프로세스가 재시작되며 사라진 오류는 놓칠 수 있다.
-외부 알림 발송은 미연결이며, 같은 서버의 Prometheus로 서버 전체 장애를 감지할 수는 없다.
-알림 수신 채널이 정해지면 기존 무료 채널에 연결한다. BRIEF 본문 발송은 RELAY가 담당한다.
+외부 알림은 [공용 Alertmanager·Slack 연결 설정](external-integrations.md)을 제공하며 실제 수신처는
+미연결이다. 같은 서버의 Prometheus로 서버 전체 장애를 감지할 수는 없다. BRIEF 본문 발송은 RELAY가 담당한다.
 
 `brief_events_received_total{outcome="..."}`은 결과별 요청 수이며 고유 이벤트 수가 아니다.
 기동 시 여섯 결과를 `0`으로 등록한다. 재시작 초기화·수집 실패·업무 이벤트 없음은

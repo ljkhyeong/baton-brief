@@ -4,6 +4,8 @@
 [HANDOFF](../HANDOFF.md), 처음 실행하는 방법은 [README](../README.md), 개발 절차는
 [AGENTS](../AGENTS.md)와 프로젝트 로컬 스킬을 따른다.
 
+[외부 연동 검토](operations/external-integrations.md): 추가 요금 없는 연동 후보와 Slack 운영 알림 설정.
+
 ## 문서 역할
 
 | 문서 | 내용 |
