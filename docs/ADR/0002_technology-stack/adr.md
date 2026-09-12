@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-11
-- 수정일: 2026-08-30
+- 수정일: 2026-09-12
 
 ## 맥락
 
@@ -95,6 +95,13 @@ bootstrap ─┬─> adapter-in-web ──────────> application 
 의존한다. 두 어댑터는 서로 의존하지 않으며 `application`이 정의한 포트 경계를 넘지
 않는다. `bootstrap`은 모듈을 조립하되 비즈니스 규칙을 소유하지 않는다. 안쪽 모듈은
 어댑터나 `bootstrap`을 참조하지 않는다.
+
+이 경계는 `bootstrap`의 `BriefArchitectureTest`에서
+[ArchUnit](https://www.archunit.org/userguide/html/000_Index.html)으로 검사한다. 웹 어댑터의 저장
+포트 직접 사용과 도메인·유스케이스의 프레임워크 의존도 금지한다. ArchUnit core는 BOM 관리 대상이
+아니므로 version catalog에 버전을 고정하고 테스트에서만 사용한다. 별도 JUnit 엔진은 추가하지 않는다.
+`:bootstrap:architectureTest`는 DB 없이 실행하며 `test`에 연결한다. 파일별 검사와 종료 전 전체 diff
+검토는 [검증 절차](../../development/verification.md)를 따른다.
 
 ### 이번 결정에서 제외하는 항목
 
