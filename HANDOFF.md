@@ -6,8 +6,10 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 계약·구조 결정은 [문서 색인](docs/README.md), 계약 버전은 [VERSION](contracts/VERSION)을 따른다.
 현재 마이그레이션은 V10이며 계약 팩은 원격 호환 검증 전인 RC 상태다.
 
-2026-09-08 조회 코드·수신 경보·인증 개선을 원격 `main`의 `5b7d880`에 병합했다(PR #14).
-조회 매개변수·수신 경보·토큰 캐시 정리의 구현 기준은 `7e1a054`다.
+2026-09-12 조회·운영 연동과 입력 검증 개선을 원격 `main`의 `791c8f4`에 병합했다
+([PR #17](https://github.com/ljkhyeong/baton-brief/pull/17)). 해당 PR의
+[필수 CI](https://github.com/ljkhyeong/baton-brief/actions/runs/34675956047)는 통과했다.
+이후 Kotlin·Tomcat 보안 수정은 `fbea014`에 로컬 커밋했으며 원격 반영 전이다.
 BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
 이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
@@ -28,6 +30,7 @@ BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `fbea014` Kotlin·Tomcat 보안 수정, 2026-09-12 | `./gradlew test :bootstrap:bootJar buildEnvironment` 성공(16초), bootstrap 42건·도메인 6건 통과. 최종 구조 검사 4건 통과 후 전체 실행에서는 결과 재사용. 실제 JAR로 DB health·이벤트/서비스 인증 분리·정상 및 중복 수신·현재 항목 조회·잘못된 JSON 거부 확인 | JDK 21.0.10·PostgreSQL 18.6·Kotlin 2.4.20·Tomcat 11.0.25. JAR의 stdlib/reflect와 Tomcat 3개 버전 정렬·Commons Lang 미포함 확인. 로그 `/tmp/brief-security-full-20260912.log`·`/tmp/brief-security-http-20260912.log`. 최초 임시 HTTP 검사에서 경로·필수 조건을 잘못 지정해 수정했으며 제품 오류는 없었음. 비밀 로그 비노출·임시 앱/DB 정리·전체 diff·문서 링크 확인. 원격 CI·HTTPS·배포 미실행. 계약 ZIP 입력 변경 없음 |
 | BRIEF `216d73d` JSON 타입·중복 필드 거부, 2026-09-12 | `./gradlew test :bootstrap:bootJar contractsZip` 성공(54초), bootstrap 41건 통과·ArchUnit 4건 및 도메인 6건 성공 결과 재사용. 숫자 sourceReference가 문자열로 변환되어 `202 APPLIED`로 저장되는 문제 재현 후, 문자열·열거형의 잘못된 타입 7가지가 `400 ProblemDetail`이며 저장 0건임을 확인. 정상 문자열 `"123"` 수신·재전달 및 기존 중복 필드 거부 포함. 로그 `/tmp/brief-scalar-before-20260912.log`·`/tmp/brief-scalar-after-20260912.log`·`/tmp/brief-scalar-full-20260912.log` | MockMvc·PostgreSQL 18.6·JDK 21.0.10·Jackson 3.1.5. `JsonMapperBuilderCustomizer`의 Textual coercion과 `spring.jackson.datatype.enum.fail-on-numbers-for-enums` 사용. 기존 scalar 옵션만으로 문자열·숫자 열거형 변환을 막을 수 없음. 최초 컴파일 의존성 누락과 Jackson 2 방식 설정 경로를 수정한 뒤 전체 검증 통과. 배포 JAR 라이브러리 84개는 이전과 동일하며 설정 반영 확인. 전체 diff·구조·문서 링크와 ZIP 문서 5개·내부 링크 8개 확인. 이벤트 스키마·계약 버전 유지. 원격 생산자·실제 HTTP 서버·배포 검증은 미실행 |
 | BRIEF `1669d91` 운영 명령 선택·초기화 검사, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefOperationsConfigurationTest' :bootstrap:bootJar` 성공(3초), 설정 테스트 2건·ArchUnit 4건 통과. 이전 JAR의 `command=false`가 출력 없이 종료 코드 0을 반환함을 재현. 변경 후 실제 JAR에서 false·FALSE·UNKNOWN·빈 값 4건 실패와 RECEIPT·ANOMALIES·REBUILD·rebuild 정상 종료 확인. 로그 `/tmp/brief-operations-false-before-20260912.stderr`·`/tmp/brief-operations-condition-after-20260912.log`·`/tmp/brief-operations-command-runtime-20260912.log` | JDK 21.0.10·PostgreSQL 18.6의 격리 DB. 잘못된 명령은 표준 출력·테이블 생성·DB 연결·웹 기동 없음. 정상 명령은 JSON 출력·수신 기록 보존·Flyway 미실행, 임시 DB 정리 확인. 명령 속성의 존재 여부는 Spring Condition에서 판정하며 값 검증은 기존 열거형 바인딩 사용. 빈 등록 전 환경에 접근해야 하므로 환경 빈을 참조하는 SpEL 대신 ConditionContext.environment 사용. 기존 웹·Flyway 비활성 초기 검사 4조건과 명령 미지정 시 비활성 확인. 전체 diff·구조·문서 링크 확인. 운영 명령만 바꿔 전체 테스트·계약 ZIP·원격 CI·배포는 미실행. 앞선 JSON 검증 범위는 `216d73d` 행 참조 |
 | BRIEF `6902274` 주간 해소 집계, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefMvpIntegrationTest.주간 해소*'` 3건·ArchUnit 4건 통과(7초). 필터·페이지·DST·재활성화·공백 이후 새 해소와 재구축 확인. 파일 검사·전체 diff 검토 통과. 로그 `/tmp/brief-resolution-tests-20260912.log` | PostgreSQL 18.6·JDK 21.0.10. V10 인덱스를 적용한 동일 합성 DB(전체 10만 건, 대상 작업공간 1만 건)에서 기존/변경 SQL 결과 일치, 1730.794→21.300ms 확인. 기록 재조회 5천 회를 윈도 집계 1회로 대체. `/tmp/brief-resolution-plans-20260912.json`·`/tmp/brief-resolution-benchmark-20260912.log`, 임시 DB 정리 완료. 단일 데이터의 비교이며 운영 성능 보장은 아님. 주간 SQL만 변경해 전체 테스트·JAR 재생성·계약 ZIP·배포는 제외. 당시 JAR는 `99e9579` 기준으로 이 변경 미포함. 최신 JAR는 운영 명령 초기화 검사 행 참조 |
@@ -73,9 +76,11 @@ BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함
 - 공개 Caddy의 인증서 볼륨 소유권을 포함한 비루트 전환, 다중 인스턴스 구성
 - 이미지 registry·릴리스 정책·라이선스
 - Gradle dependency verification checksum의 최초 검토와 플랫폼 간 유지 절차
-- 이전 검토에서 남은 Kotlin Gradle plugin의 `GHSA-r937-wjx7-w2jp`와 Spring Boot 빌드 classpath의
-  Commons Lang `GHSA-j288-q9x7-2f5v` 후속 검토. 이번 작업에서 최신 패치 상태는 조회하지 않았다.
-  기존 `main` 전용 Actions 캐시 쓰기 정책을 유지하며 상세 판단은 이전 HANDOFF와 ADR-0002를 참조한다.
+- Commons Lang 3.16.0의 `GHSA-j288-q9x7-2f5v`는 Spring Boot 4.1.1 빌드 플러그인의
+  `spring-boot-buildpack-platform → commons-compress → commons-lang3` 경로에 남아 있다.
+  실행 JAR에는 없고 이미지는 Dockerfile로 빌드하므로, 관련 플러그인 의존성 갱신 시 재검토한다.
+  기존 `main` 전용 Actions 캐시 쓰기 정책을 유지한다. 2026-09-12 확인한 나머지 경고 4건은
+  `fbea014`의 Kotlin 2.4.20·Tomcat 11.0.25로 수정 버전을 적용했다. 원격 경고 해소는 병합 후 확인한다.
 
 ## 다음 작업
 
