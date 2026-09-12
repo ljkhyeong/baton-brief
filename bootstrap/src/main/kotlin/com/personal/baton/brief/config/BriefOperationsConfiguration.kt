@@ -8,7 +8,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.env.Environment
 import tools.jackson.databind.json.JsonMapper
 
 @ConfigurationProperties("brief.operations")
@@ -34,16 +33,9 @@ class BriefOperationsConfiguration {
     @Bean
     fun briefOperationsRunner(
         properties: BriefOperationsProperties,
-        environment: Environment,
         brief: BriefUseCases,
         json: JsonMapper,
     ): ApplicationRunner {
-        require(environment.getProperty("spring.main.web-application-type").equals("none", ignoreCase = true)) {
-            "운영 명령은 spring.main.web-application-type=none으로 실행해야 합니다"
-        }
-        require(environment.getProperty("spring.flyway.enabled", Boolean::class.java) == false) {
-            "운영 명령은 spring.flyway.enabled=false로 실행해야 합니다"
-        }
         return ApplicationRunner {
             val result = when (properties.command) {
                 BriefOperationsProperties.Command.RECEIPT -> brief.findEventReceipt(
