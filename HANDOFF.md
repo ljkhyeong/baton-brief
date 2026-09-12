@@ -4,7 +4,7 @@
 
 BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [README](README.md),
 계약·구조 결정은 [문서 색인](docs/README.md), 계약 버전은 [VERSION](contracts/VERSION)을 따른다.
-현재 마이그레이션은 V9이며 계약 팩은 원격 호환 검증 전인 RC 상태다.
+현재 마이그레이션은 V10이며 계약 팩은 원격 호환 검증 전인 RC 상태다.
 
 2026-09-08 조회 코드·수신 경보·인증 개선을 원격 `main`의 `5b7d880`에 병합했다(PR #14).
 조회 매개변수·수신 경보·토큰 캐시 정리의 구현 기준은 `7e1a054`다.
@@ -28,6 +28,7 @@ BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `99e9579` 수신 기록 조회 인덱스, 2026-09-12 | `./gradlew test :bootstrap:bootJar` 성공(18초). bootstrap 39건 통과, ArchUnit 4건·도메인 6건 성공 결과 재사용. V2·V7 대표 데이터의 V9→V10 업그레이드 전후 전체 행 보존, JAR의 V10 포함 확인. 로그 `/tmp/brief-receipt-index-tests-20260912.log` | PostgreSQL 18.6·JDK 21.0.10. 100개 작업공간·수신 10만 건·현재 항목 5만 건·충돌 2천 건의 격리 DB에서 기존 SQL 4개의 결과 일치와 조회 계획 개선 확인. 생성 기준 9.327→0.035ms, 이상 수신 7.516→0.428ms, 전이 8.646→0.181ms, 주간 해소 33.288→20.131ms, 인덱스 약 5.7MiB. 단일 합성 데이터의 비교이며 운영 지연 보장·쓰기 처리량 검증은 아님. 근거 `/tmp/brief-receipt-index-plans-20260912.json`·`/tmp/brief-receipt-index-20260912-retry.log`. 첫 실측은 임시 DB 초기화 완료 오인으로 실패해 TCP 준비 확인으로 수정한 뒤 통과·정리. 전체 diff·구조 검사 통과. 원격 CI·배포 미실행. V10 생성 중 쓰기 대기는 배포 문서 참고 |
 | BRIEF `9d6e9f2` 운영 안내·경보 문구, 2026-09-12 | `:bootstrap:test`에서 `BriefOperationsConfigurationTest` 1건과 `contractsZip` 성공. Prometheus 경보 시나리오 8개 통과. 계약 ZIP의 문서 5개·내부 링크 8개 확인 | 오류·경보 문자열만 변경. 검증 조건·경보 규칙·API·실행 예시는 유지. 문서 로컬 링크 177개 확인. 전체 테스트·JAR 생성·배포는 문구 수정 범위에서 제외 |
 | BRIEF `2d2521d` 운영·전달 경보, 2026-09-12 | Prometheus 3.14.0 `promtool check config`·`test rules`로 규칙 6개·시나리오 18개 통과. 실제 Alertmanager 중단으로 전송 오류 증가·전달 실패 경보를 확인하고 재시작 후 HTTPS 전달·Slack 수신 대역의 경보/해제 확인. 기본 대상 `[]`에서 업무 경보가 발생해도 전송 오류·유실 지표와 전달 실패 경보가 없음을 별도 확인. 로그 `/tmp/brief-notification-rules-20260912.log`·`/tmp/brief-notification-runtime-20260912.log`·`/tmp/brief-notification-disabled-20260912.log` | Alertmanager 0.32.1·Python 3.14.7, 비루트·읽기 전용·외부 네트워크/호스트 포트 없는 임시 환경. 시험에만 간격 단축·임시 CA 사용 후 정리. 실패 없음. 유실 카운터 증가·5분 후 해제·재시작 초기화는 규칙 시나리오로 검증. 앱·빌드 입력 불변으로 `6ed7922`의 Gradle·JAR 근거 재사용. 기존 DB 대기 실측은 `7d54ba6`·`42b744f` JAR의 `/tmp/brief-db-wait-runtime-20260912-retry.log` 근거 유지. 실제 Slack·Discord 수신·원격 배포·CI는 미실행 |
 | BRIEF `6ed7922` 파일·구조 검증 루프, 2026-09-12 | `./gradlew test :bootstrap:bootJar` 성공(14초). bootstrap 39건 통과, ArchUnit 4건·도메인 6건 기존 결과 재사용. 검사 도구 테스트 5건·actionlint 1.7.12 통과. Controller의 저장 포트/구현체 참조, Domain의 구성·SQL 참조, Service의 JDBC 구현체 참조를 임시로 넣어 네 규칙의 실패를 확인한 뒤 제거. 로그 `/tmp/brief-feedback-build-20260912.log`·`/tmp/brief-architecture-probes-20260912.log` | JDK 21.0.10·PostgreSQL 18.6·Python 3.14.7. 전체 diff·구조 검사 2초, DB 기동 없음. 중간 커밋·staged/unstaged·새 파일·삭제·한글 공백 경로와 문서만 변경 시 Gradle 생략 확인. 주간 해소 정렬을 포함한 현재 코드 검증과 JAR 생성 완료. JAR에 ArchUnit·임시 위반 코드 없음. 자동화는 프로젝트 지침·검사 명령·CI 기준이며 앱 전역 저장 훅은 미설치. 원격 CI·배포·계약 ZIP은 미실행 |

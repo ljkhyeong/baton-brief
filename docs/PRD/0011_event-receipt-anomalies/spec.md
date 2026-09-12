@@ -106,8 +106,8 @@ fingerprint, 원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 �
 
 - 기존 `POST /api/v1/events`, `GET /api/v1/events/{eventId}/receipt`, 투영과 브리프 계약을
   바꾸지 않는 추가 조회다.
-- 기존 `source_event_receipt`와 `source_event_conflict`만 읽으며 새 테이블, 열, 인덱스와
-  Flyway 마이그레이션을 추가하지 않는다.
+- 기존 `source_event_receipt`와 `source_event_conflict`만 읽으며 새 테이블·열을 추가하지 않는다.
+  작업공간·시즌별 조회 인덱스는 [ADR-0002](../../ADR/0002_technology-stack/adr.md)의 V10을 따른다.
 - 조회는 수신 기록, 충돌 기록, 현재 투영과 브리프를 생성·수정·삭제하지 않는다.
 - PRD-0008의 `retain-all` 경계에서 보존된 최초 수신 결과와 최초 충돌 한 건만 사용한다.
   후속 삭제 계약은 단건 조회와 이력 페이지 모두의 만료 의미를 먼저 정의해야 한다.
@@ -119,7 +119,7 @@ fingerprint, 원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 �
 - offset 페이지네이션이나 여러 요청을 묶는 스냅샷 토큰
 - 중복·충돌 횟수와 모든 전달 시도 이력
 - 재처리, 격리 해제, 정정, 삭제와 운영 조치 API
-- 새 스키마·마이그레이션·인덱스, 보존 기간과 용량 상한
+- 새 테이블·열, 보존 기간과 용량 상한
 - BATON 멤버십, 운영 인증·인가, 외부 공개와 배포
 
 ## 수용 기준

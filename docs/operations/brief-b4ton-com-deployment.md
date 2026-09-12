@@ -67,6 +67,14 @@ Cloudflare DNS와 Ubuntu 홈서버, 공인 IP·인증서, 공유기 80·443 포�
 
 현재 구축·검증 상태와 남은 입력은 [HANDOFF.md](../../HANDOFF.md)를 기준으로 확인한다.
 
+## V10 업그레이드
+
+애플리케이션 시작 시 Flyway가 수신 기록의 작업공간·시즌별 조회 인덱스를 만든다.
+기존 기록은 유지하지만, 인덱스 생성 중에는 수신 기록 쓰기가 대기하므로 BATON 전달을 잠시 멈춘
+시간대에 업그레이드한다. 완료 후 전달을 재개하고 쌓인 outbox의 처리를 확인한다.
+소요 시간과 필요한 디스크 공간은 기록량에 따라 달라진다.
+[PostgreSQL 인덱스 생성](https://www.postgresql.org/docs/18/sql-createindex.html)의 잠금 특성을 따른다.
+
 ## 관련 계약
 
 - [HTTPS 이벤트 수신](../PRD/0022_https-event-ingress/spec.md)
