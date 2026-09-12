@@ -3,11 +3,14 @@ package com.personal.baton.brief.config
 import com.personal.baton.brief.application.BriefUseCases
 import java.util.UUID
 import org.springframework.boot.ApplicationRunner
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Condition
+import org.springframework.context.annotation.ConditionContext
+import org.springframework.context.annotation.Conditional
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.type.AnnotatedTypeMetadata
 import tools.jackson.databind.json.JsonMapper
 
 @ConfigurationProperties("brief.operations")
@@ -27,7 +30,7 @@ data class BriefOperationsProperties(
 }
 
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty("brief.operations.command")
+@Conditional(OperationsCommandPresent::class)
 @EnableConfigurationProperties(BriefOperationsProperties::class)
 class BriefOperationsConfiguration {
     @Bean
@@ -60,4 +63,9 @@ class BriefOperationsConfiguration {
             println(json.writeValueAsString(result))
         }
     }
+}
+
+private class OperationsCommandPresent : Condition {
+    override fun matches(context: ConditionContext, metadata: AnnotatedTypeMetadata): Boolean =
+        context.environment.containsProperty("brief.operations.command")
 }

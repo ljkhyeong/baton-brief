@@ -3,6 +3,7 @@ package com.personal.baton.brief
 import com.personal.baton.brief.application.BriefUseCases
 import com.personal.baton.brief.config.BriefOperationsConfiguration
 import com.personal.baton.brief.config.BriefOperationsContextInitializer
+import com.personal.baton.brief.config.BriefOperationsProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -12,6 +13,28 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import tools.jackson.databind.json.JsonMapper
 
 class BriefOperationsConfigurationTest {
+    @Test
+    fun `false 명령은 실행 생략이 아니라 잘못된 명령으로 거부한다`() {
+        val brief = mock(BriefUseCases::class.java)
+        val runner = ApplicationContextRunner()
+            .withUserConfiguration(BriefOperationsConfiguration::class.java)
+            .withBean(BriefUseCases::class.java, { brief })
+            .withBean(JsonMapper::class.java, { JsonMapper.builder().build() })
+
+        runner.run { context ->
+            assertThat(context).hasNotFailed()
+            assertThat(context).doesNotHaveBean(BriefOperationsProperties::class.java)
+            assertThat(context).doesNotHaveBean("briefOperationsRunner")
+        }
+        listOf("false", "FALSE").forEach { command ->
+            runner.withPropertyValues("brief.operations.command=$command").run { context ->
+                assertThat(context).hasFailed()
+                assertThat(context.startupFailure).hasRootCauseInstanceOf(IllegalArgumentException::class.java)
+            }
+        }
+        verifyNoInteractions(brief)
+    }
+
     @Test
     fun `운영 명령은 잘못된 실행 설정을 빈 생성 전에 거부한다`() {
         val brief = mock(BriefUseCases::class.java)
