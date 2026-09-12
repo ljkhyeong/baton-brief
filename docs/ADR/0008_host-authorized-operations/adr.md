@@ -36,9 +36,10 @@ BRIEF의 네트워크 공간을 공유해 loopback 지표를 수집하며 외부
 오류, 충돌·미지원 수신과 변경 번호 공백 탐지의 증가, DB 연결 대기를 경보 규칙으로 판정한다.
 공백 탐지는 기존 `APPLIED_WITH_GAP` 카운터로 확인하며 누락 확정이나 전달 완료로 해석하지 않는다.
 DB 대기는 HikariCP의 기본 지표를 사용하며 별도 수집기를 추가하지 않는다.
-운영 알림은 공용 Alertmanager의 기본 Slack Incoming Webhook 연동을 사용한다.
+운영 알림은 공용 Alertmanager의 기본 Slack·Discord 웹훅 연동을 사용한다.
+필요한 채널을 선택하고 함께 사용할 때는 한 수신처에 두 채널 설정을 둔다.
 Prometheus는 경보에 `service=brief`를 붙이고 파일에 등록한 비공개 HTTPS 대상에 전달한다.
-기본 대상 목록은 비어 있어 실제 연결 전에는 발송하지 않는다. Slack 웹훅은 Alertmanager에만
+기본 대상 목록은 비어 있어 실제 연결 전에는 발송하지 않는다. 채널 웹훅은 Alertmanager에만
 파일로 제공하며 앱 코드·외부 발송 어댑터·공개 관리 경로를 추가하지 않는다.
 현재 RELAY의 loopback Alertmanager는 BRIEF가 직접 접근할 수 없으므로 공용 연결 경로를 마련한 뒤 적용한다.
 설정은 [외부 연동 절차](../../operations/external-integrations.md)를 따른다. 서버 설치는 이번 범위에 포함하지 않는다.
