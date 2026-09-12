@@ -10,7 +10,7 @@ services:
     volumes:
       - brief-postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U brief -d baton_brief"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U brief -d baton_brief"]
       interval: 5s
       timeout: 3s
       retries: 10

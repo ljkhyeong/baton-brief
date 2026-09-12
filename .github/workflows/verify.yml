@@ -33,7 +33,19 @@ jobs:
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
       - name: Gradle 검증
+        id: gradle-verification
         run: ./gradlew --no-daemon test :bootstrap:bootJar contractsZip
+
+      - name: 실패한 테스트 보고서 보관
+        if: ${{ failure() && steps.gradle-verification.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: brief-test-reports-${{ github.run_attempt }}
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**/*.xml
+          retention-days: 3
+          if-no-files-found: ignore
 
       - name: Compose 설정 검증
         run: |
@@ -52,7 +64,7 @@ jobs:
             --volume "$PWD/ops/prometheus:/etc/prometheus:ro" --workdir /etc/prometheus \
             "$prometheus_image" test rules alerts.test.yml
           alertmanager_image='prom/alertmanager:v0.32.1@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286'
-          for channel in slack discord; do
+          for channel in slack discord slack-discord; do
             config="/etc/alertmanager/brief-$channel.example.yml"
             docker run --rm --network none --entrypoint /bin/amtool \
               --volume "$PWD/ops/alertmanager:/etc/alertmanager:ro" \
@@ -121,6 +133,12 @@ jobs:
             local cleanup_status=0
             trap - EXIT
             set +e
+            if ((original_status != 0)); then
+              echo "::group::스테이징 실패 진단"
+              "${compose[@]}" ps --all
+              "${compose[@]}" logs --no-color --tail 100
+              echo "::endgroup::"
+            fi
             "${compose[@]}" down --volumes --remove-orphans || cleanup_status=$?
             docker network rm "$service_network" >/dev/null || cleanup_status=$?
             rm -rf "$staging_dir" || cleanup_status=$?
@@ -133,6 +151,8 @@ jobs:
 
           event_token="ci-event-token-000000000000000000000000"
           service_token="ci-service-token-0000000000000000000000"
+          echo "::add-mask::$event_token"
+          echo "::add-mask::$service_token"
           curl_image="curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6"
           printf '%s' "ci-database-password" > "$staging_dir/database-password"
           printf '%s' "$event_token" > "$staging_dir/event-bearer-token"

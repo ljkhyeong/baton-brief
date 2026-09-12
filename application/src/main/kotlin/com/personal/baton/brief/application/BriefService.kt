@@ -2,7 +2,6 @@ package com.personal.baton.brief.application
 
 import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.AttentionProjector
-import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.EditionItemSection
 import com.personal.baton.brief.domain.SourceEvent
@@ -14,7 +13,6 @@ import java.io.OutputStream
 import java.security.DigestOutputStream
 import java.security.MessageDigest
 import java.time.Clock
-import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
@@ -62,11 +60,8 @@ class BriefService(
         baseEditionId: UUID,
         targetEditionId: UUID,
     ): EditionComparisonResult {
-        val base = persistence.findEdition(baseEditionId)
-        val target = persistence.findEdition(targetEditionId)
-        if (base == null || target == null) {
-            return EditionComparisonResult.NotFound
-        }
+        val base = persistence.findEdition(baseEditionId) ?: return EditionComparisonResult.NotFound
+        val target = persistence.findEdition(targetEditionId) ?: return EditionComparisonResult.NotFound
         if (base.workspaceId != target.workspaceId || base.seasonId != target.seasonId) {
             return EditionComparisonResult.ScopeMismatch
         }

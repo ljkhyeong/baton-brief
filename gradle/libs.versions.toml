@@ -1,6 +1,7 @@
 [versions]
-kotlin = "2.4.10"
+kotlin = "2.4.20"
 spring-boot = "4.1.1"
+tomcat = "11.0.25"
 archunit = "1.5.0"
 
 [libraries]

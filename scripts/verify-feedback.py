@@ -3,6 +3,7 @@
 
 import argparse
 import ast
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -24,6 +25,10 @@ def git_paths(*args):
     return run("git", *args, "-z", capture=True).decode().rstrip("\0").split("\0")
 
 
+def reject_json_constant(value):
+    raise ValueError(f"JSON에서 허용하지 않는 값입니다: {value}")
+
+
 def check_files(paths, allow_deleted=False):
     tasks = set()
     structural = False
@@ -39,6 +44,8 @@ def check_files(paths, allow_deleted=False):
                 ast.parse(path.read_text(), filename=name)
             elif path.suffix == ".toml":
                 tomllib.loads(path.read_text())
+            elif path.suffix == ".json":
+                json.loads(path.read_text(), parse_constant=reject_json_constant)
         elif not path.exists() and not allow_deleted:
             run("git", "ls-files", "--error-unmatch", "--", name, capture=True)
 

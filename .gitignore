@@ -5,6 +5,7 @@
 .env.*
 !.env.example
 !.env.staging.example
+!.env.runtime.example
 *.key
 *.pem
 *.p12

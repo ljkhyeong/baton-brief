@@ -9,10 +9,36 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoInteractions
 import org.springframework.boot.SpringApplication
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import tools.jackson.databind.json.JsonMapper
 
 class BriefOperationsConfigurationTest {
+    @Test
+    fun `운영 프로필은 명령을 지정해야 실행기를 등록한다`() {
+        val brief = mock(BriefUseCases::class.java)
+        val runner = ApplicationContextRunner()
+            .withInitializer(ConfigDataApplicationContextInitializer())
+            .withPropertyValues("spring.config.location=classpath:/application.yml")
+            .withUserConfiguration(BriefOperationsConfiguration::class.java)
+            .withBean(BriefUseCases::class.java, { brief })
+            .withBean(JsonMapper::class.java, { JsonMapper.builder().build() })
+
+        listOf("spring.profiles.active=operations", "spring.profiles.default=operations").forEach { profile ->
+            runner.withPropertyValues(profile).run { context ->
+                assertThat(context).hasFailed()
+                assertThat(context.startupFailure).hasStackTraceContaining("parameter command")
+            }
+            runner.withPropertyValues(profile, "brief.operations.command=REBUILD").run { context ->
+                assertThat(context).hasNotFailed()
+                assertThat(context).hasBean("briefOperationsRunner")
+                assertThat(context.getBean(BriefOperationsProperties::class.java).command)
+                    .isEqualTo(BriefOperationsProperties.Command.REBUILD)
+            }
+        }
+        verifyNoInteractions(brief)
+    }
+
     @Test
     fun `false 명령은 실행 생략이 아니라 잘못된 명령으로 거부한다`() {
         val brief = mock(BriefUseCases::class.java)

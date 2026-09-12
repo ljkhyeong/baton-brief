@@ -11,7 +11,8 @@ k3s는 도입 예정이다. 이 문서는 연동 선택과 설정을 다루며 �
 | 운영 장애 알림 | Prometheus → Alertmanager → Slack·Discord 웹훅 | BRIEF 경보 전달 설정과 채널별 수신 설정을 제공한다. 공용 Alertmanager와 웹훅을 연결하면 사용한다. |
 | 공휴일 표시 | BATON의 `KasiPublicHolidayClient`가 한국천문연구원 API를 조회하고 1시간 캐시 | 이미 구현돼 있다. BATON의 `BATON_HOLIDAYS_ENABLED`와 서비스 키를 설정한다. BRIEF·CAL에 같은 호출을 추가하지 않는다. |
 | 캘린더 앱 연결 | CAL의 `.ics` 구독, BATON의 Google·Apple·Outlook 등록 안내 | 기존 기능을 사용한다. 앱이 정한 주기로 갱신되며 실시간 양방향 동기화는 아니다. |
-| 업무 알림 발송 | RELAY의 Discord·HTTP 웹훅 어댑터 | 기존 발송·재시도 기능을 사용한다. Slack·Discord 채널 선택은 운영 경보에 적용하며 RELAY의 업무 발송 채널은 바꾸지 않는다. |
+| 업무 알림 발송 | RELAY의 Slack·Discord·HTTP 웹훅 어댑터 | 기존 발송·재시도 기능을 사용한다. 업무 발송은 RELAY, 운영 경보는 Alertmanager에 연결한다. |
+| Slack·Discord 장애 공지 조회 | RELAY의 `ProviderStatusProbe`가 공식 상태 API를 조회 | 전송 장애를 조사할 때 기존 조회 명령을 사용한다. 전체 서비스 공지이며 개별 메시지의 성공 여부를 뜻하지 않는다. |
 | 외부 백업 보관 | BATON은 이미 `rclone crypt`로 외부 저장소를 연결. BRIEF는 PostgreSQL 백업·격리 복원 제공 | 보유한 별도 저장소가 정해지면 rclone으로 연결한다. 저장소별 API 클라이언트를 만들거나 유료 저장소를 추가하지 않는다. |
 | DNS 갱신 | Cloudflare DNS API를 사용하는 ddclient | 공인 IP가 바뀌는 환경에만 필요하다. 고정 IP면 생략한다. 직접 IP 감지·DNS 갱신 코드를 만들지 않는다. |
 | 인증서 갱신 | 기존 Caddy의 ACME, 향후 공용 앞단의 인증서 관리 기능 | 준비된 인증서의 종류·갱신 방식을 따른다. 서비스마다 별도 인증서 발급 코드를 추가하지 않는다. |
@@ -25,6 +26,12 @@ DNS 자동 갱신은 [Cloudflare가 안내하는 ddclient](https://developers.cl
 이미 준비된 공인 IP·포트포워딩 경로에 Tunnel을 추가할 필요는 현재 확인되지 않았다.
 
 ## 남은 연결 조건
+
+BRIEF의 코드·빌드·임시 환경변수 준비와 실제 서버 설정을 구분한다.
+[.env.runtime.example](../../.env.runtime.example)에 Compose와 무관하게 주입할 DB·API 인증·probe 값을
+정리했다. 운영자는 실제 주소와 비밀을 지정하고 이미지 빌드·k3s·DNS·TLS를 적용한다.
+Slack·Discord 웹훅은 아래 Alertmanager의 비밀 파일 또는 RELAY의 채널 설정에 주입하며
+BRIEF 애플리케이션에는 사용하지 않는 웹훅 환경변수를 추가하지 않는다.
 
 후속 검토에서 경보 설정·채널 분기·전달 실패 진단과 백업·복원 스크립트를 대조했다.
 현재 요구를 충족하려고 새 외부 API나 서비스를 추가할 필요는 확인되지 않았다.
@@ -55,6 +62,7 @@ BRIEF 지표 → 기존 Prometheus 경보 → 공용 Alertmanager → Slack·Dis
 | --- | --- | --- |
 | Slack | [brief-slack.example.yml](../../ops/alertmanager/brief-slack.example.yml) | `/run/secrets/brief-slack-webhook-url` |
 | Discord | [brief-discord.example.yml](../../ops/alertmanager/brief-discord.example.yml) | `/run/secrets/brief-discord-webhook-url` |
+| Slack·Discord 동시 수신 | [brief-slack-discord.example.yml](../../ops/alertmanager/brief-slack-discord.example.yml) | 위 두 파일 |
 
 1. Slack은 기존 앱의 [Incoming Webhooks](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/)에서,
    Discord는 운영 텍스트 채널의 [채널 편집 → 연동 → 웹훅](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks)에서 주소를 만든다.
@@ -62,9 +70,8 @@ BRIEF 지표 → 기존 Prometheus 경보 → 공용 Alertmanager → Slack·Dis
    위 경로에 읽기 전용으로 연결한다. 실행 사용자만 읽게 한다.
 2. 선택한 예시의 `route.routes` 항목과 채널 수신처를 공용 Alertmanager 설정에 합친다.
    BRIEF 경로는 먼저 일치하는 포괄 경로보다 앞에 둔다. `unmatched`는 예시 검사용이므로
-   기존 기본 수신처를 덮어쓰지 않는다. **두 채널을 함께 쓰려면** 기존 `brief-slack` 수신처 안에서
-   `slack_configs`와 같은 수준에 Discord 예시의 `discord_configs`를 추가하고 두 비밀 파일을 연결한다.
-   이때 BRIEF 경로는 하나만 유지한다. 같은 조건의 경로를 두 개 나란히 두면 기본적으로 첫 경로만 선택된다.
+   기존 기본 수신처를 덮어쓰지 않는다. 두 채널을 함께 쓰려면 동시 수신 예시와 두 비밀 파일을 사용한다.
+   이 예시는 한 BRIEF 경로의 수신처에 두 채널을 포함한다. 단독 채널 경로를 함께 추가하지 않는다.
 3. [Prometheus 연결 대상](../../ops/prometheus/alertmanager-targets.yml)의 빈 목록을 실제 비공개
    Alertmanager 주소로 바꾼다. `targets`에는 URL 경로 없이 `호스트:포트`를 넣는다.
 
@@ -105,7 +112,7 @@ Slack Incoming Webhook·Discord 채널 웹훅과 자체 호스팅 Alertmanager�
 Discord는 별도 봇 서버나 유료 발송 상품 없이 기본 웹훅을 사용한다. 홈서버 자원·네트워크 사용과
 각 채널의 요청 제한은 적용된다.
 
-CI는 Prometheus 설정·경보 규칙과 Alertmanager 설정·서비스별 분기를 검사한다.
+CI는 Prometheus 설정·경보 규칙과 Alertmanager의 단독·동시 수신 예시 3개, 서비스별 분기를 검사한다.
 실제 워크스페이스·서버의 채널 권한과 도착 여부는 웹훅을 연결한 뒤 확인한다.
 현재 검증 결과는 [HANDOFF](../../HANDOFF.md)를 따른다.
 

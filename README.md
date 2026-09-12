@@ -138,7 +138,7 @@ AI 요약으로 업무 상태를 판정하지 않는다.
 
 [ADR-0002](docs/ADR/0002_technology-stack/adr.md)를 기술 기준으로 사용한다.
 
-- Kotlin/JVM·Kotlin BOM 2.4.10, Java 21 도구 체인과 JDK 21 실행 환경
+- Kotlin/JVM·Kotlin BOM 2.4.20, Java 21 도구 체인과 JDK 21 실행 환경
 - Spring Boot/BOM 4.1.1, Gradle wrapper 9.2.1과 Kotlin DSL
 - PostgreSQL 18.6, Spring JDBC `JdbcClient`, Flyway, JPA 미사용
 - `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap`의 다섯
@@ -172,6 +172,27 @@ BRIEF_EVENT_RECEIVER_BEARER_TOKEN=<32~200자의 URL-safe ASCII 값>
 보호 범위는 `POST /api/v1/events`뿐이다. 중단 없이 값을 바꿀 때는 새 값을 현재 token에,
 기존 값을 `BRIEF_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN`에 한 번만 함께 배포하고 BATON 전환
 뒤 직전 값을 제거한다.
+
+### Compose 없이 실행할 환경변수
+
+[.env.runtime.example](.env.runtime.example)은 JAR·컨테이너에 직접 주입할 Spring Boot 환경변수다.
+k3s에서도 같은 키를 사용한다. DB 주소·사용자·비밀번호와 이벤트 수신·서비스 API의 서로 다른
+토큰을 지정한다. 비밀은 Kubernetes Secret 등 배포 환경의 비밀 주입 기능으로 전달한다.
+`.env` 파일을 저장하는 것만으로 애플리케이션에 자동 반영되지는 않는다.
+
+이 예시는 `0.0.0.0:8080`으로 요청을 받고 두 API 인증을 모두 켠다. 토큰이 없거나 서로 같으면
+기동하지 않는다. 외부 허용 경로는 `https://brief.b4ton.com/api/v1/events`의 POST 하나이며,
+조회·생성과 관리 경로는 기존 비공개 접근 범위를 유지한다.
+
+상태 확인은 Spring Boot의 `/actuator/health/liveness`와 `/actuator/health/readiness`를 사용한다.
+생존 확인은 DB 장애와 분리하고, 준비 상태는 DB 접속을 포함한다. 공개 경로에 추가하지 않는다.
+기본 로컬 실행과 기존 Compose의 probe 비활성 설정은 그대로 유지한다.
+
+로컬 검증용 `.env.runtime.local`은 Git에서 제외하며 운영 비밀로 사용하지 않는다.
+현재 준비·검증 결과는 [HANDOFF](HANDOFF.md)를 따른다. 이미지 빌드·k3s 리소스 적용·DNS·TLS 설정은
+운영자가 수행하며 이 환경변수 파일은 해당 설정을 대신하지 않는다.
+
+### BATON의 비공개 조회·생성 연결
 
 BATON 백엔드 경유 조회·생성 연결은 이벤트 token을 재사용하지 않는다. 같은 호스트에서
 연결할 때도 서비스 전용 HTTPS를 사용한다. 운영자는 내부 네트워크를 한 번 만들고

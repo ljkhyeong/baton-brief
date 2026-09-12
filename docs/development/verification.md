@@ -33,9 +33,11 @@ python3 scripts/verify-feedback.py final <시작-커밋>
 | Kotlin·Java 테스트 | 해당 모듈 `testClasses`로 컴파일 |
 | Gradle 설정·버전 catalog | `help`로 빌드 설정 평가 |
 | 셸·Python·TOML | `bash -n`·표준 AST·TOML 파서로 문법 확인 |
+| JSON | 표준 JSON 파서로 구문 확인. `NaN`·`Infinity` 같은 비표준 숫자 표기 거부 |
 | 모든 변경 파일 | Git 공백 오류 검사 |
 
 문서 링크·표현, YAML 설정의 실제 유효성, 제품 동작은 이 빠른 검사만으로 보장하지 않는다.
+JSON 필드·값의 계약 일치는 기존 JSON Schema·통합 테스트에서 확인한다.
 변경 범위 표와 해당 스킬의 검증을 이어서 적용한다.
 
 `final`은 시작 커밋 이후의 현재 파일 diff와 별도의 staged diff, Git에서 무시하지 않은 새 파일을
@@ -118,6 +120,17 @@ python3 scripts/verify-feedback.py final <시작-커밋>
 표준 도구가 이미 제공하는 검증·캐시를 우선 사용한다. 보조 도구에 의존성이 없으면 기존 환경을 확인한 뒤
 필요한 도구만 임시 환경에 준비한다. 같은 의존성이 없다고 확인한 런타임을 반복해서 시도하지 않는다.
 범위가 넓은 실행과 실패 재현의 로그는 구분해 이전 실패 근거를 덮어쓰지 않는다.
+
+스테이징 CI 실행 단계가 실패하면 컨테이너를 정리하기 전에 상태와 서비스별 최근 로그 100줄을
+`스테이징 실패 진단` 그룹에 출력한다. 진단 수집이 실패해도 원래 검증의 종료 코드를 유지한다.
+테스트용 Bearer는 컨테이너 기동 전에 [GitHub 로그 마스킹](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#masking-a-value-in-a-log)에
+등록한다. 이 마스킹은 GitHub Actions 출력에 적용되며 컨테이너 원본 로그의 비밀 비노출 검사는 유지한다.
+
+Gradle 검증이 실패하면 도메인·통합·ArchUnit의 HTML 보고서와 JUnit XML을
+`brief-test-reports-<실행 시도 번호>` 산출물로 3일간 보관한다.
+[해당 Actions 실행의 Artifacts](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts)에서
+내려받아 각 모듈의 `build/reports/tests/<태스크>/index.html`을 열면 오류 상세를 확인할 수 있다.
+컴파일 단계에서 실패해 보고서가 없으면 업로드를 생략한다.
 
 ## 다음 세션에 남길 근거
 

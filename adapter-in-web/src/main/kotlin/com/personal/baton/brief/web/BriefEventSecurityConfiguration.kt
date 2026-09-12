@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
-import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
 
@@ -48,11 +47,8 @@ class BriefEventSecurityConfiguration {
             "baton-event-producer",
             "BRIEF 이벤트 수신 인증 정보가 올바르지 않습니다",
         )
-        val entryPoint = BearerTokenAuthenticationEntryPoint()
-
         return http
             .authorizeHttpRequests { it.anyRequest().authenticated() }
-            .exceptionHandling { it.authenticationEntryPoint(entryPoint) }
             .oauth2ResourceServer {
                 it.authenticationManagerResolver { authenticationManager }
             }

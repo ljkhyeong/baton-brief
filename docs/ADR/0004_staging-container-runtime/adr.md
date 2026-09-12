@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-27
-- 수정일: 2026-08-29
+- 수정일: 2026-09-12
 
 ## 배경
 
@@ -30,6 +30,9 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 구성을 제공하지만 운영과 유
   capability 제거를 사용한다.
 - `compose.staging.yml`의 기본 profile은 BRIEF와 PostgreSQL 18.6을 함께 실행한다. PostgreSQL은 내부
   데이터 네트워크에서만 실행하고 호스트 포트를 공개하지 않는다.
+- 개발용·스테이징 PostgreSQL 상태 검사는 `pg_isready -h 127.0.0.1`로 TCP 연결을 확인한다.
+  [공식 이미지의 초기화용 서버](https://hub.docker.com/_/postgres)는 Unix 소켓만 열므로,
+  초기화 중에는 준비 완료로 판단하지 않는다. BRIEF는 기존 `service_healthy` 조건으로 기다린다.
 - BRIEF 프로세스는 컨테이너 내부 네트워크 요청을 받도록 `0.0.0.0:8080`에서 실행하되,
   호스트에는 포트를 게시하지 않는다. 공개 호스트 인입은 후속 ADR-0005의 선택적인 Caddy
   profile만 담당하고, 서비스 조회·생성은 ADR-0007의 호스트 포트 없는 서비스 Caddy를
