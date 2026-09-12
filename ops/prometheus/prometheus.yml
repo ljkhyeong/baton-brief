@@ -15,6 +15,13 @@ alerting:
         - files: [/etc/prometheus/alertmanager-targets.yml]
 
 scrape_configs:
+  - job_name: brief-prometheus
+    static_configs:
+      - targets: [127.0.0.1:9090]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: prometheus_notifications_(errors|dropped)_total
+        action: keep
   - job_name: brief
     metrics_path: /actuator/prometheus
     static_configs:

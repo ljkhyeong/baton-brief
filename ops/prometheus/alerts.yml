@@ -1,6 +1,15 @@
 groups:
   - name: brief
     rules:
+      - alert: BriefAlertDeliveryFailed
+        expr: >-
+          sum(increase(prometheus_notifications_errors_total{job="brief-prometheus"}[5m])) > 0
+          or sum(increase(prometheus_notifications_dropped_total{job="brief-prometheus"}[5m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: BRIEF 경보의 Alertmanager 전달 오류 또는 유실이 발생했습니다.
       - alert: BriefMetricsUnavailable
         expr: up{job="brief"} == 0 or absent(up{job="brief"})
         for: 2m

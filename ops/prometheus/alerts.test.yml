@@ -2,6 +2,73 @@ rule_files:
   - alerts.yml
 evaluation_interval: 30s
 tests:
+  - name: 첫 경보 전달 오류를 탐지하고 증가가 멈추면 해제한다
+    interval: 30s
+    input_series:
+      - series: 'prometheus_notifications_errors_total{job="brief-prometheus",alertmanager="https://alertmanager.internal:9093/api/v2/alerts"}'
+        values: '0 0 1x12'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: BRIEF 경보의 Alertmanager 전달 오류 또는 유실이 발생했습니다.
+      - eval_time: 7m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
+  - name: 전송 오류 카운터 없이 유실만 증가해도 경보한다
+    interval: 30s
+    input_series:
+      - series: 'prometheus_notifications_dropped_total{job="brief-prometheus",alertmanager="primary"}'
+        values: '0 0 1x12'
+      - series: 'prometheus_notifications_dropped_total{job="brief-prometheus",alertmanager="secondary"}'
+        values: '0 0 1x12'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: BRIEF 경보의 Alertmanager 전달 오류 또는 유실이 발생했습니다.
+  - name: 수신처 미등록으로 지표가 없어도 전달 오류를 만들지 않는다
+    interval: 30s
+    input_series: []
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
+  - name: 정상 전송과 다른 수집기의 오류는 제외한다
+    interval: 30s
+    input_series:
+      - series: 'prometheus_notifications_errors_total{job="brief-prometheus"}'
+        values: '0x12'
+      - series: 'prometheus_notifications_dropped_total{job="brief-prometheus"}'
+        values: '0x12'
+      - series: 'prometheus_notifications_errors_total{job="other"}'
+        values: '0+1x12'
+      - series: 'prometheus_notifications_dropped_total{job="other"}'
+        values: '0+1x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
+  - name: 전달 카운터의 재시작 초기화는 실패 증가가 아니다
+    interval: 30s
+    input_series:
+      - series: 'prometheus_notifications_errors_total{job="brief-prometheus"}'
+        values: '20 20 0x12'
+      - series: 'prometheus_notifications_dropped_total{job="brief-prometheus"}'
+        values: '20 20 0x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BriefAlertDeliveryFailed
+        exp_alerts: []
   - name: 짧은 수집 실패는 기다리고 지속 실패만 경보한다
     interval: 30s
     input_series:
