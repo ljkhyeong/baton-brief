@@ -9,7 +9,7 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 2026-09-12 조회·운영 연동과 입력 검증 개선을 원격 `main`의 `791c8f4`에 병합했다
 ([PR #17](https://github.com/ljkhyeong/baton-brief/pull/17)). 해당 PR의
 [필수 CI](https://github.com/ljkhyeong/baton-brief/actions/runs/34675956047)는 통과했다.
-이후 Kotlin·Tomcat 보안 수정은 `fbea014`에 로컬 커밋했으며 원격 반영 전이다.
+이후 보안 수정 `fbea014`와 DB 준비 검사 `522ff3c`를 로컬 커밋했으며 원격 반영 전이다.
 BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
 이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
@@ -30,6 +30,7 @@ BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF `522ff3c` PostgreSQL 준비 검사, 2026-09-12 | 개발용·스테이징과 HTTPS·서비스 API·지표 Compose 조합 5개 구문 확인. PostgreSQL 18.6의 초기화를 지연해 기존 검사가 TCP 접속 불가 상태를 `healthy`로 표시하는 문제 재현. 수정 후 초기화 중 `starting`, 완료 후 `healthy`·TCP SQL 성공, 기존 DB 재시작 확인 | 네트워크·호스트 포트 없는 임시 컨테이너, 검사 간격만 1초로 단축. 초기 검증용 파일 마운트 권한과 Compose 달러 이스케이프 처리 오류를 수정한 뒤 통과·정리. 로그 `/tmp/brief-postgres-readiness-before-20260912.log`·`/tmp/brief-postgres-readiness-after-20260912.log`. 전체 diff·문서 링크 확인. 앱·빌드·스키마 불변으로 `fbea014`의 테스트·JAR 근거 재사용. 전체 서비스 재기동·원격 CI·배포 미실행 |
 | BRIEF `fbea014` Kotlin·Tomcat 보안 수정, 2026-09-12 | `./gradlew test :bootstrap:bootJar buildEnvironment` 성공(16초), bootstrap 42건·도메인 6건 통과. 최종 구조 검사 4건 통과 후 전체 실행에서는 결과 재사용. 실제 JAR로 DB health·이벤트/서비스 인증 분리·정상 및 중복 수신·현재 항목 조회·잘못된 JSON 거부 확인 | JDK 21.0.10·PostgreSQL 18.6·Kotlin 2.4.20·Tomcat 11.0.25. JAR의 stdlib/reflect와 Tomcat 3개 버전 정렬·Commons Lang 미포함 확인. 로그 `/tmp/brief-security-full-20260912.log`·`/tmp/brief-security-http-20260912.log`. 최초 임시 HTTP 검사에서 경로·필수 조건을 잘못 지정해 수정했으며 제품 오류는 없었음. 비밀 로그 비노출·임시 앱/DB 정리·전체 diff·문서 링크 확인. 원격 CI·HTTPS·배포 미실행. 계약 ZIP 입력 변경 없음 |
 | BRIEF `216d73d` JSON 타입·중복 필드 거부, 2026-09-12 | `./gradlew test :bootstrap:bootJar contractsZip` 성공(54초), bootstrap 41건 통과·ArchUnit 4건 및 도메인 6건 성공 결과 재사용. 숫자 sourceReference가 문자열로 변환되어 `202 APPLIED`로 저장되는 문제 재현 후, 문자열·열거형의 잘못된 타입 7가지가 `400 ProblemDetail`이며 저장 0건임을 확인. 정상 문자열 `"123"` 수신·재전달 및 기존 중복 필드 거부 포함. 로그 `/tmp/brief-scalar-before-20260912.log`·`/tmp/brief-scalar-after-20260912.log`·`/tmp/brief-scalar-full-20260912.log` | MockMvc·PostgreSQL 18.6·JDK 21.0.10·Jackson 3.1.5. `JsonMapperBuilderCustomizer`의 Textual coercion과 `spring.jackson.datatype.enum.fail-on-numbers-for-enums` 사용. 기존 scalar 옵션만으로 문자열·숫자 열거형 변환을 막을 수 없음. 최초 컴파일 의존성 누락과 Jackson 2 방식 설정 경로를 수정한 뒤 전체 검증 통과. 배포 JAR 라이브러리 84개는 이전과 동일하며 설정 반영 확인. 전체 diff·구조·문서 링크와 ZIP 문서 5개·내부 링크 8개 확인. 이벤트 스키마·계약 버전 유지. 원격 생산자·실제 HTTP 서버·배포 검증은 미실행 |
 | BRIEF `1669d91` 운영 명령 선택·초기화 검사, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefOperationsConfigurationTest' :bootstrap:bootJar` 성공(3초), 설정 테스트 2건·ArchUnit 4건 통과. 이전 JAR의 `command=false`가 출력 없이 종료 코드 0을 반환함을 재현. 변경 후 실제 JAR에서 false·FALSE·UNKNOWN·빈 값 4건 실패와 RECEIPT·ANOMALIES·REBUILD·rebuild 정상 종료 확인. 로그 `/tmp/brief-operations-false-before-20260912.stderr`·`/tmp/brief-operations-condition-after-20260912.log`·`/tmp/brief-operations-command-runtime-20260912.log` | JDK 21.0.10·PostgreSQL 18.6의 격리 DB. 잘못된 명령은 표준 출력·테이블 생성·DB 연결·웹 기동 없음. 정상 명령은 JSON 출력·수신 기록 보존·Flyway 미실행, 임시 DB 정리 확인. 명령 속성의 존재 여부는 Spring Condition에서 판정하며 값 검증은 기존 열거형 바인딩 사용. 빈 등록 전 환경에 접근해야 하므로 환경 빈을 참조하는 SpEL 대신 ConditionContext.environment 사용. 기존 웹·Flyway 비활성 초기 검사 4조건과 명령 미지정 시 비활성 확인. 전체 diff·구조·문서 링크 확인. 운영 명령만 바꿔 전체 테스트·계약 ZIP·원격 CI·배포는 미실행. 앞선 JSON 검증 범위는 `216d73d` 행 참조 |
