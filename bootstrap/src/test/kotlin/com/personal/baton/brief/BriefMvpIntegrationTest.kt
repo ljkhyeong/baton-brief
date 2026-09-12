@@ -1841,6 +1841,38 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `문자열과 열거형 필드에 다른 JSON 타입을 보내면 저장 전에 거부한다`() {
+        val workspace = UUID.randomUUID().toString()
+        val season = UUID.randomUUID().toString()
+        listOf(
+            "sourceReference" to "123",
+            "sourceReference" to "1.5",
+            "sourceReference" to "true",
+            "eventType" to "3",
+            "sourceSeverity" to "0",
+            "state" to "0",
+            "state" to "1",
+        ).forEach { (field, value) ->
+            val event = eventJson(
+                UUID.randomUUID().toString(), workspace, season, "invalid-type", 1,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
+            ).putRawValue(field, RawValue(value))
+            postEvent(event)
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+        listOf("source_event_receipt", "source_event_conflict", "attention_item").forEach { table ->
+            assertThat(jdbc.sql("SELECT COUNT(*) FROM $table").query(Long::class.java).single()).isZero()
+        }
+
+        val valid = eventJson(UUID.randomUUID().toString(), workspace, season, "123", 1)
+        postEvent(valid).andExpect(status().isAccepted)
+            .andExpect(jsonPath("$.item.sourceReference").value("123"))
+        postEvent(valid).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("DUPLICATE"))
+    }
+
+    @Test
     fun `중복 JSON 필드는 이벤트와 에디션 저장 전에 거부한다`() {
         val workspace = UUID.randomUUID().toString()
         val season = UUID.randomUUID().toString()
