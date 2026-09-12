@@ -4,5 +4,8 @@ spring:
     banner-mode: "off"
   flyway:
     enabled: false
+brief:
+  operations:
+    command: ""
 logging:
   config: classpath:logback-operations.xml
