@@ -9,8 +9,8 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 2026-09-12 조회·운영 연동과 입력 검증 개선을 원격 `main`의 `791c8f4`에 병합했다
 ([PR #17](https://github.com/ljkhyeong/baton-brief/pull/17)). 해당 PR의
 [필수 CI](https://github.com/ljkhyeong/baton-brief/actions/runs/34675956047)는 통과했다.
-이후 보완한 코드·설정과 검증 변경은 로컬 커밋 상태이며 원격 반영 전이다.
-각 변경의 기준 커밋과 검증 범위는 아래 표를 따른다.
+후속 보안 패치·실행 설정·연동 준비와 코드 정리는 [PR #18](https://github.com/ljkhyeong/baton-brief/pull/18)로 묶었다.
+병합·최종 CI 상태는 해당 PR, 각 변경의 로컬 검증 범위는 아래 표를 따른다.
 BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
 이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
