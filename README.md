@@ -13,6 +13,7 @@ Kotlin/JDK 21, Spring Boot 4.1과 PostgreSQL 18.6 기반의 로컬 MVP를 구현
 - 월요일 기준 주간 브리프 생성·조회·이력·비교
 - 표준 오류 응답(`ProblemDetail`)과 애플리케이션·DB 상태 확인
 - 이벤트 수신 지표와 선택적 Prometheus 경보. 공용 Alertmanager·Slack·Discord 연결 설정 제공, 실제 수신처는 미연결
+- Prometheus 기본 지표로 Alertmanager 전달 오류·경보 유실 진단
 - PostgreSQL 백업·격리 복원 확인과 Linux 정기 실행 예시
 - BATON 전용 Bearer와 파일 기반 비밀을 사용하는 스테이징 컨테이너
 - 선택적 Caddy HTTPS 프록시: 이벤트 수신 경로만 공개

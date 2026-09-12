@@ -77,6 +77,10 @@ Prometheus는 경보에 `service=brief`를 붙인다. 채널 수신 경로는 �
 `[]`로 되돌린다. 이미 Alertmanager에 전달된 경보는 만료되기 전까지 남을 수 있으므로 즉시 발송 중단이
 필요하면 Alertmanager에서 `service=brief`를 일시 중지한다. 로컬 지표 수집과 경보 판정은 계속된다.
 
+Prometheus의 전송 오류·유실은 [전달 실패 경보](diagnostics-and-metrics.md)로 확인한다.
+수신처 연결 자체가 끊기면 이 경보도 외부에 도착하지 않을 수 있어 로컬 조회가 필요하다.
+이 검사는 Slack·Discord의 메시지 수신을 확인하는 검사가 아니다.
+
 ## 비용과 검증 범위
 
 Slack Incoming Webhook·Discord 채널 웹훅과 자체 호스팅 Alertmanager를 사용하며 별도 유료 발송 서비스는 추가하지 않는다.

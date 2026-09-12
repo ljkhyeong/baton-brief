@@ -107,6 +107,19 @@ docker compose --env-file .env.staging -f compose.staging.yml -f compose.observa
 | `BriefEventRejected` | 최근 5분의 `CONFLICT` 또는 `UNSUPPORTED` 카운터 증가가 감지된 상태가 1분간 지속 |
 | `BriefDatabaseConnectionWait` | DB 연결을 기다리는 요청이 있는 상태가 연결 풀별로 2분간 지속 |
 | `BriefEventRevisionGap` | 최근 5분의 `APPLIED_WITH_GAP` 카운터 증가가 감지된 상태가 1분간 지속 |
+| `BriefAlertDeliveryFailed` | 최근 5분의 Alertmanager 전달 오류 또는 경보 유실 증가가 감지된 상태가 1분간 지속 |
+
+Prometheus는 `brief-prometheus` 작업으로 자신의 loopback 지표 중 경보 전송 오류·유실 카운터만
+수집한다. 별도 exporter나 API 키는 필요 없다. [기본 제공 카운터](https://github.com/prometheus/prometheus/blob/main/notifier/metric.go)는
+`prometheus_notifications_errors_total`과 `prometheus_notifications_dropped_total`이며,
+경보에는 수신처 URL을 포함하지 않는다.
+
+`BriefAlertDeliveryFailed`는 Prometheus에서 Alertmanager까지의 전달 문제다. 해당 경보가 발생하면
+`/api/v1/alertmanagers`의 연결 대상과 인증서·인증·네트워크를 확인한다. Alertmanager가 모든 경보를
+받지 못하는 중에는 이 경보도 외부로 전달되지 않을 수 있으므로 위 로컬 경보 조회에서 확인한다.
+Slack·Discord 웹훅 오류와 실제 메시지 도착은 Alertmanager와 수신 채널에서 별도로 확인한다.
+최근 5분에 새 오류·유실이 없으면 해제되며, 이전에 유실한 경보가 복구됐다는 뜻은 아니다.
+수신처를 등록하지 않아 카운터가 없는 상태나 재시작 초기화만으로는 경보하지 않는다.
 
 이벤트 거부 경보는 `outcome`으로 충돌과 미지원을 구분한다. HTTP `409`·`422`도 확인할 수
 있으며, BATON의 이벤트 버전·본문과 BRIEF 수신 기록을 조사한다. 정상 적용·중복·오래된 리비전은

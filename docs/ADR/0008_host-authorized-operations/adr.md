@@ -43,6 +43,9 @@ Prometheus는 경보에 `service=brief`를 붙이고 파일에 등록한 비공�
 파일로 제공하며 앱 코드·외부 발송 어댑터·공개 관리 경로를 추가하지 않는다.
 현재 RELAY의 loopback Alertmanager는 BRIEF가 직접 접근할 수 없으므로 공용 연결 경로를 마련한 뒤 적용한다.
 설정은 [외부 연동 절차](../../operations/external-integrations.md)를 따른다. 서버 설치는 이번 범위에 포함하지 않는다.
+Prometheus는 자신의 loopback에서 기본 경보 전송 오류·유실 카운터만 추가 수집한다.
+Alertmanager까지의 전달 실패를 진단하며 수신처 URL은 경보 레이블에 포함하지 않는다.
+전달 경로 전체가 끊긴 동안에는 로컬 경보 조회가 필요하다. Slack·Discord 수신 완료로 해석하지 않는다.
 같은 서버의 수집기는 호스트 전체 장애를 감지할 수 없다. 유료 관리형 저장소·API 대신
 기존 서버 자원을 사용한다.
 
