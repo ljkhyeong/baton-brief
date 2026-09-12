@@ -66,6 +66,21 @@ class FeedbackTest(unittest.TestCase):
         self.assertEqual(self.verify("final", self.base).returncode, 0)
         self.assertFalse((self.root / "gradle-tasks.log").exists())
 
+    def test_json_errors_stop_both_modes_without_gradle(self):
+        for payload in ['{"value":}', '{"value":NaN}', '{"value":Infinity}', '{"value":-Infinity}']:
+            self.write("payload.json", payload + "\n")
+            for args in [("files", "payload.json"), ("final", self.base)]:
+                with self.subTest(payload=payload, mode=args[0]):
+                    result = self.verify(*args)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertFalse((self.root / "gradle-tasks.log").exists())
+
+        self.write("payload.json", '{"문구":"점검 완료","값":[1,null,true,"NaN","Infinity"]}\n')
+        for args in [("files", "payload.json"), ("final", self.base)]:
+            result = self.verify(*args)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse((self.root / "gradle-tasks.log").exists())
+
     def test_final_keeps_staged_diff_when_worktree_matches_base_and_allows_committed_deletion(self):
         self.git("rm", "-q", ".gitignore")
         self.git("commit", "-qm", "파일 삭제")
