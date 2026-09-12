@@ -115,7 +115,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `V2와 V7 대표 데이터를 최신 마이그레이션까지 보존한다`() {
+    fun `V2와 V7 대표 데이터를 V9와 최신 마이그레이션까지 보존한다`() {
         val schema = "brief_migration_upgrade"
         jdbc.sql("DROP SCHEMA IF EXISTS $schema CASCADE").update()
         jdbc.sql("CREATE SCHEMA $schema").update()
@@ -143,7 +143,18 @@ class BriefMvpIntegrationTest(
                     }
                 }
             }
+            flywayConfiguration.target("9").load().migrate()
+            val tables = listOf(
+                "source_event_receipt", "source_event_conflict", "attention_item",
+                "brief_edition", "brief_edition_item",
+            )
+            fun storedRows() = tables.associateWith { table ->
+                jdbc.sql("SELECT to_jsonb(stored)::text FROM $schema.$table stored ORDER BY 1")
+                    .query(String::class.java).list()
+            }
+            val previousRows = storedRows()
             flywayConfiguration.target(MigrationVersion.LATEST).load().migrate()
+            assertThat(storedRows()).isEqualTo(previousRows)
 
             assertThat(
                 jdbc.sql("SELECT COUNT(*) FROM $schema.attention_item")
