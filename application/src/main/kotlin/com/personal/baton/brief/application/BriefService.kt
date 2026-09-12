@@ -60,11 +60,8 @@ class BriefService(
         baseEditionId: UUID,
         targetEditionId: UUID,
     ): EditionComparisonResult {
-        val base = persistence.findEdition(baseEditionId)
-        val target = persistence.findEdition(targetEditionId)
-        if (base == null || target == null) {
-            return EditionComparisonResult.NotFound
-        }
+        val base = persistence.findEdition(baseEditionId) ?: return EditionComparisonResult.NotFound
+        val target = persistence.findEdition(targetEditionId) ?: return EditionComparisonResult.NotFound
         if (base.workspaceId != target.workspaceId || base.seasonId != target.seasonId) {
             return EditionComparisonResult.ScopeMismatch
         }
