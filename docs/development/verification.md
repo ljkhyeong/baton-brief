@@ -33,9 +33,11 @@ python3 scripts/verify-feedback.py final <시작-커밋>
 | Kotlin·Java 테스트 | 해당 모듈 `testClasses`로 컴파일 |
 | Gradle 설정·버전 catalog | `help`로 빌드 설정 평가 |
 | 셸·Python·TOML | `bash -n`·표준 AST·TOML 파서로 문법 확인 |
+| JSON | 표준 JSON 파서로 구문 확인. `NaN`·`Infinity` 같은 비표준 숫자 표기 거부 |
 | 모든 변경 파일 | Git 공백 오류 검사 |
 
 문서 링크·표현, YAML 설정의 실제 유효성, 제품 동작은 이 빠른 검사만으로 보장하지 않는다.
+JSON 필드·값의 계약 일치는 기존 JSON Schema·통합 테스트에서 확인한다.
 변경 범위 표와 해당 스킬의 검증을 이어서 적용한다.
 
 `final`은 시작 커밋 이후의 현재 파일 diff와 별도의 staged diff, Git에서 무시하지 않은 새 파일을
