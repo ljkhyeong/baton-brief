@@ -243,14 +243,13 @@ class JdbcBriefPersistenceAdapter(
         .single()
 
     override fun findWeeklyResolutions(
-        workspaceId: UUID,
-        seasonId: UUID,
-        window: WeeklyWindow,
+        command: GenerateEditionCommand,
         evaluatedAt: Instant,
         after: AttentionItemCursor?,
         limit: Int,
         eventType: SourceEventType?,
     ): WeeklyResolutionSummary {
+        val window = command.window
         val afterClause = if (after == null) "" else
             "WHERE (reason_code, source_reference) > (:afterEventType, :afterSourceReference)"
         val rows = jdbc.sql(
@@ -290,8 +289,8 @@ class JdbcBriefPersistenceAdapter(
           ) page ON TRUE
          ORDER BY page.reason_code, page.source_reference
             """.trimIndent(),
-        ).param("workspaceId", workspaceId)
-            .param("seasonId", seasonId)
+        ).param("workspaceId", command.workspaceId)
+            .param("seasonId", command.seasonId)
             .param("windowStart", window.start.jdbcValue())
             .param("windowEnd", window.end.jdbcValue())
             .param("evaluatedAt", evaluatedAt.jdbcValue())
@@ -392,13 +391,12 @@ class JdbcBriefPersistenceAdapter(
     @Transactional
     override fun createEdition(
         command: GenerateEditionCommand,
-        window: WeeklyWindow,
         currentTime: () -> Instant,
         selectContent: (List<AttentionItem>) -> EditionContent,
     ): EditionResult {
         lock(PROJECTION_LOCK)
 
-        val candidates = findAttentionForWindow(command, window)
+        val candidates = findAttentionForWindow(command)
         val content = selectContent(candidates)
         findLatestEditionByState(command, content.stateFingerprint)?.let { existing ->
             return EditionResult(existing, created = false)
@@ -412,7 +410,7 @@ class JdbcBriefPersistenceAdapter(
             workspaceId = command.workspaceId,
             seasonId = command.seasonId,
             generation = generation,
-            window = window,
+            window = command.window,
             ruleVersion = BriefEdition.RULE_VERSION,
             sourceCursor = sourceCursor,
             generatedAt = generatedAt,
@@ -569,10 +567,7 @@ class JdbcBriefPersistenceAdapter(
         ).update()
     }
 
-    private fun findAttentionForWindow(
-        command: GenerateEditionCommand,
-        window: WeeklyWindow,
-    ): List<AttentionItem> = jdbc.sql(
+    private fun findAttentionForWindow(command: GenerateEditionCommand): List<AttentionItem> = jdbc.sql(
         """
         $ATTENTION_ITEM_SELECT
          WHERE workspace_id = :workspaceId
@@ -584,7 +579,7 @@ class JdbcBriefPersistenceAdapter(
         mapOf(
             "workspaceId" to command.workspaceId,
             "seasonId" to command.seasonId,
-            "windowEnd" to window.end.jdbcValue(),
+            "windowEnd" to command.window.end.jdbcValue(),
         ),
     ).query(ATTENTION_ITEM_MAPPER).list()
 

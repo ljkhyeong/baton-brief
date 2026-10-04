@@ -110,7 +110,9 @@ data class GenerateEditionCommand(
     val seasonId: UUID,
     val weekStart: LocalDate,
     val zoneId: ZoneId,
-)
+) {
+    val window: WeeklyWindow = WeeklyWindow.startingOn(weekStart, zoneId)
+}
 
 data class EditionResult(
     val edition: BriefEdition,
@@ -272,9 +274,7 @@ interface BriefPersistencePort : BriefQueries {
     ): IngestResult
 
     fun findWeeklyResolutions(
-        workspaceId: UUID,
-        seasonId: UUID,
-        window: WeeklyWindow,
+        command: GenerateEditionCommand,
         evaluatedAt: Instant,
         after: AttentionItemCursor?,
         limit: Int,
@@ -285,7 +285,6 @@ interface BriefPersistencePort : BriefQueries {
 
     fun createEdition(
         command: GenerateEditionCommand,
-        window: WeeklyWindow,
         currentTime: () -> Instant,
         selectContent: (List<AttentionItem>) -> EditionContent,
     ): EditionResult

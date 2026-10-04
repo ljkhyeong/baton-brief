@@ -38,22 +38,12 @@ class BriefService(
         after: AttentionItemCursor?,
         limit: Int,
         eventType: SourceEventType?,
-    ): WeeklyResolutionSummary = persistence.findWeeklyResolutions(
-        command.workspaceId, command.seasonId, WeeklyWindow.startingOn(command.weekStart, command.zoneId),
-        now(), after, limit, eventType,
-    )
+    ): WeeklyResolutionSummary = persistence.findWeeklyResolutions(command, now(), after, limit, eventType)
 
     override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)
 
-    override fun generateEdition(command: GenerateEditionCommand): EditionResult {
-        val window = WeeklyWindow.startingOn(command.weekStart, command.zoneId)
-        return persistence.createEdition(
-            command,
-            window,
-            ::now,
-            { selectEditionContent(it, window) },
-        )
-    }
+    override fun generateEdition(command: GenerateEditionCommand): EditionResult =
+        persistence.createEdition(command, ::now) { selectEditionContent(it, command.window) }
 
     override fun compareEditions(
         baseEditionId: UUID,

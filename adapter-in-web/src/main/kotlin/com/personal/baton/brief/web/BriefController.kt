@@ -15,7 +15,6 @@ import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
-import com.personal.baton.brief.domain.WeeklyWindow
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
@@ -223,16 +222,13 @@ class BriefController(
         @Valid @ModelAttribute request: EditionWeekRequest,
         @RequestParam("beforeGeneration", required = false) @Positive beforeGeneration: Long?,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
-    ): EditionHistoryResult {
-        val command = request.toCommand(workspaceId, seasonId)
-        return brief.findEditionHistory(
-            workspaceId,
-            seasonId,
-            beforeGeneration,
-            limit,
-            WeeklyWindow.startingOn(command.weekStart, command.zoneId),
-        )
-    }
+    ): EditionHistoryResult = brief.findEditionHistory(
+        workspaceId,
+        seasonId,
+        beforeGeneration,
+        limit,
+        request.toCommand(workspaceId, seasonId).window,
+    )
 
     @GetMapping("/editions/{editionId}")
     fun findEdition(
