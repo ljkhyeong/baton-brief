@@ -67,14 +67,7 @@ class BriefServiceApiSecurityIntegrationTest(
             post(editionPath)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "weekStart": "2026-08-24",
-                      "zoneId": "Asia/Seoul"
-                    }
-                    """.trimIndent(),
-                ),
+                .content("""{"weekStart":"2026-08-24","zoneId":"Asia/Seoul"}"""),
         ).andExpect(status().isCreated).andReturn()
         val editionId = JsonPath.read<String>(createdEdition.response.contentAsString, "$.editionId")
         val comparisonPath = "/api/v1/editions/$editionId/changes"
