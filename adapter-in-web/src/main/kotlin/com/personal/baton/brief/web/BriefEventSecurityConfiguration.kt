@@ -14,12 +14,12 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 
 @ConfigurationProperties("brief.event-receiver")
 class BriefEventReceiverSecurityProperties(
-    @DefaultValue("false") val authenticationRequired: Boolean,
+    @DefaultValue("false") private val authenticationRequired: Boolean,
     @DefaultValue("") private val bearerToken: String,
     @DefaultValue("") private val previousBearerToken: String,
 ) {
-    fun acceptedBearerTokens(): List<String> =
-        acceptedBearerTokens(bearerToken, previousBearerToken, "BRIEF 이벤트 수신")
+    fun requiredBearerTokens(): List<String>? =
+        requiredBearerTokens(authenticationRequired, bearerToken, previousBearerToken, "BRIEF 이벤트 수신")
 }
 
 @Configuration(proxyBeanMethods = false)
@@ -33,7 +33,7 @@ class BriefEventSecurityConfiguration {
         properties: BriefEventReceiverSecurityProperties,
     ): SecurityFilterChain = http.staticBearerFilterChain(
         EVENT_INGESTION,
-        if (properties.authenticationRequired) properties.acceptedBearerTokens() else null,
+        properties.requiredBearerTokens(),
         "baton-event-producer",
         "BRIEF 이벤트 수신 인증 정보가 올바르지 않습니다",
     )

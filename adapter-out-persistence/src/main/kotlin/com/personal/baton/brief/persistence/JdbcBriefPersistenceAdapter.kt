@@ -96,11 +96,7 @@ class JdbcBriefPersistenceAdapter(
             }
 
             is ProjectionDecision.Applied -> {
-                val status = if (decision.hasRevisionGap) {
-                    IngestStatus.APPLIED_WITH_GAP
-                } else {
-                    IngestStatus.APPLIED
-                }
+                val status = if (decision.hasRevisionGap) IngestStatus.APPLIED_WITH_GAP else IngestStatus.APPLIED
                 insertReceipt(event, fingerprint, status, receivedAt)
                 jdbc.sql(UPSERT_ATTENTION).params(decision.item.jdbcParameters()).update()
                 IngestResult(event.eventId, status, decision.item)
@@ -162,14 +158,13 @@ class JdbcBriefPersistenceAdapter(
            AND event_type = :eventType
            AND source_reference = :sourceReference
         """.trimIndent(),
-    ).params(
-        mapOf(
-            "workspaceId" to workspaceId,
-            "seasonId" to seasonId,
-            "eventType" to eventType.name,
-            "sourceReference" to sourceReference,
-        ),
-    ).query(ATTENTION_ITEM_MAPPER).optional().getOrNull()
+    ).param("workspaceId", workspaceId)
+        .param("seasonId", seasonId)
+        .param("eventType", eventType.name)
+        .param("sourceReference", sourceReference)
+        .query(ATTENTION_ITEM_MAPPER)
+        .optional()
+        .getOrNull()
 
     override fun findAttentionItems(
         workspaceId: UUID,
@@ -560,13 +555,10 @@ class JdbcBriefPersistenceAdapter(
             VALUES (:eventId, :fingerprint, :detectedAt)
             ON CONFLICT (event_id) DO NOTHING
             """.trimIndent(),
-        ).params(
-            mapOf(
-                "eventId" to eventId,
-                "fingerprint" to fingerprint,
-                "detectedAt" to detectedAt.jdbcValue(),
-            ),
-        ).update()
+        ).param("eventId", eventId)
+            .param("fingerprint", fingerprint)
+            .param("detectedAt", detectedAt.jdbcValue())
+            .update()
     }
 
     private fun findAttentionForWindow(command: GenerateEditionCommand): List<AttentionItem> = jdbc.sql(
@@ -577,13 +569,11 @@ class JdbcBriefPersistenceAdapter(
            AND item_status = 'ACTIVE'
            AND observed_at < :windowEnd
         """.trimIndent(),
-    ).params(
-        mapOf(
-            "workspaceId" to command.workspaceId,
-            "seasonId" to command.seasonId,
-            "windowEnd" to command.window.end.jdbcValue(),
-        ),
-    ).query(ATTENTION_ITEM_MAPPER).list()
+    ).param("workspaceId", command.workspaceId)
+        .param("seasonId", command.seasonId)
+        .param("windowEnd", command.window.end.jdbcValue())
+        .query(ATTENTION_ITEM_MAPPER)
+        .list()
 
     private fun AttentionItem.jdbcParameters(): Map<String, Any> = mapOf(
         "workspaceId" to workspaceId,
@@ -606,12 +596,10 @@ class JdbcBriefPersistenceAdapter(
            AND season_id = :seasonId
            AND processing_outcome <> 'UNSUPPORTED'
         """.trimIndent(),
-    ).params(
-        mapOf(
-            "workspaceId" to command.workspaceId,
-            "seasonId" to command.seasonId,
-        ),
-    ).query(Long::class.java).single()
+    ).param("workspaceId", command.workspaceId)
+        .param("seasonId", command.seasonId)
+        .query(Long::class.java)
+        .single()
 
     private fun nextGeneration(command: GenerateEditionCommand): Long = jdbc.sql(
         """
@@ -619,7 +607,8 @@ class JdbcBriefPersistenceAdapter(
           FROM brief_edition
          WHERE workspace_id = :workspaceId AND season_id = :seasonId
         """.trimIndent(),
-    ).params(mapOf("workspaceId" to command.workspaceId, "seasonId" to command.seasonId))
+    ).param("workspaceId", command.workspaceId)
+        .param("seasonId", command.seasonId)
         .query(Long::class.java)
         .single()
 
@@ -729,7 +718,24 @@ class JdbcBriefPersistenceAdapter(
               $whereClause
             """.trimIndent(),
         ).params(parameters)
-            .query(::mapEditionWithoutItems)
+            .query { result, _ ->
+                BriefEdition(
+                    editionId = result.getObject("edition_id", UUID::class.java),
+                    workspaceId = result.getObject("workspace_id", UUID::class.java),
+                    seasonId = result.getObject("season_id", UUID::class.java),
+                    generation = result.getLong("generation"),
+                    window = WeeklyWindow(
+                        weekStart = result.getObject("week_start", LocalDate::class.java),
+                        zoneId = ZoneId.of(result.getString("zone_id")),
+                        start = result.instant("window_start"),
+                        end = result.instant("window_end"),
+                    ),
+                    ruleVersion = result.getInt("rule_version"),
+                    sourceCursor = result.getLong("source_cursor"),
+                    generatedAt = result.instant("generated_at"),
+                    items = emptyList(),
+                )
+            }
             .optional()
             .getOrNull()
             ?: return null
@@ -754,30 +760,6 @@ class JdbcBriefPersistenceAdapter(
             .param("lockKey", key)
             .query()
             .singleValue()
-    }
-
-    private fun mapEditionWithoutItems(
-        result: ResultSet,
-        @Suppress("UNUSED_PARAMETER") rowNumber: Int,
-    ): BriefEdition {
-        val weekStart = result.getObject("week_start", LocalDate::class.java)
-        val zoneId = ZoneId.of(result.getString("zone_id"))
-        return BriefEdition(
-            editionId = result.getObject("edition_id", UUID::class.java),
-            workspaceId = result.getObject("workspace_id", UUID::class.java),
-            seasonId = result.getObject("season_id", UUID::class.java),
-            generation = result.getLong("generation"),
-            window = WeeklyWindow(
-                weekStart = weekStart,
-                zoneId = zoneId,
-                start = result.instant("window_start"),
-                end = result.instant("window_end"),
-            ),
-            ruleVersion = result.getInt("rule_version"),
-            sourceCursor = result.getLong("source_cursor"),
-            generatedAt = result.instant("generated_at"),
-            items = emptyList(),
-        )
     }
 
     private fun ResultSet.instant(column: String): Instant =

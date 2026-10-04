@@ -20,11 +20,8 @@ class BriefServiceApiSecurityProperties(
     @DefaultValue("") private val bearerToken: String,
     @DefaultValue("") private val previousBearerToken: String,
 ) {
-    fun acceptedBearerTokens(): List<String> = acceptedBearerTokens(
-        bearerToken,
-        previousBearerToken,
-        "BRIEF 서비스 API",
-    )
+    fun requiredBearerTokens(): List<String>? =
+        requiredBearerTokens(authenticationRequired, bearerToken, previousBearerToken, "BRIEF 서비스 API")
 }
 
 @Configuration(proxyBeanMethods = false)
@@ -38,9 +35,9 @@ class BriefServiceApiSecurityConfiguration {
         properties: BriefServiceApiSecurityProperties,
         eventProperties: BriefEventReceiverSecurityProperties,
     ): SecurityFilterChain {
-        val serviceApiTokens = if (properties.authenticationRequired) properties.acceptedBearerTokens() else null
-        if (serviceApiTokens != null && eventProperties.authenticationRequired) {
-            val eventTokens = eventProperties.acceptedBearerTokens()
+        val serviceApiTokens = properties.requiredBearerTokens()
+        if (serviceApiTokens != null) {
+            val eventTokens = eventProperties.requiredBearerTokens().orEmpty()
             require(serviceApiTokens.none(eventTokens::contains)) {
                 "BRIEF 이벤트 수신과 서비스 API bearer token은 서로 달라야 합니다"
             }
@@ -58,19 +55,13 @@ class BriefServiceApiSecurityConfiguration {
     fun unlistedApiSecurityFilterChain(
         http: HttpSecurity,
         properties: BriefServiceApiSecurityProperties,
-    ): SecurityFilterChain {
-        http
-            .securityMatcher(pathPattern("/api/v1/**"))
-            .configureStatelessApi()
-            .authorizeHttpRequests {
-                if (properties.authenticationRequired) {
-                    it.anyRequest().denyAll()
-                } else {
-                    it.anyRequest().permitAll()
-                }
-            }
-        return http.build()
-    }
+    ): SecurityFilterChain = http
+        .securityMatcher(pathPattern("/api/v1/**"))
+        .configureStatelessApi()
+        .authorizeHttpRequests {
+            if (properties.authenticationRequired) it.anyRequest().denyAll() else it.anyRequest().permitAll()
+        }
+        .build()
 
     private companion object {
         val SERVICE_API: RequestMatcher = OrRequestMatcher(

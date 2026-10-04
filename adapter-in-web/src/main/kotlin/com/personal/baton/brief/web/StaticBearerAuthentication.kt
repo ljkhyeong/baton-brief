@@ -12,11 +12,14 @@ import org.springframework.security.web.util.matcher.RequestMatcher
 
 private val BEARER_TOKEN_PATTERN = Regex("[A-Za-z0-9._~-]{32,200}")
 
-internal fun acceptedBearerTokens(
+/** 인증을 끄면 `null`, 켜면 형식을 검사한 현재·직전 token을 반환한다. */
+internal fun requiredBearerTokens(
+    authenticationRequired: Boolean,
     currentToken: String,
     previousToken: String,
     boundaryName: String,
-): List<String> {
+): List<String>? {
+    if (!authenticationRequired) return null
     require(BEARER_TOKEN_PATTERN.matches(currentToken)) {
         "$boundaryName 현재 bearer token은 32~200자의 URL-safe ASCII여야 합니다"
     }

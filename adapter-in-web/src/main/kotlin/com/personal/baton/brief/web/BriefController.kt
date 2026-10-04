@@ -108,7 +108,7 @@ class BriefController(
     fun findAttentionItems(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
-        @Valid @ModelAttribute request: AttentionItemCursorRequest,
+        @Valid @ModelAttribute cursor: AttentionItemCursorRequest,
         @RequestParam("status", defaultValue = "ACTIVE") status: SourceEventState,
         @RequestParam("eventType", required = false) eventType: SourceEventType?,
         @RequestParam("severity", required = false) severity: Severity?,
@@ -122,7 +122,7 @@ class BriefController(
             eventType,
             severity,
             revisionGap,
-            request.toCursor(),
+            cursor.toCursor(),
             limit,
         ),
     )
@@ -175,12 +175,12 @@ class BriefController(
         @Valid @RequestBody request: EditionWeekRequest,
     ): ResponseEntity<BriefEditionResponse> {
         val result = brief.generateEdition(request.toCommand(workspaceId, seasonId))
-        val response = if (result.created) {
+        val builder = if (result.created) {
             ResponseEntity.created(URI.create("/api/v1/editions/${result.edition.editionId}"))
         } else {
             ResponseEntity.ok()
         }
-        return result.edition.toResponse(response)
+        return result.edition.toResponse(builder)
     }
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest")
