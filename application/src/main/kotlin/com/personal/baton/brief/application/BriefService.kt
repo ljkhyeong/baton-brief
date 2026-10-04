@@ -22,14 +22,13 @@ class BriefService(
 ) : BriefUseCases, BriefQueries by persistence {
     override fun ingest(event: SourceEvent): IngestResult {
         val normalizedEvent = event.copy(occurredAt = event.occurredAt.truncatedTo(ChronoUnit.MICROS))
-        val currentTimestamp = { clock.instant().truncatedTo(ChronoUnit.MICROS) }
-        val receivedAt = currentTimestamp()
+        val receivedAt = now()
         val fingerprint = fingerprint(normalizedEvent)
         if (!normalizedEvent.isSupported) {
-            return persistence.recordUnsupported(normalizedEvent, fingerprint, receivedAt, currentTimestamp)
+            return persistence.recordUnsupported(normalizedEvent, fingerprint, receivedAt, ::now)
         }
 
-        return persistence.processEvent(normalizedEvent, fingerprint, receivedAt, currentTimestamp) { current ->
+        return persistence.processEvent(normalizedEvent, fingerprint, receivedAt, ::now) { current ->
             AttentionProjector.project(normalizedEvent, current)
         }
     }
@@ -41,7 +40,7 @@ class BriefService(
         eventType: SourceEventType?,
     ): WeeklyResolutionSummary = persistence.findWeeklyResolutions(
         command.workspaceId, command.seasonId, WeeklyWindow.startingOn(command.weekStart, command.zoneId),
-        clock.instant().truncatedTo(ChronoUnit.MICROS), after, limit, eventType,
+        now(), after, limit, eventType,
     )
 
     override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)
@@ -51,7 +50,7 @@ class BriefService(
         return persistence.createEdition(
             command,
             window,
-            { clock.instant().truncatedTo(ChronoUnit.MICROS) },
+            ::now,
             { selectEditionContent(it, window) },
         )
     }
@@ -85,6 +84,8 @@ class BriefService(
             ),
         )
     }
+
+    private fun now() = clock.instant().truncatedTo(ChronoUnit.MICROS)
 
     private fun selectEditionContent(items: List<AttentionItem>, window: WeeklyWindow): EditionContent {
         val selected = items

@@ -190,7 +190,7 @@ class BriefController(
         @PathVariable("seasonId") seasonId: UUID,
     ): ResponseEntity<BriefEditionResponse> = brief.findLatestEdition(workspaceId, seasonId)
         ?.toResponse()
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
+        ?: editionNotFound()
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest")
     fun findLatestEditionForWeek(
@@ -200,7 +200,7 @@ class BriefController(
     ): ResponseEntity<BriefEditionResponse> =
         brief.findLatestEditionForWeek(request.toCommand(workspaceId, seasonId))
             ?.toResponse()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
+            ?: editionNotFound()
 
     @GetMapping(
         "/workspaces/{workspaceId}/seasons/{seasonId}/editions",
@@ -239,7 +239,7 @@ class BriefController(
         @PathVariable("editionId") editionId: UUID,
     ): ResponseEntity<BriefEditionResponse> = brief.findEdition(editionId)
         ?.toResponse()
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
+        ?: editionNotFound()
 
     @GetMapping("/editions/{targetEditionId}/changes")
     fun compareEditions(
@@ -249,14 +249,16 @@ class BriefController(
         is EditionComparisonResult.Found -> ResponseEntity.ok()
             .eTag("brief-edition-comparison-v1-$fromEditionId-$targetEditionId")
             .body(result.comparison)
-        EditionComparisonResult.NotFound ->
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
+        EditionComparisonResult.NotFound -> editionNotFound()
         EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(
             HttpStatus.BAD_REQUEST,
             "브리프는 같은 작업공간과 시즌에 속해야 합니다",
         )
     }
 }
+
+private fun editionNotFound(): Nothing =
+    throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
 
 private fun BriefEdition.toResponse(
     builder: ResponseEntity.BodyBuilder = ResponseEntity.ok(),
