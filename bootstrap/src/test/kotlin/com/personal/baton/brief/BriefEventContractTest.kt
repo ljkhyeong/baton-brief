@@ -11,6 +11,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.core.io.ClassPathResource
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver
+import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.databind.node.ObjectNode
 
@@ -33,10 +34,8 @@ class BriefEventContractTest {
         val invalidExample = EXAMPLE_DOCUMENT.deepCopy()
             .put("aggregateRevision", "9223372036854775808".toBigInteger())
 
-        assertThat(SCHEMA.validate(JSON.writeValueAsString(validExample), InputFormat.JSON))
-            .isEmpty()
-        assertThat(SCHEMA.validate(JSON.writeValueAsString(invalidExample), InputFormat.JSON))
-            .isNotEmpty()
+        assertThat(schemaErrors(validExample)).isEmpty()
+        assertThat(schemaErrors(invalidExample)).isNotEmpty()
     }
 
     @Test
@@ -47,8 +46,7 @@ class BriefEventContractTest {
             "occurredAt" to "2026-02-30T09:00:00Z",
         ).forEach { (field, value) ->
             val invalidExample = EXAMPLE_DOCUMENT.deepCopy().put(field, value)
-            assertThat(SCHEMA.validate(JSON.writeValueAsString(invalidExample), InputFormat.JSON))
-                .isNotEmpty()
+            assertThat(schemaErrors(invalidExample)).isNotEmpty()
         }
     }
 
@@ -76,16 +74,17 @@ class BriefEventContractTest {
     fun `sourceReference는 원문을 보존할 수 있는 문자와 같은 공백 기준을 사용한다`() {
         listOf("\u00a0", "\nreference", "😀".repeat(128)).forEach { sourceReference ->
             val validExample = EXAMPLE_DOCUMENT.deepCopy().put("sourceReference", sourceReference)
-            assertThat(SCHEMA.validate(JSON.writeValueAsString(validExample), InputFormat.JSON))
-                .isEmpty()
+            assertThat(schemaErrors(validExample)).isEmpty()
         }
         listOf("", " \t\n", "\u2003", "\u0000", "valid\u0000suffix", "\uD800", "\uDC00")
             .forEach { sourceReference ->
                 val invalidExample = EXAMPLE_DOCUMENT.deepCopy().put("sourceReference", sourceReference)
-                assertThat(SCHEMA.validate(JSON.writeValueAsString(invalidExample), InputFormat.JSON))
-                    .isNotEmpty()
+                assertThat(schemaErrors(invalidExample)).isNotEmpty()
             }
     }
+
+    private fun schemaErrors(document: JsonNode) =
+        SCHEMA.validate(JSON.writeValueAsString(document), InputFormat.JSON)
 
     companion object {
         private val JSON = JsonMapper.builder().build()

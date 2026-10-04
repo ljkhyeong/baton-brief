@@ -78,34 +78,19 @@ class BriefOperationsConfigurationTest {
             .withBean(JsonMapper::class.java, { JsonMapper.builder().build() })
             .withPropertyValues("brief.operations.command=REBUILD")
 
-        runner.withPropertyValues("spring.main.web-application-type=servlet", "spring.flyway.enabled=false")
-            .run { context ->
+        val webMessage = "운영 명령은 spring.main.web-application-type=none으로 실행해야 합니다"
+        val flywayMessage = "운영 명령은 spring.flyway.enabled=false로 실행해야 합니다"
+        listOf(
+            listOf("spring.main.web-application-type=servlet", "spring.flyway.enabled=false") to webMessage,
+            listOf("spring.main.web-application-type=none", "spring.flyway.enabled=true") to flywayMessage,
+            listOf("spring.main.web-application-type=none") to flywayMessage,
+            listOf("spring.flyway.enabled=false") to webMessage,
+        ).forEach { (properties, message) ->
+            runner.withPropertyValues(*properties.toTypedArray()).run { context ->
                 assertThat(context).hasFailed()
-                assertThat(context.startupFailure).hasMessageContaining(
-                    "운영 명령은 spring.main.web-application-type=none으로 실행해야 합니다",
-                )
+                assertThat(context.startupFailure).hasMessageContaining(message)
             }
-        runner.withPropertyValues("spring.main.web-application-type=none", "spring.flyway.enabled=true")
-            .run { context ->
-                assertThat(context).hasFailed()
-                assertThat(context.startupFailure).hasMessageContaining(
-                    "운영 명령은 spring.flyway.enabled=false로 실행해야 합니다",
-                )
-            }
-        runner.withPropertyValues("spring.main.web-application-type=none")
-            .run { context ->
-                assertThat(context).hasFailed()
-                assertThat(context.startupFailure).hasMessageContaining(
-                    "운영 명령은 spring.flyway.enabled=false로 실행해야 합니다",
-                )
-            }
-        runner.withPropertyValues("spring.flyway.enabled=false")
-            .run { context ->
-                assertThat(context).hasFailed()
-                assertThat(context.startupFailure).hasMessageContaining(
-                    "운영 명령은 spring.main.web-application-type=none으로 실행해야 합니다",
-                )
-            }
+        }
         assertThat(useCasesCreated).isFalse()
         verifyNoInteractions(brief)
     }

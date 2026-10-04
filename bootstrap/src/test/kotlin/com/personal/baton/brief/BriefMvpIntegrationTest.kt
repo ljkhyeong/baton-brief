@@ -261,12 +261,7 @@ class BriefMvpIntegrationTest(
         val seasonId = "20000000-0000-0000-0000-000000000001"
         val eventId = "30000000-0000-0000-0000-000000000001"
         val first = eventJson(
-            eventId,
-            workspaceId,
-            seasonId,
-            "handoff:1",
-            1,
-            occurredAt = "2026-08-12t18:00:00.1+09:00",
+            eventId, workspaceId, seasonId, "handoff:1", 1, occurredAt = "2026-08-12t18:00:00.1+09:00",
         )
 
         postEvent(first)
@@ -325,36 +320,21 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000002",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                1,
+                "30000000-0000-0000-0000-000000000002", workspaceId, seasonId, "handoff:1", 1,
                 occurredAt = "2026-08-12T09:00:00.123456789z",
             ),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("STALE"))
 
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000003",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                3,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000003", workspaceId, seasonId, "handoff:1", 3),
         ).andExpect(status().isAccepted)
             .andExpect(jsonPath("$.status").value("APPLIED_WITH_GAP"))
             .andExpect(jsonPath("$.item.aggregateRevision").value(3))
             .andExpect(jsonPath("$.item.revisionGap").value(true))
 
         val unsupported = eventJson(
-            "30000000-0000-0000-0000-000000000004",
-            workspaceId,
-            seasonId,
-            "handoff:2",
-            1,
-            eventVersion = 2,
+            "30000000-0000-0000-0000-000000000004", workspaceId, seasonId, "handoff:2", 1, eventVersion = 2,
         )
         postEvent(unsupported)
             .andExpect(status().isUnprocessableContent)
@@ -481,21 +461,13 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000006",
-                workspaceId,
-                seasonId,
-                "decision:current",
-                1,
+                "30000000-0000-0000-0000-000000000006", workspaceId, seasonId, "decision:current", 1,
                 type = "DECISION_FOLLOW_UP_OVERDUE",
             ),
         )
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000007",
-                workspaceId,
-                seasonId,
-                "routine:current",
-                1,
+                "30000000-0000-0000-0000-000000000007", workspaceId, seasonId, "routine:current", 1,
                 type = "ROUTINE_MISSED",
             ),
         )
@@ -754,11 +726,7 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000005",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                4,
+                "30000000-0000-0000-0000-000000000005", workspaceId, seasonId, "handoff:1", 4,
                 state = "RESOLVED",
             ),
         )
@@ -1141,13 +1109,8 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000004",
-                workspaceId,
-                seasonId,
-                "decision:temporary",
-                1,
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-                occurredAt = "2026-08-13T09:00:00Z",
+                "40000000-0000-0000-0000-000000000004", workspaceId, seasonId, "decision:temporary", 1,
+                type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-13T09:00:00Z",
             ),
         )
 
@@ -1158,14 +1121,8 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000005",
-                workspaceId,
-                seasonId,
-                "decision:temporary",
-                2,
-                state = "RESOLVED",
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-                occurredAt = "2026-08-13T09:00:00Z",
+                "40000000-0000-0000-0000-000000000005", workspaceId, seasonId, "decision:temporary", 2,
+                state = "RESOLVED", type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-13T09:00:00Z",
             ),
         )
 
@@ -1370,14 +1327,8 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000006",
-                workspaceId,
-                seasonId,
-                "routine:weekly",
-                2,
-                type = "ROUTINE_MISSED",
-                state = "RESOLVED",
-                occurredAt = "2026-08-14T09:00:00Z",
+                "40000000-0000-0000-0000-000000000006", workspaceId, seasonId, "routine:weekly", 2,
+                type = "ROUTINE_MISSED", state = "RESOLVED", occurredAt = "2026-08-14T09:00:00Z",
             ),
         )
 
@@ -1451,23 +1402,14 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000001",
-                workspaceId,
-                seasonId,
-                removedReference,
-                1,
+                "60000000-0000-0000-0000-000000000001", workspaceId, seasonId, removedReference, 1,
                 occurredAt = "2026-08-11T01:00:00Z",
             ),
         )
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000002",
-                workspaceId,
-                seasonId,
-                changedReference,
-                1,
-                type = "ROUTINE_MISSED",
-                occurredAt = "2026-08-11T02:00:00Z",
+                "60000000-0000-0000-0000-000000000002", workspaceId, seasonId, changedReference, 1,
+                type = "ROUTINE_MISSED", occurredAt = "2026-08-11T02:00:00Z",
             ),
         )
 
@@ -1482,13 +1424,8 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000004",
-                workspaceId,
-                seasonId,
-                changedReference,
-                3,
-                type = "ROUTINE_MISSED",
-                occurredAt = "2026-08-11T02:00:00Z",
+                "60000000-0000-0000-0000-000000000004", workspaceId, seasonId, changedReference, 3,
+                type = "ROUTINE_MISSED", occurredAt = "2026-08-11T02:00:00Z",
             ),
         )
 
@@ -1501,33 +1438,19 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000003",
-                workspaceId,
-                seasonId,
-                removedReference,
-                2,
-                state = "RESOLVED",
-                occurredAt = "2026-08-12T01:00:00Z",
+                "60000000-0000-0000-0000-000000000003", workspaceId, seasonId, removedReference, 2,
+                state = "RESOLVED", occurredAt = "2026-08-12T01:00:00Z",
             ),
         )
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000005",
-                workspaceId,
-                seasonId,
-                "decision:added",
-                1,
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-                occurredAt = "2026-08-14T03:00:00Z",
+                "60000000-0000-0000-0000-000000000005", workspaceId, seasonId, "decision:added", 1,
+                type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-14T03:00:00Z",
             ),
         )
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000006",
-                workspaceId,
-                seasonId,
-                "handoff:added",
-                1,
+                "60000000-0000-0000-0000-000000000006", workspaceId, seasonId, "handoff:added", 1,
                 occurredAt = "2026-08-15T03:00:00Z",
             ),
         )
@@ -1596,11 +1519,7 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000007",
-                workspaceId,
-                seasonId,
-                "handoff:after-target",
-                1,
+                "60000000-0000-0000-0000-000000000007", workspaceId, seasonId, "handoff:after-target", 1,
                 occurredAt = "2026-08-15T04:00:00Z",
             ),
         ).andExpect(status().isAccepted)
@@ -1675,10 +1594,7 @@ class BriefMvpIntegrationTest(
                 .content(
                     JSON.writeValueAsString(
                         eventJson(
-                            "30000000-0000-0000-0000-000000000011",
-                            workspaceId,
-                            seasonId,
-                            "rotation-overlap",
+                            "30000000-0000-0000-0000-000000000011", workspaceId, seasonId, "rotation-overlap",
                             1,
                         ),
                     ),
@@ -1702,11 +1618,7 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000012",
-                workspaceId,
-                seasonId,
-                "future-version",
-                1,
+                "30000000-0000-0000-0000-000000000012", workspaceId, seasonId, "future-version", 1,
                 eventVersion = 3,
             ),
         ).andExpect(status().isUnprocessableContent)
@@ -1717,13 +1629,7 @@ class BriefMvpIntegrationTest(
         postEvent(numericInstant).andExpect(status().isBadRequest)
 
         val decimalVersion = eventJson(
-            eventId,
-            workspaceId,
-            seasonId,
-            "invalid",
-            1,
-            type = "ROLE_UNASSIGNED",
-            eventVersion = 2,
+            eventId, workspaceId, seasonId, "invalid", 1, type = "ROLE_UNASSIGNED", eventVersion = 2,
             sourceSeverity = "CRITICAL",
         ).putRawValue("eventVersion", RawValue("2.0"))
         postEvent(decimalVersion).andExpect(status().isBadRequest)
@@ -1760,52 +1666,30 @@ class BriefMvpIntegrationTest(
             "2026-08-12T23:59:60Z",
         ).forEach { occurredAt ->
             postEvent(
-                eventJson(
-                    eventId,
-                    workspaceId,
-                    seasonId,
-                    "invalid",
-                    1,
-                    occurredAt = occurredAt,
-                ),
+                eventJson(eventId, workspaceId, seasonId, "invalid", 1, occurredAt = occurredAt),
             ).andExpect(status().isBadRequest)
         }
 
         postEvent(
             eventJson(
-                eventId = eventId,
-                workspaceId = workspaceId,
-                seasonId = seasonId,
-                sourceReference = "invalid",
-                revision = 1,
-                type = "ROLE_UNASSIGNED",
-                eventVersion = 2,
+                eventId = eventId, workspaceId = workspaceId, seasonId = seasonId,
+                sourceReference = "invalid", revision = 1, type = "ROLE_UNASSIGNED", eventVersion = 2,
             ),
         ).andExpect(status().isBadRequest)
 
         postEvent(
             eventJson(
-                eventId = "30000000-0000-0000-0000-000000000013",
-                workspaceId = workspaceId,
-                seasonId = seasonId,
-                sourceReference = "😀".repeat(128),
-                revision = 1,
-                type = "ROLE_UNASSIGNED",
-                eventVersion = 2,
-                sourceSeverity = "CRITICAL",
+                eventId = "30000000-0000-0000-0000-000000000013", workspaceId = workspaceId,
+                seasonId = seasonId, sourceReference = "😀".repeat(128), revision = 1,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
             ),
         ).andExpect(status().isAccepted)
 
         postEvent(
             eventJson(
-                eventId = "30000000-0000-0000-0000-000000000014",
-                workspaceId = workspaceId,
-                seasonId = seasonId,
-                sourceReference = "😀".repeat(129),
-                revision = 1,
-                type = "ROLE_UNASSIGNED",
-                eventVersion = 2,
-                sourceSeverity = "CRITICAL",
+                eventId = "30000000-0000-0000-0000-000000000014", workspaceId = workspaceId,
+                seasonId = seasonId, sourceReference = "😀".repeat(129), revision = 1,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
             ),
         ).andExpect(status().isBadRequest)
     }
@@ -1997,13 +1881,7 @@ class BriefMvpIntegrationTest(
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
         val sourceReference = "handoff:\"quoted\"\\path"
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000091",
-                workspaceId,
-                seasonId,
-                sourceReference,
-                1,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000091", workspaceId, seasonId, sourceReference, 1),
         ).andExpect(status().isAccepted)
         mockMvc.perform(
             get("$path/current")
@@ -2013,14 +1891,8 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.sourceReference").value(sourceReference))
 
         val validEvent = eventJson(
-            "30000000-0000-0000-0000-000000000092",
-            workspaceId,
-            seasonId,
-            "review:?",
-            1,
-            type = "ROLE_UNASSIGNED",
-            eventVersion = 2,
-            sourceSeverity = "CRITICAL",
+            "30000000-0000-0000-0000-000000000092", workspaceId, seasonId, "review:?", 1,
+            type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
         )
         val escapedJson = JSON.writer().with(JsonWriteFeature.ESCAPE_NON_ASCII)
         listOf("review:\uD800", "review:\uDC00").forEach { invalidReference ->
@@ -2055,21 +1927,11 @@ class BriefMvpIntegrationTest(
         val seasonId = "20000000-0000-0000-0000-000000000011"
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000111",
-                workspaceId,
-                seasonId,
-                "\u00a0",
-                1,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000111", workspaceId, seasonId, "\u00a0", 1),
         ).andExpect(status().isAccepted)
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000112",
-                workspaceId,
-                seasonId,
-                "next-item",
-                1,
+                "30000000-0000-0000-0000-000000000112", workspaceId, seasonId, "next-item", 1,
                 type = "ROUTINE_MISSED",
             ),
         ).andExpect(status().isAccepted)
@@ -2094,11 +1956,7 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000004"
         val seasonId = "20000000-0000-0000-0000-000000000004"
         val event = eventJson(
-            "30000000-0000-0000-0000-000000000020",
-            workspaceId,
-            seasonId,
-            "handoff:concurrent",
-            1,
+            "30000000-0000-0000-0000-000000000020", workspaceId, seasonId, "handoff:concurrent", 1,
         )
 
         assertThat(concurrentStatuses { postEvent(event).andReturn().response.status })
@@ -2111,13 +1969,7 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000004"
         val seasonId = "20000000-0000-0000-0000-000000000004"
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000020",
-                workspaceId,
-                seasonId,
-                "handoff:concurrent",
-                1,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000020", workspaceId, seasonId, "handoff:concurrent", 1),
         ).andExpect(status().isAccepted)
 
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
@@ -2132,13 +1984,7 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000004"
         val seasonId = "20000000-0000-0000-0000-000000000004"
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000020",
-                workspaceId,
-                seasonId,
-                "handoff:concurrent",
-                1,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000020", workspaceId, seasonId, "handoff:concurrent", 1),
         ).andExpect(status().isAccepted)
 
         val rebuildStarted = CountDownLatch(1)
@@ -2223,40 +2069,22 @@ class BriefMvpIntegrationTest(
     ) {
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000001",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                1,
+                "30000000-0000-0000-0000-000000000001", workspaceId, seasonId, "handoff:1", 1,
                 occurredAt = "2026-08-12t18:00:00.1+09:00",
             ),
         )
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000003",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                3,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000003", workspaceId, seasonId, "handoff:1", 3),
         )
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000006",
-                workspaceId,
-                seasonId,
-                "decision:current",
-                1,
+                "30000000-0000-0000-0000-000000000006", workspaceId, seasonId, "decision:current", 1,
                 type = "DECISION_FOLLOW_UP_OVERDUE",
             ),
         )
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000007",
-                workspaceId,
-                seasonId,
-                "routine:current",
-                1,
+                "30000000-0000-0000-0000-000000000007", workspaceId, seasonId, "routine:current", 1,
                 type = "ROUTINE_MISSED",
             ),
         )
@@ -2268,34 +2096,20 @@ class BriefMvpIntegrationTest(
     ) {
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000001",
-                workspaceId,
-                seasonId,
-                "handoff:weekly",
-                1,
+                "40000000-0000-0000-0000-000000000001", workspaceId, seasonId, "handoff:weekly", 1,
                 occurredAt = "2026-08-09T15:00:00Z",
             ),
         )
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000002",
-                workspaceId,
-                seasonId,
-                "routine:weekly",
-                1,
-                type = "ROUTINE_MISSED",
-                occurredAt = "2026-08-16T14:59:59.999999999Z",
+                "40000000-0000-0000-0000-000000000002", workspaceId, seasonId, "routine:weekly", 1,
+                type = "ROUTINE_MISSED", occurredAt = "2026-08-16T14:59:59.999999999Z",
             ),
         ).andExpect(jsonPath("$.item.observedAt").value("2026-08-16T14:59:59.999999Z"))
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000003",
-                workspaceId,
-                seasonId,
-                "decision:next-week",
-                1,
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-                occurredAt = "2026-08-16T15:00:00Z",
+                "40000000-0000-0000-0000-000000000003", workspaceId, seasonId, "decision:next-week", 1,
+                type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-16T15:00:00Z",
             ),
         )
     }
@@ -2307,33 +2121,20 @@ class BriefMvpIntegrationTest(
         val eventId = "30000000-0000-0000-0000-000000000001"
         postEvent(
             eventJson(
-                eventId,
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                1,
-                occurredAt = "2026-08-12t18:00:00.1+09:00",
+                eventId, workspaceId, seasonId, "handoff:1", 1, occurredAt = "2026-08-12t18:00:00.1+09:00",
             ),
         )
         postEvent(eventJson(eventId, workspaceId, seasonId, "handoff:1", 1, state = "RESOLVED"))
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000002",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                1,
+                "30000000-0000-0000-0000-000000000002", workspaceId, seasonId, "handoff:1", 1,
                 occurredAt = "2026-08-12T09:00:00.123456789z",
             ),
         )
         postEvent(eventJson("30000000-0000-0000-0000-000000000003", workspaceId, seasonId, "handoff:1", 3))
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000004",
-                workspaceId,
-                seasonId,
-                "handoff:2",
-                1,
+                "30000000-0000-0000-0000-000000000004", workspaceId, seasonId, "handoff:2", 1,
                 eventVersion = 2,
             ),
         )
@@ -2576,16 +2377,9 @@ class BriefMvpIntegrationTest(
             .getContentAsString(Charsets.UTF_8)
 
     private fun eventJson(
-        eventId: String,
-        workspaceId: String,
-        seasonId: String,
-        sourceReference: String,
-        revision: Long,
-        state: String = "ACTIVE",
-        type: String = "HANDOFF_BLOCKED",
-        occurredAt: String = "2026-08-12T09:00:00Z",
-        eventVersion: Int = 1,
-        sourceSeverity: String? = null,
+        eventId: String, workspaceId: String, seasonId: String, sourceReference: String, revision: Long,
+        state: String = "ACTIVE", type: String = "HANDOFF_BLOCKED",
+        occurredAt: String = "2026-08-12T09:00:00Z", eventVersion: Int = 1, sourceSeverity: String? = null,
     ): ObjectNode = JSON.createObjectNode()
         .put("eventId", eventId)
         .put("eventType", type)
