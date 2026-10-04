@@ -2,6 +2,16 @@ import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.bundling.Zip
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
+buildscript {
+    // Spring Boot Gradle 플러그인이 쓰는 라이브러리도 보안 수정 버전에 맞춘다. 실행 JAR에는 포함되지 않는다.
+    dependencies {
+        classpath(platform(libs.jackson.bom))
+        constraints {
+            classpath("org.apache.commons:commons-lang3:${libs.versions.commons.lang3.get()}")
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.spring) apply false
@@ -17,6 +27,13 @@ subprojects {
     pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
         dependencies {
             add("implementation", platform(libs.kotlin.bom))
+            // Spring Boot BOM에 보안 수정 버전이 반영되기 전까지 모든 모듈·구성의 버전을 맞춘다.
+            add("implementation", platform(libs.jackson.bom))
+            constraints {
+                listOf("tomcat-embed-core", "tomcat-embed-el", "tomcat-embed-websocket").forEach { module ->
+                    add("implementation", "org.apache.tomcat.embed:$module:${libs.versions.tomcat.get()}")
+                }
+            }
         }
 
         extensions.configure<KotlinJvmProjectExtension> {
