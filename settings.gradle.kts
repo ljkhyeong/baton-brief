@@ -14,8 +14,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "baton-brief"
 
-include("domain")
-include("application")
-include("adapter-in-web")
-include("adapter-out-persistence")
-include("bootstrap")
+include("domain", "application", "adapter-in-web", "adapter-out-persistence", "bootstrap")

@@ -1,5 +1,3 @@
-import org.gradle.language.jvm.tasks.ProcessResources
-
 plugins {
     kotlin("jvm")
     id("org.springframework.boot")
@@ -27,7 +25,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-postgresql")
 }
 
-tasks.named<ProcessResources>("processTestResources") {
+tasks.processTestResources {
     from(rootProject.layout.projectDirectory.dir("contracts")) {
         into("contracts")
     }
@@ -41,7 +39,7 @@ val architectureTest by tasks.registering(Test::class) {
     include("**/BriefArchitectureTest.class")
 }
 
-tasks.named<Test>("test") {
+tasks.test {
     dependsOn(architectureTest)
     exclude("**/BriefArchitectureTest.class")
 }

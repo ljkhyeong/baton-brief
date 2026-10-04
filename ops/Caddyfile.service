@@ -2,6 +2,14 @@
 	admin off
 }
 
+(brief_proxy) {
+	header Cache-Control "no-store"
+	request_header -Forwarded
+	request_header -X-Forwarded-*
+	request_header -Proxy-Authorization
+	reverse_proxy brief:8080
+}
+
 https://{$BRIEF_SERVICE_HOST:brief-service}:8443 {
 	tls /run/secrets/brief-service-tls-cert /run/secrets/brief-service-tls-key
 
@@ -19,11 +27,7 @@ https://{$BRIEF_SERVICE_HOST:brief-service}:8443 {
 		path_regexp service_reads ^/api/v1/(?:workspaces/[^/]+/seasons/[^/]+/(?:attention-items(?:/current|/summary|/resolutions|/transitions)?|editions(?:/latest|/weekly/latest)?)|editions/[^/]+(?:/changes)?)$
 	}
 	handle @serviceReads {
-		header Cache-Control "no-store"
-		request_header -Forwarded
-		request_header -X-Forwarded-*
-		request_header -Proxy-Authorization
-		reverse_proxy brief:8080
+		import brief_proxy
 	}
 
 	@editionGeneration {
@@ -31,11 +35,7 @@ https://{$BRIEF_SERVICE_HOST:brief-service}:8443 {
 		path_regexp edition_generation ^/api/v1/workspaces/[^/]+/seasons/[^/]+/editions$
 	}
 	handle @editionGeneration {
-		header Cache-Control "no-store"
-		request_header -Forwarded
-		request_header -X-Forwarded-*
-		request_header -Proxy-Authorization
-		reverse_proxy brief:8080
+		import brief_proxy
 	}
 
 	handle {
