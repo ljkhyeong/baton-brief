@@ -15,7 +15,11 @@
 | 이벤트 계약·멱등 수신·수신 증거 | [이벤트](.agents/skills/baton-brief-event-flows/SKILL.md) |
 | 현재 관심 항목·상태 전이·주간 해소·재구축 | [투영](.agents/skills/baton-brief-projection-flows/SKILL.md) |
 | 에디션 생성·이력·비교·조건부 조회 | [에디션](.agents/skills/baton-brief-edition-flows/SKILL.md) |
+| HTTP 경로·DTO·오류·ETag·서비스 API 허용 목록 | [HTTP API](.agents/skills/baton-brief-api-flows/SKILL.md) |
+| Flyway·JDBC 쿼리·잠금·트랜잭션 | [저장소](.agents/skills/baton-brief-persistence-flows/SKILL.md) |
 | 빌드·모듈·공통 설정·인증·배포 | [공통 설정](.agents/skills/baton-brief-flows/SKILL.md) |
+| 지표·경보·운영 명령·백업 복원 | [운영](.agents/skills/baton-brief-operations-flows/SKILL.md) |
+| 테스트 위치·fixture·중복 정리 | [테스트](.agents/skills/baton-brief-test-flows/SKILL.md) |
 | 문서·스킬·지시 | [문서 관리](.agents/skills/baton-brief-documentation-flows/SKILL.md) |
 
 ## 서비스와 코드 경계

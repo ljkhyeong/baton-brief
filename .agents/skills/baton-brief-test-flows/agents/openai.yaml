@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF 테스트"
+  short_description: "BRIEF 테스트 위치·fixture·중복 정리"
+  default_prompt: "$baton-brief-test-flows를 사용해 BATON BRIEF 테스트를 필요한 범위에서 추가하거나 정리해 주세요."

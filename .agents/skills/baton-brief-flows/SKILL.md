@@ -1,6 +1,6 @@
 ---
 name: baton-brief-flows
-description: BATON BRIEF의 빌드·모듈·공통 설정·인증·스테이징 배포·운영 명령을 변경할 때 사용한다. 이벤트·투영·에디션만의 변경은 해당 스킬을 사용한다.
+description: BATON BRIEF의 빌드·모듈·공통 설정·인증·스테이징 배포를 변경할 때 사용한다. 이벤트·투영·에디션·HTTP API·저장소·운영 지표만의 변경은 해당 스킬을 사용한다.
 ---
 
 # BATON BRIEF 공통 설정과 실행
@@ -17,7 +17,8 @@ description: BATON BRIEF의 빌드·모듈·공통 설정·인증·스테이징 
   [ADR-0005](../../../docs/ADR/0005_caddy-event-ingress/adr.md)
 - BATON 조회·생성 연결: [PRD-0025](../../../docs/PRD/0025_baton-service-api-security/spec.md),
   [ADR-0007](../../../docs/ADR/0007_baton-service-api-security/adr.md)
-- 운영 명령·지표: [ADR-0008](../../../docs/ADR/0008_host-authorized-operations/adr.md)
+- 서비스 API 허용 경로는 [HTTP API 스킬](../baton-brief-api-flows/SKILL.md), 지표·경보·운영 명령·백업은
+  [운영 스킬](../baton-brief-operations-flows/SKILL.md)을 함께 사용한다.
 
 ## 변경 시 주의점
 
@@ -38,8 +39,7 @@ description: BATON BRIEF의 빌드·모듈·공통 설정·인증·스테이징 
 - 공개 Caddy는 `cap_drop=ALL`에 `NET_BIND_SERVICE`만 추가한다. 서비스 Caddy는 빌드 시
   file capability도 제거하고 런타임 `cap_drop=ALL`을 유지한다. Bearer 판정은 앱이 맡고
   Caddy 접근 로그에는 Authorization을 남기지 않는다.
-- 기본 health probes는 비활성화한다. 선택적 지표는 관리 서버 `127.0.0.1:9091`에서만 제공한다.
-  운영 명령은 웹 서버·Flyway를 끄고 한 번 실행하며 호스트 권한을 사용한다. 공개 관리 API를 추가하지 않는다.
+- 기본 health probes는 비활성화하고 공개 관리 API를 추가하지 않는다.
 
 ## 변경에 맞는 검증
 
@@ -49,4 +49,3 @@ description: BATON BRIEF의 빌드·모듈·공통 설정·인증·스테이징 
   호스트 포트 비게시·파일 Bearer 수신을 확인한다.
 - Caddy 변경은 신뢰한 HTTPS에서 설정 유효성, 무인증 `401`, 정상 Bearer, 허용 목록 밖 `404`와
   Authorization 로그 비노출을 확인한다. 네트워크·capability 변경은 실제 연결·권한도 확인한다.
-- 운영 명령·지표 변경은 실행 포트·종료 상태·Flyway 비활성·비밀 비노출을 해당 시나리오로 확인한다.

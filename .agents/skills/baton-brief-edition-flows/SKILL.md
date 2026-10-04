@@ -17,6 +17,8 @@ description: BATON BRIEF의 불변 에디션 생성·선정·시간 구간·스�
   [주간 최신](../../../docs/PRD/0009_weekly-latest-edition/spec.md),
   [비교](../../../docs/PRD/0005_edition-comparison/spec.md),
   [ETag](../../../docs/PRD/0012_edition-etag/spec.md)
+- 조회 경로·응답 필드를 바꾸면 [HTTP API 스킬](../baton-brief-api-flows/SKILL.md), 스냅샷 열·마이그레이션을
+  바꾸면 [저장소 스킬](../baton-brief-persistence-flows/SKILL.md)을 함께 사용한다.
 
 ## 유지할 규칙
 

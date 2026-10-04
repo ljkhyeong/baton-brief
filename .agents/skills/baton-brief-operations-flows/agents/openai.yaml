@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF 운영"
+  short_description: "BRIEF 지표·경보·운영 명령·백업 복원 변경"
+  default_prompt: "$baton-brief-operations-flows를 사용해 BATON BRIEF 지표·경보와 운영 절차를 변경해 주세요."
