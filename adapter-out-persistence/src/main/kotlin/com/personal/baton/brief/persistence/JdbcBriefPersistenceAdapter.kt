@@ -303,10 +303,12 @@ class JdbcBriefPersistenceAdapter(
                     RESOLUTION_ITEM_MAPPER.mapRow(result, rowNumber)
                 }
             }.list()
-        val (items, next) = rows.mapNotNull { it.second }
+        // 건수는 모든 행에 같은 값으로 붙고, 빈 페이지에서도 LEFT JOIN으로 한 행이 남는다.
+        val resolvedCount = rows.first().first
+        val (items, next) = rows.mapNotNull { (_, item) -> item }
             .toPage(limit) { AttentionItemCursor(it.reasonCode, it.sourceReference) }
         return WeeklyResolutionSummary(
-            window.weekStart, window.zoneId, window.start, window.end, evaluatedAt, rows.first().first, items, next,
+            window.weekStart, window.zoneId, window.start, window.end, evaluatedAt, resolvedCount, items, next,
         )
     }
 

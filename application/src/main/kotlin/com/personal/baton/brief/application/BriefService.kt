@@ -55,13 +55,12 @@ class BriefService(
             return EditionComparisonResult.ScopeMismatch
         }
 
-        val baseItemsByKey = base.items.associateBy { it.reasonCode to it.sourceReference }
-        val targetItemsByKey = target.items.associateBy { it.reasonCode to it.sourceReference }
-        val added = target.items.filter { (it.reasonCode to it.sourceReference) !in baseItemsByKey }
-        val removed = base.items.filter { (it.reasonCode to it.sourceReference) !in targetItemsByKey }
+        val baseItemsByKey = base.items.associateBy { it.comparisonKey }
+        val targetItemsByKey = target.items.associateBy { it.comparisonKey }
+        val added = target.items.filter { it.comparisonKey !in baseItemsByKey }
+        val removed = base.items.filter { it.comparisonKey !in targetItemsByKey }
         val changed = target.items.mapNotNull { after ->
-            val before = baseItemsByKey[after.reasonCode to after.sourceReference] ?: return@mapNotNull null
-            if (before == after) null else EditionItemChange(before, after)
+            baseItemsByKey[after.comparisonKey]?.takeIf { it != after }?.let { EditionItemChange(it, after) }
         }
 
         return EditionComparisonResult.Found(
@@ -76,6 +75,9 @@ class BriefService(
     }
 
     private fun now() = clock.instant().truncatedTo(ChronoUnit.MICROS)
+
+    private val BriefEditionItem.comparisonKey
+        get() = reasonCode to sourceReference
 
     private fun selectEditionContent(items: List<AttentionItem>, window: WeeklyWindow): EditionContent {
         val selected = items
