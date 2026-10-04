@@ -15,7 +15,7 @@
 | `docs/PRD/**` | 제품 동작, API·이벤트·저장 규칙, 수용 기준과 제외 범위 |
 | `docs/ADR/**` | 장기 구조·기술·보안·실행 결정과 대안·장단점 |
 | `HANDOFF.md` | 검증 결과, 미검증 범위와 다음 작업 |
-| `AGENTS.md`, `.agents/skills/**` | 개발 절차와 변경 시 지켜야 할 규칙 |
+| `AGENTS.md`, `.agents/skills/**` | 개발 절차와 변경 시 지켜야 할 규칙. `CLAUDE.md`·`.claude/skills/**`는 Claude Code용 import·링크 |
 | `contracts/**` | 언어에 관계없이 사용할 이벤트 v2 JSON Schema와 예시 |
 
 ## 제품 기준과 공통 계약
