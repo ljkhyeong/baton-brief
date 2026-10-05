@@ -21,7 +21,7 @@ GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items
 
 | 이름 | 형식 | 생략 시 | 의미 |
 | --- | --- | --- | --- |
-| `eventType` | PRD-0002의 v1·v2 이벤트 종류 | 업무 종류 제한 없음 | 지정한 이벤트 종류의 점검 항목 |
+| `eventType` | PRD-0002의 이벤트 종류 | 업무 종류 제한 없음 | 지정한 이벤트 종류의 점검 항목 |
 | `severity` | `HIGH` 또는 `MEDIUM` | 심각도 제한 없음 | 지정한 심각도의 항목 |
 | `revisionGap` | Boolean, `true` 또는 `false` | 공백 여부 제한 없음 | `true`: 공백 탐지 기록 있음, `false`: 없음 |
 
@@ -73,7 +73,7 @@ GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items
 ## 수용 기준
 
 - 필터 생략은 기존 상태별 목록을 보존하고 각 필터와 필터 조합의 결과가 정확하다.
-- 업무 종류 필터는 v1·v2 종류를 모두 지원하며 `afterEventType`과 별도로 처리한다.
+- 업무 종류 필터는 PRD-0002의 모든 종류를 지원하며 `afterEventType`과 별도로 처리한다.
 - 필터된 결과에서도 식별자 순서·배타 커서·마지막 페이지의 `nextCursor=null`을 유지한다.
 - 다른 작업공간·시즌의 항목이 섞이지 않는다.
 - 해소된 항목은 활성 필터 목록에서 빠지고 같은 조건의 해소 목록에 나타난다.

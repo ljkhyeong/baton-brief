@@ -58,10 +58,8 @@ PRD-0002와 PRD-0003은 브리프의 단건·이력 조회를 제공하지만, B
 
 `added`, `removed`와 `changed.before`·`changed.after`는 PRD-0002 단건 브리프 항목의 고정
 표시 필드를 그대로 재사용한다. 즉 `reasonCode`, `severity`, `sourceReference`, `status`,
-`observedAt`, `ruleVersion`, `null`을 허용하는 `aggregateRevision`과 `revisionGap`을 포함한다.
-Flyway V3 이전 항목은 두 리비전 근거가 모두 `null`이며, 새 항목은 둘 다 저장된 값이다.
-PRD-0029의 `section`도 같은 고정 표현에 포함한다. V9 이전 항목은 `null`이며 분류만
-달라도 `changed`로 반환한다.
+`observedAt`, `ruleVersion`, `aggregateRevision`과 `revisionGap`을 포함한다.
+PRD-0029의 `section`도 같은 고정 표현에 포함하며 분류만 달라도 `changed`로 반환한다.
 변경되지 않은 항목은 응답에 반복하지 않는다.
 
 ## 비교 규칙
@@ -96,9 +94,6 @@ PRD-0029의 `section`도 같은 고정 표현에 포함한다. V9 이전 항목�
 - 별도 비교 테이블, 변경 이력 이벤트와 상태 전이 기록을 만들지 않는다.
 - 서로 다른 규칙 버전의 의미를 번역하거나 동일시하지 않고 저장된 표시 필드 차이만
   반환한다.
-- 이전 항목의 리비전 근거가 `null`이어도 현재 투영이나 수신 기록에서 값을 추정하지
-  않는다. `null`과 새 항목의 저장된 근거는 서로 다른 고정 값이므로 같은 비교 키에서는
-  `changed`가 될 수 있다.
 
 ## 제외 범위
 

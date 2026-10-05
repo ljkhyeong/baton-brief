@@ -75,9 +75,8 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 
 ## 영속성과 호환성
 
-- Flyway V4가 정의한 `attention_item`의
-  `(workspace_id, season_id, event_type, source_reference)` 복합 기본 키를 그대로
-  사용한다.
+- `attention_item`의 `(workspace_id, season_id, event_type, source_reference)` 복합 기본 키를
+  그대로 사용한다.
 - 이벤트 적용에 쓰던 단건 조회를 애플리케이션 포트에서도 사용한다.
 - 새 테이블, 열, 인덱스, Flyway 마이그레이션과 별도 응답 DTO를 추가하지 않는다.
 - 조회는 수신 기록, 현재 투영과 브리프를 생성·수정·삭제하지 않는다.

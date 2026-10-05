@@ -92,7 +92,7 @@ PRD-0013은 복합 식별자를 아는 호출자가 점검 항목 한 건을 확
 
 ## 영속성과 호환성
 
-- Flyway V4의 `(workspace_id, season_id, event_type, source_reference)` 복합 기본 키와
+- `attention_item`의 `(workspace_id, season_id, event_type, source_reference)` 복합 기본 키와
   PostgreSQL 행 값 비교를 사용해 배타 키셋을 조회한다.
 - 기존 `attention_item`과 `AttentionItemResponse`를 재사용하며 새 테이블, 열, 인덱스와
   Flyway 마이그레이션을 추가하지 않는다.

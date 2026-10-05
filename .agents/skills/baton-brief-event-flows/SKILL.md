@@ -10,7 +10,7 @@ description: BATON BRIEF의 이벤트 계약·멱등 수신·지문·수신 증�
 변경 대상의 문서만 읽는다.
 
 - 봉투·수신 결과: [MVP 계약](../../../docs/PRD/0002_mvp-contract/spec.md)
-- v1·v2 호환성: [이벤트 v2](../../../docs/PRD/0019_baton-continuity-event-v2/spec.md),
+- 버전·심각도 계약: [이벤트 v2](../../../docs/PRD/0019_baton-continuity-event-v2/spec.md),
   [계약 팩](../../../contracts/README.md)과 `contracts/VERSION`
 - 수신 증거 조회: [단건](../../../docs/PRD/0007_event-receipt-query/spec.md),
   [이상 이력](../../../docs/PRD/0011_event-receipt-anomalies/spec.md)
@@ -26,8 +26,8 @@ description: BATON BRIEF의 이벤트 계약·멱등 수신·지문·수신 증�
   최초 수신 기록과 투영을 덮어쓰지 않는다. 미지원 이벤트의 재전달은 `UNSUPPORTED`를 유지한다.
 - 수신 기록과 투영 효과는 원자적으로 저장한다. 저장·지문의 시각은 PostgreSQL 마이크로초
   정밀도로 정규화하며 임의 JSON 재직렬화 결과를 지문 입력으로 쓰지 않는다.
-- v2의 필수 `sourceSeverity`는 수신 증거와 지문에 보존한다. v1·이전 미지원 기록의 `null`과
-  기존 v1 지문 입력은 바꾸지 않는다.
+- 지원 버전은 `2`뿐이며 필수 `sourceSeverity`를 수신 증거와 지문에 보존한다. `3` 이상은
+  `UNSUPPORTED`로 보존하고 심각도가 없으면 지문 입력에 `null`을 넣는다.
 - 수신 증거는 최초 `processingOutcome`을 반환한다. `DUPLICATE`·`CONFLICT`로 덮어쓰지 않으며
   충돌은 최초 탐지 시각으로 표시한다. 지문과 원문 payload는 응답에 노출하지 않는다.
 - `UNSUPPORTED`를 포함한 모든 수신 기록과 이벤트별 최초 충돌 한 건은 대체 보존 계약의

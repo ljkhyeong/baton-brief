@@ -35,8 +35,8 @@ PRD-0015는 같은 목록 경로에 선택적인 `status`를 추가한다. 생�
 PRD-0016은 복합 식별자에 실제 적용된 상태 변경 이력을 집계 리비전 내림차순 키셋으로
 조회한다. 현재 규칙으로 과거 투영 전체를 재계산하는 경로가 아니다.
 
-PRD-0019는 기존 v1을 보존하면서 BATON이 판정한 다섯 연속성 신호와 원본 심각도를 이벤트
-v2로 수신·재생하는 계약을 추가한다.
+PRD-0019는 BATON이 판정한 다섯 연속성 신호와 원본 심각도를 이벤트 v2로 수신·재생하는
+계약을 정한다. 투영하는 이벤트 버전은 v2뿐이다.
 
 ## MVP 경계
 
@@ -53,7 +53,7 @@ v2로 수신·재생하는 계약을 추가한다.
 
 | 메서드 | 경로 | 의미 |
 |---|---|---|
-| `POST` | `/api/v1/events` | 이벤트 v1·v2 수신과 멱등 투영 |
+| `POST` | `/api/v1/events` | 이벤트 v2 수신과 멱등 투영 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/current` | PRD-0013의 점검 항목 단건 조회 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items` | PRD-0014·0015의 점검 항목 상태별 키셋 조회 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions` | PRD-0016의 적용 상태 변경 이력 |
@@ -67,7 +67,7 @@ v2로 수신·재생하는 계약을 추가한다.
 `POST /api/v1/events`만 전용 Bearer를 선택적으로 필수화할 수 있다. 호출자가 전달한
 작업공간·시즌의 사용자·운영자 권한은 BRIEF가 자체 판정하지 않는다.
 
-## 이벤트 v1·v2
+## 이벤트 v2
 
 ### 이벤트 요청
 
@@ -75,15 +75,15 @@ v2로 수신·재생하는 계약을 추가한다.
 
 | 필드 | 형식 | 제약 |
 |---|---|---|
-| `eventId` | 36자 하이픈 UUID | 이벤트 식별자 |
-| `eventType` | 열거형 | 아래 버전별 종류 중 하나 |
-| `eventVersion` | 정수 | `1..2147483647`, 소비자가 지원하는 값은 `1`과 `2` |
-| `sourceSeverity` | 열거형 또는 `null` | v1은 생략·`null`, v2는 `CRITICAL` 또는 `WARNING` 필수 |
-| `workspaceId` | 36자 하이픈 UUID | 작업공간 식별자 |
-| `seasonId` | 36자 하이픈 UUID | 시즌 식별자 |
+| `eventId` | UUID 문자열 | 이벤트 식별자 |
+| `eventType` | 열거형 | 아래 다섯 종류 중 하나 |
+| `eventVersion` | 정수 | `2..2147483647`, 소비자가 지원하는 값은 `2` |
+| `sourceSeverity` | 열거형 또는 `null` | `eventVersion=2`는 `CRITICAL` 또는 `WARNING` 필수, `3` 이상은 생략 가능 |
+| `workspaceId` | UUID 문자열 | 작업공간 식별자 |
+| `seasonId` | UUID 문자열 | 시즌 식별자 |
 | `sourceReference` | 문자열 | 아래 문자·공백 규칙을 따르는 원본 참조값, Unicode code point 기준 최대 128자 |
 | `aggregateRevision` | 정수 | `1`부터 `9223372036854775807`까지 |
-| `occurredAt` | JSON 문자열의 ISO-8601 시점 | 초가 필수인 offset 시각, 소수초는 1~9자리 |
+| `occurredAt` | ISO-8601 시점 | 시간대 오프셋 또는 `Z` 필수, UTC 기준 연도 `0000`~`9999` |
 | `state` | 열거형 | `ACTIVE` 또는 `RESOLVED` |
 
 `sourceReference`는 원본 항목의 참조값이다. BRIEF는 문자·길이 규칙만 검증하고 내부 형식을 해석하지 않는다.
@@ -93,8 +93,9 @@ v2로 수신·재생하는 계약을 추가한다.
 `400 Bad Request`로 거부하며 수신 기록이나 투영을 저장하지 않는다.
 문자열 필드는 JSON 문자열만 받는다. `sourceReference: 123`을 `"123"`으로 변환하지 않는다.
 열거형은 이름 문자열로 보내며 `state: 0` 같은 선언 순번은 `400 Bad Request`로 거부한다.
-UUID 필드는 ASCII 16진수의 `8-4-4-4-12` 하이픈 표기만 허용하며 Base64·Base64URL 같은
-동일 값의 별칭을 받지 않는다.
+UUID·시점 필드는 Jackson 표준 `UUID`·`Instant` 해석을 따른다. 따라서 Base64 형태 UUID,
+`occurredAt`의 `24:00:00`·윤초와 숫자 epoch 초도 받는다. 생산자는
+[계약 팩](../../../contracts/README.md)의 36자 하이픈 UUID와 오프셋이 있는 ISO-8601 문자열을 사용한다.
 
 `sourceReference`의 문자·공백 규칙은 수신·현재 단건·전이 이력·목록 커서에 동일하게 적용한다.
 
@@ -105,19 +106,7 @@ UUID 필드는 ASCII 16진수의 `8-4-4-4-12` 하이픈 표기만 허용하며 B
 - 같은 공용 `@Pattern`으로 검사하고 문자열을 자르거나 공백을 제거하거나 대체 문자로
   바꾸지 않는다. 목록 커서는 이 규칙과 별개로 두 필드의 동시 제공 여부만 확인한다.
 
-지문 알고리즘과 기존 저장 기록은 바꾸지 않는다. 이미 대체 문자로 저장된 참조가 있더라도
-원본 근거 없이 값을 추정해 복원하지 않는다.
-
-`occurredAt`의 `24:00:00`과 윤초는 실제 다른 시각으로 정규화하지 않고 `400 Bad Request`로
-거부한다.
-
-v1에서 지원하는 `eventType`은 다음과 같다.
-
-- `HANDOFF_BLOCKED`
-- `ROUTINE_MISSED`
-- `DECISION_FOLLOW_UP_OVERDUE`
-
-v2에서 지원하는 `eventType`은 다음과 같다.
+지원하는 `eventType`은 다음과 같다.
 
 - `ROLE_UNASSIGNED`
 - `ROLE_SUCCESSOR_MISSING`
@@ -125,14 +114,17 @@ v2에서 지원하는 `eventType`은 다음과 같다.
 - `ROUTINE_REPEATEDLY_OVERDUE`
 - `HANDOFF_INCOMPLETE`
 
-v2 지원 전 `UNSUPPORTED`로 보존할 수 있었던 `eventVersion=2`·v1 타입·심각도 없음 조합은
-동일 재전달 호환성을 위해 계속 `UNSUPPORTED`로만 기록한다. 새 v2 타입에 심각도가 없거나
-그 밖의 지원 버전 조합이 어긋나면 수신 기록 없이 `400 Bad Request`다.
+`eventVersion`이 `1` 이하이거나 `eventVersion=2`에 `sourceSeverity`가 없으면 수신 기록 없이
+`400 Bad Request`다.
 
 ### 수신 결과
 
 BRIEF는 정규 이벤트 페이로드의 지문을 이벤트 식별자와 함께 보존하고 다음 결과를
 구분한다.
+
+지문은 `eventId`, `eventType`, `eventVersion`, `workspaceId`, `seasonId`, `sourceReference`,
+`aggregateRevision`, 정규화한 `occurredAt`, `state`, `sourceSeverity` 순서의 값을 SHA-256으로
+계산한다. `sourceSeverity`가 없으면 `null`을 넣는다.
 
 PostgreSQL `TIMESTAMPTZ`와 저장·응답 데이터의 정밀도를 맞추기 위해 모든 이벤트·생성 시각은
 애플리케이션에서 마이크로초 미만을 버린 값으로 처리한다.
@@ -145,14 +137,15 @@ PostgreSQL `TIMESTAMPTZ`와 저장·응답 데이터의 정밀도를 맞추기 �
   성공으로 처리하며 현재 점검 항목을 다시 갱신하지 않는다.
 - `CONFLICT`: 같은 `eventId`에 다른 지문이 들어왔다. 기존 수신 기록과 점검 항목을 유지하고,
   최초 충돌의 지문·탐지 시각만 저장한다. 원문 본문이나 비밀 값은 저장하지 않는다.
-- `UNSUPPORTED`: 양수인 `eventVersion`이 `1`·`2`가 아니거나 위의 기존 v2 호환 조합이다.
+- `UNSUPPORTED`: `eventVersion`이 `3` 이상이다.
   수신 기록을 `UNSUPPORTED` 결과로 보존하고 투영을 부분 적용하지 않는다.
 - `STALE`: 이미 적용한 현재 리비전 이하의 이벤트다. 수신 기록에는 결과를 남기지만
   투영을 변경하지 않는다.
 
-36자 하이픈 표기가 아닌 UUID, 문법적으로 잘못된 시점·열거형, 위 문자·공백 규칙을 어기거나
-128자를 넘는 `sourceReference`, 32비트 양의 정수 범위를 벗어난 이벤트 버전
-또는 양수가 아닌 리비전은 유효한 이벤트 수신 기록이나 투영 효과를 만들지 않는다.
+UUID로 해석할 수 없는 값, 오프셋이 없거나 연도 범위를 벗어난 시점, 알 수 없는 열거형,
+위 문자·공백 규칙을 어기거나 128자를 넘는 `sourceReference`, `2` 미만이거나 32비트 정수
+범위를 벗어난 이벤트 버전 또는 양수가 아닌 리비전은 유효한 이벤트 수신 기록이나 투영 효과를
+만들지 않는다.
 
 HTTP 상태와 응답 본문은 다음과 같다.
 
@@ -160,7 +153,7 @@ HTTP 상태와 응답 본문은 다음과 같다.
 - `DUPLICATE`, `STALE`: `200 OK`
 - `CONFLICT`: `409 Conflict`
 - `UNSUPPORTED`: `422 Unprocessable Content`
-- 요청 검증 실패: `400 Bad Request` (`eventVersion`의 32비트 양의 정수 범위 위반 포함)
+- 요청 검증 실패: `400 Bad Request` (`eventVersion`의 `1` 이하와 32비트 정수 범위 위반 포함)
 
 본문은 `eventId`, `status`와 적용된 경우의 `item`을 반환한다. `item`은 `reasonCode`,
 `severity`, `sourceReference`, `status`, `observedAt`, `aggregateRevision`, `ruleVersion`과
@@ -185,15 +178,12 @@ HTTP 상태와 응답 본문은 다음과 같다.
 
 ## `AttentionItem` 투영 규칙 v1
 
-규칙 버전은 `1`이며 이벤트 종류별 점검 사유·심각도는 다음 표를 따른다.
+규칙 버전은 `1`이며 점검 사유·심각도는 다음 표를 따른다.
 
-| 이벤트 종류 | `reasonCode` | `severity` |
+| 이벤트 | `reasonCode` | `severity` |
 |---|---|---|
-| `HANDOFF_BLOCKED` | `HANDOFF_BLOCKED` | `HIGH` |
-| `ROUTINE_MISSED` | `ROUTINE_MISSED` | `MEDIUM` |
-| `DECISION_FOLLOW_UP_OVERDUE` | `DECISION_FOLLOW_UP_OVERDUE` | `MEDIUM` |
-| v2 다섯 타입 + `sourceSeverity=CRITICAL` | 수신한 `eventType` | `HIGH` |
-| v2 다섯 타입 + `sourceSeverity=WARNING` | 수신한 `eventType` | `MEDIUM` |
+| 다섯 타입 + `sourceSeverity=CRITICAL` | 수신한 `eventType` | `HIGH` |
+| 다섯 타입 + `sourceSeverity=WARNING` | 수신한 `eventType` | `MEDIUM` |
 
 - `ACTIVE`는 해당 원본 참조의 점검 항목을 활성 상태로 투영한다.
 - `RESOLVED`는 해당 점검 항목을 해소 상태로 투영한다.
@@ -244,17 +234,15 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 
 | 필드 | 형식 | 제약 |
 |---|---|---|
-| `weekStart` | JSON 문자열의 ISO-8601 지역 날짜 `uuuu-MM-dd` | 연도는 네 자리 `0000`~`9999`, 반드시 월요일 |
+| `weekStart` | ISO-8601 지역 날짜 `uuuu-MM-dd` | 연도 `0000`~`9999`, 반드시 월요일 |
 | `zoneId` | JSON 문자열의 IANA 시간대 ID | JVM이 제공하는 이름 있는 시간대 ID |
 
-숫자 타임스탬프, 배열형 지역 날짜와 `+09:00` 같은 고정 오프셋 시간대는 받지 않는다. 요청
-표현을 문자열로 고정해 동일한 의미가 여러 JSON 형태로 들어오는 것을 막는다.
+`weekStart`는 Jackson 표준 `LocalDate`로 해석하므로 `[2026,8,10]` 같은 배열 표현도 받는다.
+`+09:00` 같은 고정 오프셋 시간대는 받지 않는다.
 
-부호가 있는 연도와 다섯 자리 이상 연도는 생성·주간 최신 조회에서 모두 `400 Bad Request`로
-거부한다. JDK의 엄격한 날짜 파서에서 연도 자릿수를 제한하며, 파싱한 날짜의 월요일 여부는
-기존 요청 DTO에서 검증한다. 허용 범위에서는 다음 주 경계 계산과 PostgreSQL 저장이 가능하다.
-현재 시점 기준의 과거·미래 제한은 추가하지 않는다. 기존에 저장한 범위 밖 브리프는 변경하지
-않으며 브리프 ID·전역 최신·이력 조회는 유지한다.
+`0000`~`9999` 밖의 연도는 생성·주간 최신 조회에서 모두 `400 Bad Request`로 거부한다.
+해석한 날짜의 연도 범위와 월요일 여부는 요청 DTO에서 검증한다. 허용 범위에서는 다음 주 경계
+계산과 PostgreSQL 저장이 가능하다. 현재 시점 기준의 과거·미래 제한은 추가하지 않는다.
 
 구간은 지정한 시간대에서 `weekStart` 00:00부터 다음 월요일 00:00까지의
 `[windowStart, windowEnd)`로 계산한다. 두 경계를 각각 시점으로 변환하므로 일광 절약 시간
@@ -277,8 +265,8 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
   포함한다. 표시 필드가 같더라도 리비전 근거가 달라지면 새 브리프를 생성하고, 같은 근거의
   반복 생성은 가장 최근 브리프를 멱등하게 반환한다.
 - `CURRENT_WEEK`, `CARRY_OVER` 그룹 순서 안에서 `severity` 내림차순(`HIGH`가 `MEDIUM`보다
-  먼저), `reasonCode`, `sourceReference` 오름차순으로 안정 정렬한다. `section`도 새 항목의
-  상태 지문에 포함하며 새 브리프의 `ruleVersion=2`와 항목의 투영 `ruleVersion=1`을 구분한다.
+  먼저), `reasonCode`, `sourceReference` 오름차순으로 안정 정렬한다. `section`도 상태 지문에
+  포함하며 새 브리프의 `ruleVersion=2`와 항목의 투영 `ruleVersion=1`을 구분한다.
 - 생성이 완료되면 선택한 항목과 표시 필드, PRD-0010의 집계 리비전·리비전 공백 근거,
   구간, 시간대, 규칙 버전과 원본 커서를 고정한다. 이후 투영 변경이나 재구축이 기존
   브리프를 수정하지 않는다.
@@ -299,11 +287,8 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 요청은 기존 브리프와 `200 OK`를 반환한다. 브리프 본문은 최소한 `editionId`,
 `workspaceId`, `seasonId`, `generation`, `weekStart`, `zoneId`, `windowStart`, `windowEnd`,
 `sourceCursor`, `generatedAt`, `ruleVersion`과 고정된 `items`를 포함한다. 항목에는
-`reasonCode`, `severity`, `sourceReference`, `status`, `observedAt`, `ruleVersion`, `null`을
-허용하는 `aggregateRevision`, `revisionGap`과 `section`을 둔다. `section`은 신규 항목에서
-필수이며 V9 이전 항목은 `null`을 유지한다. PRD-0010 적용 뒤 새 항목은 두 근거가
-모두 값이 있고, Flyway V3 이전 항목은 정확한 값을 저장하지 않았으므로 둘 다 `null`이다.
-이전 값을 `0`·`false`로 채우거나 현재 투영에서 추정하지 않는다. 조회 대상이 없으면
+`reasonCode`, `severity`, `sourceReference`, `status`, `observedAt`, `ruleVersion`,
+`aggregateRevision`, `revisionGap`과 `section`을 두며 모두 `null`이 아니다. 조회 대상이 없으면
 `404 Not Found`를 반환한다.
 
 PRD-0012에 따라 생성 응답과 저장된 전체 브리프를 반환하는 세 `GET` 경로는 선택된
@@ -313,7 +298,7 @@ MVC의 표준 처리로 `304 Not Modified`를 반환하며, 브리프 선택 결
 
 ## 호환성과 오류 경계
 
-- 소비자는 명시적으로 채택한 v1·v2 이벤트 종류와 버전별 심각도 조합만 처리한다.
+- 소비자는 명시적으로 채택한 이벤트 v2 종류와 심각도 조합만 투영한다.
 - 생산자가 기존 필드 의미, 식별자 범위, 리비전 의미 또는 열거형을 바꾸려면 새 버전과
   생산자·소비자 호환성 검증이 필요하다.
 - PRD-0018과 BATON PRD-0006의 생산 의미에 따라 현재 BATON 신호는 이벤트 v2로만
@@ -329,15 +314,14 @@ MVC의 표준 처리로 `304 Not Modified`를 반환하며, 브리프 선택 결
 - 지원하지 않는 이벤트의 완전히 같은 재생은 안정적으로 `UNSUPPORTED`를 반환하고 같은
   식별자의 다른 지문은 `CONFLICT`가 된다. 충돌 기록은 이벤트별 한 건을 넘지 않는다.
 - 오래된 리비전은 투영을 변경하지 않고, 리비전 간격은 명시적인 증거를 남긴다.
-- v1 세 이벤트 종류의 `ACTIVE`/`RESOLVED` 투영이 기존 규칙에 맞다.
-- 이벤트 v2 다섯 종류가 BATON 원본 심각도 대응과 함께 적용되고 v1과 함께 재구축된다.
+- 이벤트 v2 다섯 종류의 `ACTIVE`/`RESOLVED`가 BATON 원본 심각도 대응과 함께 적용되고
+  재구축된다.
 - 재구축 결과가 같은 수락 수신 기록의 실시간 투영과 같다.
 - 월요일 검증, IANA 시간대와 DST 경계의 `[start, end)` 계산이 고정 시간 테스트로 확인된다.
 - 같은 요청 범위의 직전 `stateFingerprint`와 동일한 반복 요청은 브리프를 중복 생성하지
   않고, 선택 상태가 달라지거나 `A → B → A`로 되돌아오면 생성 번호가 증가한다.
 - PRD-0010 적용 뒤 표시 필드가 같더라도 `aggregateRevision` 또는 `revisionGap`이 달라지면
-  새 브리프가 생성되고, 이후 동일한 근거의 반복 생성은 멱등하다. 이전 항목의 두 값은
-  `null`로 유지한다.
+  새 브리프가 생성되고, 이후 동일한 근거의 반복 생성은 멱등하다.
 - 정렬 순서가 항상 재현되고, 생성 뒤 투영을 바꿔도 브리프 항목이 변하지 않는다.
 - 전역 최신 조회가 작업공간·시즌에서 생성 번호가 가장 큰 브리프를 반환하고 단건 조회가 동일 고정 스냅샷을
   반환한다.

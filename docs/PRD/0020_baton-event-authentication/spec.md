@@ -75,7 +75,7 @@ PRD-0021의 스테이징 구성은 현재·직전 token 파일을 Compose secret
 ## 수용 기준
 
 - 인증이 필수인 BRIEF는 Bearer가 없는 요청과 잘못된 요청을 `401`로 거부한다.
-- 같은 구성의 정상 Bearer는 기존 v1·v2 이벤트 수신 결과를 유지한다.
+- 같은 구성의 정상 Bearer는 기존 이벤트 수신 결과를 유지한다.
 - BRIEF가 새 token과 직전 token을 함께 허용하는 구간에 BATON의 직전 token 전달이
   계속 성공한다.
 - BATON 실제 `RestClient`가 전용 Bearer를 보내며 `401`을 영구 실패로 분류한다.

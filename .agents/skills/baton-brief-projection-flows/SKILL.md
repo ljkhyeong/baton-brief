@@ -26,12 +26,12 @@ description: BATON BRIEF의 현재 관심 항목·리비전 판정·상태 전�
 
 - 현재 항목의 키는 `(workspaceId, seasonId, eventType, sourceReference)`다. 최신 판정은
   원본 `aggregateRevision`을 사용하며 도착 순서나 로컬 `sourceCursor`로 대신하지 않는다.
-- 실시간 수신과 재구축은 같은 규칙을 사용한다. v1의 타입별 심각도를 유지하고 v2는
-  `CRITICAL` → `HIGH`, `WARNING` → `MEDIUM`으로 표시한다.
+- 실시간 수신과 재구축은 같은 규칙을 사용한다. 원본 심각도 `CRITICAL`은 `HIGH`,
+  `WARNING`은 `MEDIUM`으로 표시한다.
 - 현재 단건은 `ACTIVE`·`RESOLVED`를 모두 반환한다. 목록은 `ACTIVE`가 기본이며
   `(eventType, sourceReference)` 오름차순 배타 키셋을 쓴다. 커서를 스냅샷으로 해석하지 않는다.
 - 전이 이력은 `APPLIED`·`APPLIED_WITH_GAP` 수신 기록을 원본 리비전 역순으로 읽는다.
-  전이별 `detectedRevisionGap`과 누적 `revisionGap`을 구분하고 v1 `sourceSeverity=null`을 추정하지 않는다.
+  전이별 `detectedRevisionGap`과 누적 `revisionGap`을 구분하고 `sourceSeverity`는 저장한 값을 그대로 쓴다.
 - 주간 해소는 연속된 활성·해소 증거와 현재 해소 상태를 함께 확인한다. 재활성화했거나
   해소 시점의 기록이 누락된 항목을 해소 건수로 추정하지 않는다.
 - 재구축은 `UNSUPPORTED`를 제외한 기록을 `ingestion_sequence` 순서로 재생하고 현재 투영만

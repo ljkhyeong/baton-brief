@@ -13,7 +13,7 @@ description: BATON BRIEF의 Flyway 마이그레이션·테이블 제약·인덱�
 - 저장 구현: `JdbcBriefPersistenceAdapter.kt`, 포트: `BriefUseCases.kt`의 `BriefPersistencePort`
 - 기술·마이그레이션 요약: [ADR-0002](../../../docs/ADR/0002_technology-stack/adr.md)
 - 보존·재구축 잠금: [PRD-0008](../../../docs/PRD/0008_retention-rebuild-boundary/spec.md)
-- 배포 중 잠금 영향: [배포 준비](../../../docs/operations/brief-b4ton-com-deployment.md)의 업그레이드 절
+- 배포 중 잠금 영향: [배포 준비](../../../docs/operations/brief-b4ton-com-deployment.md)의 스키마 적용 절
 
 ## 유지할 규칙
 
@@ -34,9 +34,8 @@ description: BATON BRIEF의 Flyway 마이그레이션·테이블 제약·인덱�
 
 ## 변경에 맞는 검증
 
-- 기존 데이터에 영향을 주는 변경은 `BriefMvpIntegrationTest`의 대표 데이터 업그레이드 시나리오에
-  필요한 `bootstrap/src/test/resources/fixtures/representative_v<N>_data.sql`과 단언을 추가한다.
-  대상 이전 버전까지 migrate한 뒤 최신으로 올려 행 보존과 새 제약을 확인한다. 빈 DB 성공으로 대신하지 않는다.
+- 보존 데이터가 생긴 뒤 기존 행에 영향을 주는 변경은 대상 이전 버전까지 migrate하고 대표 이전 행을
+  넣은 뒤 최신으로 올려 행 보존과 새 제약을 확인한다. 빈 DB 성공으로 대신하지 않는다.
 - 쿼리 변경은 해당 통합 시나리오의 범위 격리·정렬·페이지 경계를 확인한다. 인덱스·성능 변경은 격리 DB의
   합성 데이터에서 기존·변경 SQL의 결과 일치와 실행 계획을 비교하고 운영 성능 보장으로 보고하지 않는다.
 - 통합 테스트는 Testcontainers PostgreSQL 18.6을 사용한다. Docker 미기동으로 건너뛰거나 실패한
