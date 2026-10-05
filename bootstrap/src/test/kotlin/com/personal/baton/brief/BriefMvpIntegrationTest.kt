@@ -1510,6 +1510,8 @@ class BriefMvpIntegrationTest(
         }
         listOf(
             "eventId" to "not-a-uuid",
+            "eventVersion" to "2",
+            "aggregateRevision" to "1",
             "sourceReference" to "\u0000",
             "sourceReference" to "valid\u0000suffix",
             "occurredAt" to "2026-08-12T09:00:00",
@@ -1517,6 +1519,9 @@ class BriefMvpIntegrationTest(
         ).forEach { (field, value) ->
             postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1).put(field, value))
                 .andExpect(status().isBadRequest)
+        }
+        listOf(0L, -1L).forEach { revision ->
+            postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", revision)).andExpect(status().isBadRequest)
         }
 
         postEvent(

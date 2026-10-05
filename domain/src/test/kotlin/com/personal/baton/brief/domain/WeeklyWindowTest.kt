@@ -4,6 +4,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import org.junit.jupiter.api.Test
 
 class WeeklyWindowTest {
@@ -27,5 +28,12 @@ class WeeklyWindowTest {
 
         assertThat(window.start).isEqualTo(Instant.parse("2026-10-18T22:00:00Z"))
         assertThat(window.end).isEqualTo(Instant.parse("2026-10-25T23:00:00Z"))
+    }
+
+    @Test
+    fun `월요일이 아닌 시작일로는 주간을 만들지 않는다`() {
+        assertThatIllegalArgumentException().isThrownBy {
+            WeeklyWindow.startingOn(LocalDate.parse("2026-10-20"), ZoneId.of("Asia/Seoul"))
+        }
     }
 }
