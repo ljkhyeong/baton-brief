@@ -33,10 +33,17 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
 - Java 21 툴체인을 사용하고 Kotlin 바이트코드 대상을 JVM 21로 고정한다. BRIEF 실행 환경도
   JDK 21을 사용한다.
 - Spring Boot와 Spring Boot BOM은 4.1.1을 사용한다.
-- Tomcat은 [11.0.25 보안 수정](https://tomcat.apache.org/security-11.html#Fixed_in_Apache_Tomcat_11.0.25)을
-  적용한다. 웹 어댑터에서 Gradle 표준 의존성 제약으로 `tomcat-embed-core`·`el`·`websocket`을
-  같은 catalog 버전에 맞춘다. Spring Boot BOM에 수정 버전이 반영되면 이 임시 제약과 catalog의
-  Tomcat 버전을 제거한다. 별도 의존성 관리 플러그인이나 제품 코드를 추가하지 않는다.
+- Spring Boot BOM보다 먼저 보안 수정 버전을 적용해야 하는 라이브러리는 루트 빌드에서 모든 Kotlin
+  모듈의 `implementation`에 걸어 테스트를 포함한 모든 구성의 버전을 맞춘다. 한 모듈에만 걸면
+  다른 모듈의 테스트 의존성처럼 그 제약이 닿지 않는 구성에 이전 버전이 남는다.
+  - Tomcat은 [11.0.25 보안 수정](https://tomcat.apache.org/security-11.html#Fixed_in_Apache_Tomcat_11.0.25)을
+    Gradle 표준 의존성 제약으로 `tomcat-embed-core`·`el`·`websocket`에 적용한다.
+  - Jackson은 3.1.6에서 수정된 `jackson-databind` 경고 때문에 같은 3.1 계열의 `jackson-bom` 3.1.7을
+    표준 `platform`으로 적용한다.
+  - Spring Boot Gradle 플러그인 경로의 Jackson과 Commons Lang 3.20.0도 루트 `buildscript`에서 맞춘다.
+    실행 JAR에는 포함되지 않지만 의존성 그래프의 경고를 남기지 않기 위해서다.
+  - Spring Boot BOM과 플러그인에 수정 버전이 반영되면 해당 제약과 catalog 버전을 제거한다.
+    별도 의존성 관리 플러그인이나 제품 코드를 추가하지 않는다.
 - 빌드 스크립트는 Kotlin DSL을 사용한다. 빌드는 Gradle 다중 프로젝트로 구성하고 Gradle
   래퍼는 9.2.1로 고정한다. Kotlin 플러그인과 Spring Boot/BOM 버전은 Gradle 표준 version
   catalog에서 한 번만 관리한다.

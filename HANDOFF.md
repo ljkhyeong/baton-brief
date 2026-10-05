@@ -88,11 +88,10 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 - 공개 Caddy의 인증서 볼륨 소유권을 포함한 비루트 전환, 다중 인스턴스 구성
 - 이미지 registry·릴리스 정책·라이선스
 - Gradle dependency verification checksum의 최초 검토와 플랫폼 간 유지 절차
-- Commons Lang 3.16.0의 `GHSA-j288-q9x7-2f5v`는 Spring Boot 4.1.1 빌드 플러그인의
-  `spring-boot-buildpack-platform → commons-compress → commons-lang3` 경로에 남아 있다.
-  실행 JAR에는 없고 이미지는 Dockerfile로 빌드하므로, 관련 플러그인 의존성 갱신 시 재검토한다.
-  기존 `main` 전용 Actions 캐시 쓰기 정책을 유지한다. 2026-09-12 확인한 나머지 경고 4건은
-  `fbea014`의 Kotlin 2.4.20·Tomcat 11.0.25로 수정 버전을 적용했다. 원격 경고 해소는 병합 후 확인한다.
+- Dependabot 경고 7건(Tomcat 3·Jackson 3·Commons Lang 1)의 원격 해소는 병합 뒤 `main`의 의존성 제출 결과로
+  확인한다. 2026-10-05 기준 Tomcat 경고가 남은 원인은 웹 어댑터에만 건 제약이 `:bootstrap:testCompileClasspath`에
+  닿지 않아 11.0.24가 그래프에 남은 것이었다. 루트 빌드로 옮긴 뒤 모든 해결 가능 구성과 `buildEnvironment`에서
+  Tomcat 11.0.25·Jackson 3.1.7·Commons Lang 3.20.0을 확인했다. 기존 `main` 전용 Actions 캐시 쓰기 정책을 유지한다.
 
 ## 다음 작업
 
