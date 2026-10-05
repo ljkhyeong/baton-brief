@@ -6,6 +6,7 @@ import com.personal.baton.brief.application.BriefUseCases
 import com.personal.baton.brief.application.CurrentAttentionItemSummary
 import com.personal.baton.brief.application.EditionComparison
 import com.personal.baton.brief.application.EditionComparisonResult
+import com.personal.baton.brief.application.EditionFreshness
 import com.personal.baton.brief.application.EditionHistoryResult
 import com.personal.baton.brief.application.EventReceiptAnomalyResult
 import com.personal.baton.brief.application.IngestStatus
@@ -241,16 +242,42 @@ class BriefController(
     fun compareEditions(
         @PathVariable("targetEditionId") targetEditionId: UUID,
         @RequestParam("fromEditionId") fromEditionId: UUID,
-    ): ResponseEntity<EditionComparison> = when (val result = brief.compareEditions(fromEditionId, targetEditionId)) {
-        is EditionComparisonResult.Found -> ResponseEntity.ok()
-            .eTag("brief-edition-comparison-v1-$fromEditionId-$targetEditionId")
-            .body(result.comparison)
-        EditionComparisonResult.NotFound -> editionNotFound()
-        EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "브리프는 같은 작업공간과 시즌에 속해야 합니다",
-        )
-    }
+    ): ResponseEntity<EditionComparison> =
+        brief.compareEditions(fromEditionId, targetEditionId).toResponse(fromEditionId, targetEditionId)
+
+    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/{targetEditionId}/changes")
+    fun compareEditionsInSeason(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @PathVariable("targetEditionId") targetEditionId: UUID,
+        @RequestParam("fromEditionId") fromEditionId: UUID,
+    ): ResponseEntity<EditionComparison> = brief.compareEditionsInSeason(
+        workspaceId,
+        seasonId,
+        fromEditionId,
+        targetEditionId,
+    ).toResponse(fromEditionId, targetEditionId)
+
+    @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/{editionId}/freshness")
+    fun checkEditionFreshness(
+        @PathVariable("workspaceId") workspaceId: UUID,
+        @PathVariable("seasonId") seasonId: UUID,
+        @PathVariable("editionId") editionId: UUID,
+    ): EditionFreshness = brief.checkEditionFreshness(workspaceId, seasonId, editionId) ?: editionNotFound()
+}
+
+private fun EditionComparisonResult.toResponse(
+    fromEditionId: UUID,
+    targetEditionId: UUID,
+): ResponseEntity<EditionComparison> = when (this) {
+    is EditionComparisonResult.Found -> ResponseEntity.ok()
+        .eTag("brief-edition-comparison-v1-$fromEditionId-$targetEditionId")
+        .body(comparison)
+    EditionComparisonResult.NotFound -> editionNotFound()
+    EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(
+        HttpStatus.BAD_REQUEST,
+        "브리프는 같은 작업공간과 시즌에 속해야 합니다",
+    )
 }
 
 private fun editionNotFound(): Nothing =

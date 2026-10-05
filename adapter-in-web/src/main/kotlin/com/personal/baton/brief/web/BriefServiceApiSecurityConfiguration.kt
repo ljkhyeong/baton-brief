@@ -73,6 +73,14 @@ class BriefServiceApiSecurityConfiguration {
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest"),
             pathPattern(HttpMethod.GET, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest"),
+            pathPattern(
+                HttpMethod.GET,
+                "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/{targetEditionId}/changes",
+            ),
+            pathPattern(
+                HttpMethod.GET,
+                "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/{editionId}/freshness",
+            ),
             pathPattern(HttpMethod.GET, "/api/v1/editions/{editionId}"),
             pathPattern(HttpMethod.GET, "/api/v1/editions/{targetEditionId}/changes"),
             pathPattern(HttpMethod.POST, "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions"),

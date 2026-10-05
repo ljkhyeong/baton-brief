@@ -86,6 +86,8 @@ BATON 화면은 조회 중 선택한 조건을 유지하며, 선택한 브리프
 - [선정 규칙 v2](docs/PRD/0029_edition-carry-over/spec.md)는 이번 주 변경과 이전부터 미해소인
   항목을 `section`으로 구분한다. 이전 브리프의 미기록 분류는 `null`이다.
 - 브리프 본문과 비교 결과는 `ETag`를 제공한다. 같은 결과의 조건부 조회는 본문 없이 `304`를 반환한다.
+- [범위 지정 비교](docs/PRD/0032_scoped-edition-comparison/spec.md)는 작업공간·시즌 확인과 비교를 한 번에 처리하고,
+  [최신 여부 확인](docs/PRD/0031_edition-freshness/spec.md)은 지금 다시 만들면 내용이 같은지 알려 준다.
 
 ### 실행 구성과 접근 제한
 

@@ -91,6 +91,12 @@ class BriefServiceApiSecurityIntegrationTest(
                 .header(HttpHeaders.IF_NONE_MATCH, comparisonEtag),
         ).andExpect(status().isNotModified)
             .andExpect(content().string(""))
+        listOf("$editionPath/$editionId/changes?fromEditionId=$editionId", "$editionPath/$editionId/freshness")
+            .forEach { path ->
+                mockMvc.perform(get(path)).andExpect(status().isUnauthorized)
+                mockMvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"))
+                    .andExpect(status().isOk)
+            }
 
         mockMvc.perform(
             get("$editionPath/latest")
