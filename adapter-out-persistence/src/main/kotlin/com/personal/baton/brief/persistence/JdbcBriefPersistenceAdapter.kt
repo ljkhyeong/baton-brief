@@ -18,6 +18,7 @@ import com.personal.baton.brief.application.WeeklyResolutionSummary
 import com.personal.baton.brief.application.ResolutionItem
 import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
+import com.personal.baton.brief.application.StoredEditionState
 import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
@@ -393,7 +394,7 @@ class JdbcBriefPersistenceAdapter(
     ): EditionResult {
         lock(PROJECTION_LOCK)
 
-        val candidates = findAttentionForWindow(command)
+        val candidates = findEditionCandidates(command)
         val content = selectContent(candidates)
         findLatestEditionByState(command, content.stateFingerprint)?.let { existing ->
             return EditionResult(existing, created = false)
@@ -561,7 +562,18 @@ class JdbcBriefPersistenceAdapter(
             .update()
     }
 
-    private fun findAttentionForWindow(command: GenerateEditionCommand): List<AttentionItem> = jdbc.sql(
+    override fun findStoredEditionState(editionId: UUID): StoredEditionState? = jdbc.sql(
+        """
+        SELECT workspace_id, season_id, week_start, zone_id, rule_version, state_fingerprint
+          FROM brief_edition
+         WHERE edition_id = :editionId
+        """.trimIndent(),
+    ).param("editionId", editionId)
+        .query(STORED_EDITION_STATE_MAPPER)
+        .optional()
+        .getOrNull()
+
+    override fun findEditionCandidates(command: GenerateEditionCommand): List<AttentionItem> = jdbc.sql(
         """
         $ATTENTION_ITEM_SELECT
          WHERE workspace_id = :workspaceId
@@ -784,6 +796,7 @@ class JdbcBriefPersistenceAdapter(
         private val RESOLUTION_ITEM_MAPPER = PostgresDataClassRowMapper(ResolutionItem::class.java)
         private val EDITION_SUMMARY_MAPPER = PostgresDataClassRowMapper(EditionSummary::class.java)
         private val EDITION_ITEM_MAPPER = PostgresDataClassRowMapper(BriefEditionItem::class.java)
+        private val STORED_EDITION_STATE_MAPPER = DataClassRowMapper(StoredEditionState::class.java)
         private val UPSERT_ATTENTION = """
             INSERT INTO attention_item (
                 workspace_id, season_id, event_type, source_reference, severity,

@@ -24,7 +24,7 @@ https://{$BRIEF_SERVICE_HOST:brief-service}:8443 {
 
 	@serviceReads {
 		method GET
-		path_regexp service_reads ^/api/v1/(?:workspaces/[^/]+/seasons/[^/]+/(?:attention-items(?:/current|/summary|/resolutions|/transitions)?|editions(?:/latest|/weekly/latest)?)|editions/[^/]+(?:/changes)?)$
+		path_regexp service_reads ^/api/v1/(?:workspaces/[^/]+/seasons/[^/]+/(?:attention-items(?:/current|/summary|/resolutions|/transitions)?|editions(?:/latest|/weekly/latest|/[^/]+/(?:changes|freshness))?)|editions/[^/]+(?:/changes)?)$
 	}
 	handle @serviceReads {
 		import brief_proxy

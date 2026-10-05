@@ -974,6 +974,67 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(get("/api/v1/editions/$oldEditionId"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.ruleVersion").value(1))
+        // 빈 선정이라 지문은 같지만 규칙 버전이 달라 다시 만들면 새 에디션이 된다.
+        mockMvc.perform(get("$path/$oldEditionId/freshness"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.upToDate").value(false))
+            .andExpect(jsonPath("$.ruleVersionChanged").value(true))
+    }
+
+    @Test
+    fun `브리프 최신 여부는 지금 다시 선정한 내용의 지문을 저장된 지문과 비교한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000002"
+        val seasonId = "20000000-0000-0000-0000-000000000002"
+        seedWeeklyEditionScenario(workspaceId, seasonId)
+        val editionsPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        val firstEditionId = editionIdOf(postEdition(editionsPath, editionRequest).andExpect(status().isCreated).andReturn())
+        fun freshness(editionId: String) = mockMvc.perform(get("$editionsPath/$editionId/freshness"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editionId").value(editionId))
+            .andExpect(jsonPath("$.ruleVersionChanged").value(false))
+            .andExpect(jsonPath("$.evaluatedAt").isNotEmpty)
+        freshness(firstEditionId).andExpect(jsonPath("$.upToDate").value(true))
+
+        // 이 주간의 선정 범위 밖인 다음 주 항목은 판정에 영향을 주지 않는다.
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000006", workspaceId, seasonId, "handoff:next-week", 1,
+                occurredAt = "2026-08-17T00:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+        freshness(firstEditionId).andExpect(jsonPath("$.upToDate").value(true))
+
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000004", workspaceId, seasonId, "decision:temporary", 1,
+                type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-13T09:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+        freshness(firstEditionId).andExpect(jsonPath("$.upToDate").value(false))
+        val secondEditionId = editionIdOf(postEdition(editionsPath, editionRequest).andExpect(status().isCreated).andReturn())
+        freshness(secondEditionId).andExpect(jsonPath("$.upToDate").value(true))
+
+        // 처음 선정 내용으로 돌아오면 최신 세대가 아니어도 내용이 같다고 판정한다.
+        postEvent(
+            eventJson(
+                "40000000-0000-0000-0000-000000000005", workspaceId, seasonId, "decision:temporary", 2,
+                state = "RESOLVED", type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-13T09:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+        freshness(firstEditionId).andExpect(jsonPath("$.upToDate").value(true))
+        freshness(secondEditionId).andExpect(jsonPath("$.upToDate").value(false))
+
+        val editionCount = countRows("brief_edition")
+        listOf(
+            "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/editions/$firstEditionId/freshness",
+            "$editionsPath/50000000-0000-0000-0000-000000000099/freshness",
+        ).forEach { path ->
+            mockMvc.perform(get(path))
+                .andExpect(status().isNotFound)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+        assertThat(countRows("brief_edition")).isEqualTo(editionCount)
     }
 
     @Test
@@ -1429,6 +1490,11 @@ class BriefMvpIntegrationTest(
         ).andExpect(status().isNotModified)
             .andExpect(header().string(HttpHeaders.ETAG, changesEtag))
             .andExpect(content().string(""))
+        val scopedChangesPath = "$generationPath/$targetEditionId/changes"
+        mockMvc.perform(get(scopedChangesPath).param("fromEditionId", baseEditionId))
+            .andExpect(status().isOk)
+            .andExpect(header().string(HttpHeaders.ETAG, changesEtag))
+            .andExpect(content().string(changes.response.contentAsString))
 
         mockMvc.perform(
             get(changesPath).param("fromEditionId", revisionEvidenceEditionId)
@@ -1487,6 +1553,11 @@ class BriefMvpIntegrationTest(
             get(changesPath).param("fromEditionId", otherEditionId).header(HttpHeaders.IF_NONE_MATCH, "*"),
         )
             .andExpect(status().isBadRequest)
+        // 범위를 지정한 경로는 다른 범위의 브리프를 400 대신 404로 감춘다.
+        mockMvc.perform(get(scopedChangesPath).param("fromEditionId", otherEditionId))
+            .andExpect(status().isNotFound)
+        mockMvc.perform(get("$otherGenerationPath/$targetEditionId/changes").param("fromEditionId", baseEditionId))
+            .andExpect(status().isNotFound)
 
         mockMvc.perform(
             get(changesPath)

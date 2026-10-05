@@ -2,6 +2,7 @@ package com.personal.baton.brief.application
 
 import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.AttentionProjector
+import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.EditionItemSection
 import com.personal.baton.brief.domain.SourceEvent
@@ -48,9 +49,43 @@ class BriefService(
     override fun compareEditions(
         baseEditionId: UUID,
         targetEditionId: UUID,
+    ): EditionComparisonResult = compareStoredEditions(baseEditionId, targetEditionId) { true }
+
+    override fun compareEditionsInSeason(
+        workspaceId: UUID,
+        seasonId: UUID,
+        baseEditionId: UUID,
+        targetEditionId: UUID,
+    ): EditionComparisonResult = compareStoredEditions(baseEditionId, targetEditionId) {
+        it.workspaceId == workspaceId && it.seasonId == seasonId
+    }
+
+    override fun checkEditionFreshness(
+        workspaceId: UUID,
+        seasonId: UUID,
+        editionId: UUID,
+    ): EditionFreshness? {
+        val evaluatedAt = now()
+        val stored = persistence.findStoredEditionState(editionId)
+            ?.takeIf { it.workspaceId == workspaceId && it.seasonId == seasonId }
+            ?: return null
+        val ruleVersionChanged = stored.ruleVersion != BriefEdition.RULE_VERSION
+        // 생성과 같은 선정·지문 계산으로 지금 다시 만들 내용이 저장된 내용과 같은지 확인한다.
+        val command = GenerateEditionCommand(workspaceId, seasonId, stored.weekStart, stored.zoneId)
+        val upToDate = !ruleVersionChanged &&
+            selectEditionContent(persistence.findEditionCandidates(command), command.window).stateFingerprint ==
+            stored.stateFingerprint
+        return EditionFreshness(editionId, upToDate, ruleVersionChanged, evaluatedAt)
+    }
+
+    private fun compareStoredEditions(
+        baseEditionId: UUID,
+        targetEditionId: UUID,
+        inScope: (BriefEdition) -> Boolean,
     ): EditionComparisonResult {
-        val base = persistence.findEdition(baseEditionId) ?: return EditionComparisonResult.NotFound
-        val target = persistence.findEdition(targetEditionId) ?: return EditionComparisonResult.NotFound
+        val base = persistence.findEdition(baseEditionId)?.takeIf(inScope) ?: return EditionComparisonResult.NotFound
+        val target = persistence.findEdition(targetEditionId)?.takeIf(inScope)
+            ?: return EditionComparisonResult.NotFound
         if (base.workspaceId != target.workspaceId || base.seasonId != target.seasonId) {
             return EditionComparisonResult.ScopeMismatch
         }

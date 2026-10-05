@@ -171,6 +171,22 @@ sealed interface EditionComparisonResult {
     data object ScopeMismatch : EditionComparisonResult
 }
 
+data class EditionFreshness(
+    val editionId: UUID,
+    val upToDate: Boolean,
+    val ruleVersionChanged: Boolean,
+    val evaluatedAt: Instant,
+)
+
+data class StoredEditionState(
+    val workspaceId: UUID,
+    val seasonId: UUID,
+    val weekStart: LocalDate,
+    val zoneId: ZoneId,
+    val ruleVersion: Int,
+    val stateFingerprint: String,
+)
+
 data class EditionContent(
     val items: List<BriefEditionItem>,
     val stateFingerprint: String,
@@ -255,6 +271,19 @@ interface BriefUseCases : BriefQueries {
         baseEditionId: UUID,
         targetEditionId: UUID,
     ): EditionComparisonResult
+
+    fun compareEditionsInSeason(
+        workspaceId: UUID,
+        seasonId: UUID,
+        baseEditionId: UUID,
+        targetEditionId: UUID,
+    ): EditionComparisonResult
+
+    fun checkEditionFreshness(
+        workspaceId: UUID,
+        seasonId: UUID,
+        editionId: UUID,
+    ): EditionFreshness?
 }
 
 interface BriefPersistencePort : BriefQueries {
@@ -282,6 +311,10 @@ interface BriefPersistencePort : BriefQueries {
     ): WeeklyResolutionSummary
 
     fun rebuild(project: (SourceEvent, AttentionItem?) -> ProjectionDecision): RebuildResult
+
+    fun findStoredEditionState(editionId: UUID): StoredEditionState?
+
+    fun findEditionCandidates(command: GenerateEditionCommand): List<AttentionItem>
 
     fun createEdition(
         command: GenerateEditionCommand,

@@ -314,6 +314,11 @@ jobs:
             "https://localhost:38443$resolutions_path")" = "404"
           test "$(http_status service_api_curl --header="Authorization: Bearer $service_token" \
             'https://brief-service:8443/actuator/health')" = "404"
+          # 새 브리프 경로도 서비스 Caddy를 지나 앱 인증까지 도달해야 한다.
+          editions_path="${summary_path%/attention-items/summary}/editions/50000000-0000-0000-0000-000000000001"
+          test "$(http_status service_api_curl "https://brief-service:8443$editions_path/freshness")" = "401"
+          test "$(http_status service_api_curl \
+            "https://brief-service:8443$editions_path/changes?fromEditionId=50000000-0000-0000-0000-000000000001")" = "401"
 
           # 로그 수집 실패는 즉시 중단하고 grep의 조기 종료와 분리한다.
           brief_logs="$(docker logs "$brief_id" 2>&1)"
