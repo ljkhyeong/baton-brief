@@ -160,8 +160,8 @@ class BriefService(
         )
     }
 
-    private fun fingerprint(event: SourceEvent): String {
-        val values = sequenceOf(
+    private fun fingerprint(event: SourceEvent): String = sha256(
+        sequenceOf(
             event.eventId,
             event.eventType.name,
             event.eventVersion,
@@ -171,9 +171,9 @@ class BriefService(
             event.aggregateRevision,
             event.occurredAt,
             event.state.name,
-        )
-        return sha256(event.sourceSeverity?.let { values + it.name } ?: values)
-    }
+            event.sourceSeverity?.name,
+        ),
+    )
 
     private fun sha256(values: Sequence<Any?>): String {
         val digest = MessageDigest.getInstance("SHA-256")

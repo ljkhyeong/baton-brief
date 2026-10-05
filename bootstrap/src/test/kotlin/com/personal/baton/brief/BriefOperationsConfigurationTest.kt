@@ -5,9 +5,12 @@ import com.personal.baton.brief.config.BriefOperationsConfiguration
 import com.personal.baton.brief.config.BriefOperationsContextInitializer
 import com.personal.baton.brief.config.BriefOperationsProperties
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoInteractions
+import org.springframework.boot.ApplicationRunner
+import org.springframework.boot.DefaultApplicationArguments
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
@@ -92,6 +95,29 @@ class BriefOperationsConfigurationTest {
             }
         }
         assertThat(useCasesCreated).isFalse()
+        verifyNoInteractions(brief)
+    }
+
+    @Test
+    fun `이상 수신 기록 명령은 범위 밖 limit과 양수가 아닌 기준 순번을 거부한다`() {
+        val brief = mock(BriefUseCases::class.java)
+        val runner = ApplicationContextRunner()
+            .withUserConfiguration(BriefOperationsConfiguration::class.java)
+            .withBean(BriefUseCases::class.java, { brief })
+            .withBean(JsonMapper::class.java, { JsonMapper.builder().build() })
+            .withPropertyValues(
+                "brief.operations.command=ANOMALIES",
+                "brief.operations.workspace-id=10000000-0000-0000-0000-000000000001",
+                "brief.operations.season-id=20000000-0000-0000-0000-000000000001",
+            )
+
+        listOf("limit=0", "limit=101", "before-ingestion-sequence=0").forEach { property ->
+            runner.withPropertyValues("brief.operations.$property").run { context ->
+                assertThatIllegalArgumentException().isThrownBy {
+                    context.getBean(ApplicationRunner::class.java).run(DefaultApplicationArguments())
+                }
+            }
+        }
         verifyNoInteractions(brief)
     }
 }

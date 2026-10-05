@@ -3,15 +3,12 @@ package com.personal.baton.brief.domain
 import java.time.Instant
 import java.util.UUID
 
-enum class SourceEventType(val contractVersion: Int) {
-    HANDOFF_BLOCKED(1),
-    ROUTINE_MISSED(1),
-    DECISION_FOLLOW_UP_OVERDUE(1),
-    ROLE_UNASSIGNED(2),
-    ROLE_SUCCESSOR_MISSING(2),
-    ROLE_PREPARATION_INCOMPLETE(2),
-    ROUTINE_REPEATEDLY_OVERDUE(2),
-    HANDOFF_INCOMPLETE(2),
+enum class SourceEventType {
+    ROLE_UNASSIGNED,
+    ROLE_SUCCESSOR_MISSING,
+    ROLE_PREPARATION_INCOMPLETE,
+    ROUTINE_REPEATEDLY_OVERDUE,
+    HANDOFF_INCOMPLETE,
 }
 
 enum class SourceEventSeverity {
@@ -38,29 +35,19 @@ data class SourceEvent(
 ) {
     init {
         require(aggregateRevision > 0) { "aggregateRevision은 양수여야 합니다" }
-        require(isReceivable(eventVersion, eventType, sourceSeverity)) {
-            "eventVersion, eventType과 sourceSeverity 조합이 올바르지 않습니다"
-        }
+        require(isReceivable(eventVersion, sourceSeverity)) { "eventVersion과 sourceSeverity 조합이 올바르지 않습니다" }
     }
 
+    /** 지원 버전만 투영한다. 이후 버전은 미지원 수신 기록으로만 보존한다. */
     val isSupported: Boolean
-        get() = isSupportedContract(eventVersion, eventType, sourceSeverity)
+        get() = eventVersion == SUPPORTED_VERSION
 
     companion object {
+        const val SUPPORTED_VERSION = 2
+
         fun isReceivable(
             eventVersion: Int,
-            eventType: SourceEventType,
             sourceSeverity: SourceEventSeverity?,
-        ): Boolean = isSupportedContract(eventVersion, eventType, sourceSeverity) ||
-            eventVersion > 2 ||
-            (eventVersion == 2 && eventType.contractVersion == 1 && sourceSeverity == null)
-
-        private fun isSupportedContract(
-            eventVersion: Int,
-            eventType: SourceEventType,
-            sourceSeverity: SourceEventSeverity?,
-        ): Boolean = eventVersion in 1..2 &&
-            eventType.contractVersion == eventVersion &&
-            if (eventVersion == 1) sourceSeverity == null else sourceSeverity != null
+        ): Boolean = eventVersion > SUPPORTED_VERSION || (eventVersion == SUPPORTED_VERSION && sourceSeverity != null)
     }
 }

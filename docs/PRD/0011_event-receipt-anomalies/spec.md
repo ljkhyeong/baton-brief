@@ -69,7 +69,7 @@ BRIEF가 PRD-0008에 따라 보존하는 최초 수신 기록과 이벤트별 �
 | `ingestionSequence` | BRIEF가 부여한 불변 로컬 수신 순서 |
 | `eventType` | 최초 저장한 이벤트 종류 |
 | `eventVersion` | 최초 저장한 이벤트 버전 |
-| `sourceSeverity` | v2가 저장한 BATON 원본 심각도, v1·기존 미지원 기록은 `null` |
+| `sourceSeverity` | 저장한 BATON 원본 심각도, 심각도 없이 받은 미지원 기록은 `null` |
 | `workspaceId` | 불투명 작업공간 참조 |
 | `seasonId` | 불투명 시즌 참조 |
 | `sourceReference` | 길이가 제한된 원본 참조값 |
@@ -107,7 +107,7 @@ fingerprint, 원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 �
 - 기존 `POST /api/v1/events`, `GET /api/v1/events/{eventId}/receipt`, 투영과 브리프 계약을
   바꾸지 않는 추가 조회다.
 - 기존 `source_event_receipt`와 `source_event_conflict`만 읽으며 새 테이블·열을 추가하지 않는다.
-  작업공간·시즌별 조회 인덱스는 [ADR-0002](../../ADR/0002_technology-stack/adr.md)의 V10을 따른다.
+  작업공간·시즌별 조회 인덱스는 [ADR-0002](../../ADR/0002_technology-stack/adr.md)를 따른다.
 - 조회는 수신 기록, 충돌 기록, 현재 투영과 브리프를 생성·수정·삭제하지 않는다.
 - PRD-0008의 `retain-all` 경계에서 보존된 최초 수신 결과와 최초 충돌 한 건만 사용한다.
   후속 삭제 계약은 단건 조회와 이력 페이지 모두의 만료 의미를 먼저 정의해야 한다.

@@ -38,7 +38,7 @@ PRD-0002는 이벤트를 수신한 요청에서 처리 결과를 반환하지만
 | `ingestionSequence` | BRIEF가 부여한 로컬 수신 순서이자 브리프 `sourceCursor`의 기준 |
 | `eventType` | 최초 저장한 이벤트 종류 |
 | `eventVersion` | 최초 저장한 이벤트 버전 |
-| `sourceSeverity` | v2가 저장한 BATON 원본 심각도, v1·기존 미지원 기록은 `null` |
+| `sourceSeverity` | 저장한 BATON 원본 심각도, 심각도 없이 받은 미지원 기록은 `null` |
 | `workspaceId` | 작업공간 식별자 |
 | `seasonId` | 시즌 식별자 |
 | `sourceReference` | 최초 저장한 이벤트의 길이가 제한된 원본 참조값 |

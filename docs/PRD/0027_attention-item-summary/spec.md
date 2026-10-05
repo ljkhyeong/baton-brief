@@ -16,7 +16,7 @@ BRIEF가 활성 항목 수를 집계해 제공한다. BATON은 목록 전체를 
 GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary
 ```
 
-`workspaceId`와 `seasonId`는 UUID다. 선택적 `eventType`에 v1·v2 이벤트 종류를 지정하면
+`workspaceId`와 `seasonId`는 UUID다. 선택적 `eventType`에 PRD-0002의 이벤트 종류를 지정하면
 해당 업무 종류만 집계한다. 생략하면 작업공간·시즌의 전체 활성 항목을 집계한다.
 예: `?eventType=ROLE_UNASSIGNED`는 역할 미배정 항목의 요약을 반환한다.
 알 수 없는 종류는 Spring MVC 변환에 따라 `400 Bad Request`·`ProblemDetail`로 거부한다.
@@ -75,7 +75,7 @@ Spring MVC 변환과 PRD-0004의 `400 Bad Request`·`ProblemDetail`을 따른다
 
 - 활성 `HIGH`·`MEDIUM`과 공백 항목이 섞인 범위에서 세 개수가 정확하다.
 - 다른 작업공간이나 시즌의 항목이 섞이지 않으며 빈 범위는 세 값 모두 `0`이다.
-- 업무 종류를 지정하면 v1·v2 모두 해당 종류만 집계하며, 일치하는 활성 항목이 없으면 세 값 모두 `0`이다.
+- 업무 종류를 지정하면 해당 종류만 집계하며, 일치하는 활성 항목이 없으면 세 값 모두 `0`이다.
 - 심각도 변경과 해소를 반영하고 재구축으로 같은 요약을 재현한다.
 - 이벤트 수신 결과가 항목 수로 중복 집계되지 않는다.
 - 서비스 인증이 활성화된 환경에서 무인증·이벤트 Bearer는 거부하고 서비스 Bearer는 허용한다.

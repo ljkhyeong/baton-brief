@@ -36,7 +36,7 @@
 | [PRD-0007 수신 기록 단건](PRD/0007_event-receipt-query/spec.md) | 채택됨 | 최초 수신 결과와 최초 충돌 탐지 시각 조회 |
 | [PRD-0011 이상 수신 기록](PRD/0011_event-receipt-anomalies/spec.md) | 채택됨 | 작업공간·시즌별 이상 수신 기록의 커서 기반 조회 |
 | [PRD-0018 BATON 이벤트 연동 조건](PRD/0018_baton-producer-compatibility/spec.md) | 채택됨 | 이벤트 의미·식별자·변경 번호·outbox·연동 검증 조건 |
-| [PRD-0019 연속성 신호 이벤트 v2](PRD/0019_baton-continuity-event-v2/spec.md) | 채택됨 | 다섯 신호, 원본 심각도, v1 수신 호환성과 계약 팩 |
+| [PRD-0019 연속성 신호 이벤트 v2](PRD/0019_baton-continuity-event-v2/spec.md) | 채택됨 | 다섯 신호, 원본 심각도, 미지원 버전 처리와 계약 팩 |
 | [PRD-0020 이벤트 수신 인증](PRD/0020_baton-event-authentication/spec.md) | 채택됨 | BATON 전용 Bearer와 현재·직전 토큰 교체 방식 |
 
 ## 점검 항목
@@ -59,7 +59,7 @@
 | [PRD-0003 브리프 이력](PRD/0003_edition-history/spec.md) | 채택됨 | 전체·주간 이력 필터와 생성 번호 커서 조회 |
 | [PRD-0005 브리프 비교](PRD/0005_edition-comparison/spec.md) | 채택됨 | 추가·제거·변경과 기준·대상 순서 |
 | [PRD-0009 주간 범위 최신](PRD/0009_weekly-latest-edition/spec.md) | 채택됨 | 주간·시간대가 일치하는 최신 저장 브리프 |
-| [PRD-0010 브리프 리비전 근거](PRD/0010_edition-revision-evidence/spec.md) | 채택됨 | 집계 리비전·공백 고정과 이전 항목 `null` 호환성 |
+| [PRD-0010 브리프 리비전 근거](PRD/0010_edition-revision-evidence/spec.md) | 채택됨 | 브리프 항목의 집계 리비전·공백 고정 |
 | [PRD-0012 브리프 조건부 조회](PRD/0012_edition-etag/spec.md) | 채택됨 | 브리프 본문·비교 결과의 `ETag`와 `If-None-Match` |
 | [PRD-0029 주간 변경·이전 미해소 구분](PRD/0029_edition-carry-over/spec.md) | 채택됨 | 브리프 선정 규칙 v2와 생성 당시 항목 분류 |
 | [PRD-0031 브리프 최신 여부 확인](PRD/0031_edition-freshness/spec.md) | 채택됨 | 지금 다시 선정한 내용의 지문과 저장된 지문 비교 |

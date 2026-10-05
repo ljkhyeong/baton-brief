@@ -3,11 +3,13 @@ package com.personal.baton.brief
 import com.personal.baton.brief.application.BriefUseCases
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
+import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
 import com.personal.baton.brief.web.BriefController
 import com.personal.baton.brief.web.SourceEventRequest
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import java.time.Instant
 import java.util.UUID
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -27,19 +29,20 @@ class BriefEventMetricsTest {
             }
 
             val request = SourceEventRequest(
-                eventId = UUID.randomUUID().toString(),
-                eventType = SourceEventType.HANDOFF_BLOCKED,
-                eventVersion = 1,
-                workspaceId = UUID.randomUUID().toString(),
-                seasonId = UUID.randomUUID().toString(),
+                eventId = UUID.randomUUID(),
+                eventType = SourceEventType.ROLE_PREPARATION_INCOMPLETE,
+                eventVersion = 2,
+                sourceSeverity = SourceEventSeverity.CRITICAL,
+                workspaceId = UUID.randomUUID(),
+                seasonId = UUID.randomUUID(),
                 sourceReference = "handoff-metrics",
                 aggregateRevision = 1,
-                occurredAt = "2026-09-08T00:00:00Z",
+                occurredAt = Instant.parse("2026-09-08T00:00:00Z"),
                 state = SourceEventState.ACTIVE,
             )
             listOf(IngestStatus.CONFLICT, IngestStatus.UNSUPPORTED).forEach { outcome ->
                 val input = if (outcome == IngestStatus.UNSUPPORTED) request.copy(eventVersion = 99) else request
-                given(brief.ingest(input.toDomain())).willReturn(IngestResult(UUID.fromString(input.eventId), outcome))
+                given(brief.ingest(input.toDomain())).willReturn(IngestResult(input.eventId, outcome))
 
                 controller.ingest(input)
 

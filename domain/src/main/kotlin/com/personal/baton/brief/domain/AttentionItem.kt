@@ -40,26 +40,9 @@ object AttentionProjector {
         }
 
         val hasGap = event.aggregateRevision > (current?.lastRevision ?: 0) + 1
-        val severity = when (event.eventVersion) {
-            1 -> when (event.eventType) {
-                SourceEventType.HANDOFF_BLOCKED -> Severity.HIGH
-                SourceEventType.ROUTINE_MISSED,
-                SourceEventType.DECISION_FOLLOW_UP_OVERDUE,
-                -> Severity.MEDIUM
-                SourceEventType.ROLE_UNASSIGNED,
-                SourceEventType.ROLE_SUCCESSOR_MISSING,
-                SourceEventType.ROLE_PREPARATION_INCOMPLETE,
-                SourceEventType.ROUTINE_REPEATEDLY_OVERDUE,
-                SourceEventType.HANDOFF_INCOMPLETE,
-                -> error("이벤트 v1에서 지원하지 않는 eventType입니다")
-            }
-
-            2 -> when (checkNotNull(event.sourceSeverity)) {
-                SourceEventSeverity.CRITICAL -> Severity.HIGH
-                SourceEventSeverity.WARNING -> Severity.MEDIUM
-            }
-
-            else -> error("지원하지 않는 eventVersion입니다")
+        val severity = when (checkNotNull(event.sourceSeverity) { "지원 버전 이벤트에는 sourceSeverity가 필요합니다" }) {
+            SourceEventSeverity.CRITICAL -> Severity.HIGH
+            SourceEventSeverity.WARNING -> Severity.MEDIUM
         }
 
         return ProjectionDecision.Applied(

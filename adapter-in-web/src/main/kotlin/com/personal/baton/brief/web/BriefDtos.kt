@@ -14,99 +14,68 @@ import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.constraints.AssertTrue
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
-import java.time.DateTimeException
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatterBuilder
-import java.time.format.ResolverStyle
-import java.time.temporal.ChronoField
-import java.util.Locale
+import java.time.ZoneOffset
 import java.util.UUID
 import org.hibernate.validator.constraints.CodePointLength
 
-private const val UUID_PATTERN =
-    "(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 internal const val SOURCE_REFERENCE_PATTERN =
     "(?s)(?=.*\\P{javaWhitespace})[^\\u0000\\uD800-\\uDFFF]*"
 
+/** PostgreSQL 시각 범위 안에서 계약이 쓰는 네 자리 연도 */
+private val SUPPORTED_YEARS = 0..9999
+
 data class SourceEventRequest(
-    @field:Pattern(regexp = UUID_PATTERN)
-    val eventId: String,
+    val eventId: UUID,
     val eventType: SourceEventType,
-    @field:Positive
+    @field:Min(SourceEvent.SUPPORTED_VERSION.toLong())
     val eventVersion: Int,
     val sourceSeverity: SourceEventSeverity? = null,
-    @field:Pattern(regexp = UUID_PATTERN)
-    val workspaceId: String,
-    @field:Pattern(regexp = UUID_PATTERN)
-    val seasonId: String,
+    val workspaceId: UUID,
+    val seasonId: UUID,
     @field:CodePointLength(max = 128)
     @field:Pattern(regexp = SOURCE_REFERENCE_PATTERN)
     val sourceReference: String,
     @field:Positive
     val aggregateRevision: Long,
-    val occurredAt: String,
+    val occurredAt: Instant,
     val state: SourceEventState,
 ) {
-    private val occurredAtInstant = try {
-        Instant.from(OCCURRED_AT_FORMATTER.parse(occurredAt))
-    } catch (_: DateTimeException) {
-        null
-    }
+    @get:AssertTrue(message = "occurredAt은 0000~9999년이어야 합니다")
+    val supportedOccurredAt: Boolean
+        get() = occurredAt.atOffset(ZoneOffset.UTC).year in SUPPORTED_YEARS
 
-    @get:AssertTrue(message = "occurredAt은 시간대 오프셋을 포함한 ISO-8601 형식이어야 합니다")
-    val validOccurredAt: Boolean
-        get() = occurredAtInstant != null
-
-    @get:AssertTrue(message = "지원하지 않는 eventVersion·eventType·sourceSeverity 조합입니다")
+    @get:AssertTrue(message = "eventVersion 2에는 sourceSeverity가 필요합니다")
     val validVersionContract: Boolean
-        get() = eventVersion <= 0 ||
-            SourceEvent.isReceivable(eventVersion, eventType, sourceSeverity)
+        get() = eventVersion < SourceEvent.SUPPORTED_VERSION || SourceEvent.isReceivable(eventVersion, sourceSeverity)
 
     fun toDomain(): SourceEvent = SourceEvent(
-        eventId = UUID.fromString(eventId),
+        eventId = eventId,
         eventType = eventType,
         eventVersion = eventVersion,
-        workspaceId = UUID.fromString(workspaceId),
-        seasonId = UUID.fromString(seasonId),
+        workspaceId = workspaceId,
+        seasonId = seasonId,
         sourceReference = sourceReference,
         aggregateRevision = aggregateRevision,
-        occurredAt = checkNotNull(occurredAtInstant),
+        occurredAt = occurredAt,
         state = state,
         sourceSeverity = sourceSeverity,
     )
-
-    companion object {
-        private val OCCURRED_AT_FORMATTER = DateTimeFormatterBuilder()
-            .parseCaseInsensitive()
-            .appendValue(ChronoField.YEAR, 4)
-            .appendPattern("-MM-dd'T'HH:mm:ss")
-            .optionalStart()
-            .appendFraction(ChronoField.NANO_OF_SECOND, 1, 9, true)
-            .optionalEnd()
-            .appendOffset("+HH:MM", "Z")
-            .toFormatter(Locale.ROOT)
-            .withResolverStyle(ResolverStyle.STRICT)
-    }
 }
 
 data class EditionWeekRequest(
-    val weekStart: String,
+    val weekStart: LocalDate,
     val zoneId: ZoneId,
 ) {
-    private val weekStartDate = try {
-        LocalDate.parse(weekStart, WEEK_START_FORMATTER)
-    } catch (_: DateTimeException) {
-        null
-    }
-
-    @get:AssertTrue(message = "weekStart는 연도 네 자리의 uuuu-MM-dd 형식이며 월요일이어야 합니다")
+    @get:AssertTrue(message = "weekStart는 0000~9999년의 월요일이어야 합니다")
     val validWeekStart: Boolean
-        get() = weekStartDate?.dayOfWeek == DayOfWeek.MONDAY
+        get() = weekStart.dayOfWeek == DayOfWeek.MONDAY && weekStart.year in SUPPORTED_YEARS
 
     @get:AssertTrue(message = "zoneId는 IANA 시간대 ID여야 합니다")
     val validIanaZone: Boolean
@@ -115,20 +84,7 @@ data class EditionWeekRequest(
     fun toCommand(
         workspaceId: UUID,
         seasonId: UUID,
-    ): GenerateEditionCommand = GenerateEditionCommand(
-        workspaceId,
-        seasonId,
-        checkNotNull(weekStartDate),
-        zoneId,
-    )
-
-    companion object {
-        private val WEEK_START_FORMATTER = DateTimeFormatterBuilder()
-            .appendValue(ChronoField.YEAR, 4)
-            .appendPattern("-MM-dd")
-            .toFormatter(Locale.ROOT)
-            .withResolverStyle(ResolverStyle.STRICT)
-    }
+    ): GenerateEditionCommand = GenerateEditionCommand(workspaceId, seasonId, weekStart, zoneId)
 }
 
 data class AttentionItemCursorRequest(
