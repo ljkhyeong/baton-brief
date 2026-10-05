@@ -3,6 +3,7 @@ package com.personal.baton.brief
 import com.personal.baton.brief.application.BriefUseCases
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
+import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
 import com.personal.baton.brief.web.BriefController
@@ -28,8 +29,9 @@ class BriefEventMetricsTest {
 
             val request = SourceEventRequest(
                 eventId = UUID.randomUUID().toString(),
-                eventType = SourceEventType.HANDOFF_BLOCKED,
-                eventVersion = 1,
+                eventType = SourceEventType.ROLE_PREPARATION_INCOMPLETE,
+                eventVersion = 2,
+                sourceSeverity = SourceEventSeverity.CRITICAL,
                 workspaceId = UUID.randomUUID().toString(),
                 seasonId = UUID.randomUUID().toString(),
                 sourceReference = "handoff-metrics",

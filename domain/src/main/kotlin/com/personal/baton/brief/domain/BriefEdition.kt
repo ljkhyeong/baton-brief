@@ -40,9 +40,9 @@ data class BriefEditionItem(
     val status: SourceEventState,
     val observedAt: Instant,
     val ruleVersion: Int,
-    val aggregateRevision: Long?,
-    val revisionGap: Boolean?,
-    val section: EditionItemSection?,
+    val aggregateRevision: Long,
+    val revisionGap: Boolean,
+    val section: EditionItemSection,
 )
 
 data class BriefEdition(

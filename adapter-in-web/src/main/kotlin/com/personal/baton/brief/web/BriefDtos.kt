@@ -14,6 +14,7 @@ import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.constraints.AssertTrue
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
 import java.time.DateTimeException
@@ -37,7 +38,7 @@ data class SourceEventRequest(
     @field:Pattern(regexp = UUID_PATTERN)
     val eventId: String,
     val eventType: SourceEventType,
-    @field:Positive
+    @field:Min(SourceEvent.SUPPORTED_VERSION.toLong())
     val eventVersion: Int,
     val sourceSeverity: SourceEventSeverity? = null,
     @field:Pattern(regexp = UUID_PATTERN)
@@ -62,10 +63,9 @@ data class SourceEventRequest(
     val validOccurredAt: Boolean
         get() = occurredAtInstant != null
 
-    @get:AssertTrue(message = "지원하지 않는 eventVersion·eventType·sourceSeverity 조합입니다")
+    @get:AssertTrue(message = "eventVersion 2에는 sourceSeverity가 필요합니다")
     val validVersionContract: Boolean
-        get() = eventVersion <= 0 ||
-            SourceEvent.isReceivable(eventVersion, eventType, sourceSeverity)
+        get() = eventVersion < SourceEvent.SUPPORTED_VERSION || SourceEvent.isReceivable(eventVersion, sourceSeverity)
 
     fun toDomain(): SourceEvent = SourceEvent(
         eventId = UUID.fromString(eventId),

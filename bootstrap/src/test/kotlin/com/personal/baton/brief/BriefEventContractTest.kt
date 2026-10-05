@@ -4,8 +4,6 @@ import com.networknt.schema.InputFormat
 import com.networknt.schema.SchemaRegistry
 import com.networknt.schema.SchemaRegistryConfig
 import com.networknt.schema.SpecificationVersion
-import com.personal.baton.brief.domain.SourceEvent
-import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventType
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -52,9 +50,7 @@ class BriefEventContractTest {
 
     @Test
     fun `이벤트 v2 종류는 도메인과 Schema와 예시에 모두 일치한다`() {
-        val domainEventTypes = SourceEventType.entries
-            .filter { SourceEvent.isReceivable(2, it, SourceEventSeverity.CRITICAL) }
-            .mapTo(mutableSetOf(), SourceEventType::name)
+        val domainEventTypes = SourceEventType.entries.mapTo(mutableSetOf(), SourceEventType::name)
         val schemaEventTypes = SCHEMA_DOCUMENT
             .path("properties")
             .path("eventType")

@@ -712,7 +712,7 @@ class JdbcBriefPersistenceAdapter(
                     "ruleVersion" to item.ruleVersion,
                     "aggregateRevision" to item.aggregateRevision,
                     "revisionGap" to item.revisionGap,
-                    "section" to checkNotNull(item.section).name,
+                    "section" to item.section.name,
                 )
             }.toTypedArray(),
         )
