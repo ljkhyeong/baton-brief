@@ -33,9 +33,7 @@ services:
 
   brief:
     image: "${BRIEF_STAGING_IMAGE:-baton-brief:staging}"
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     restart: unless-stopped
     init: true
     read_only: true

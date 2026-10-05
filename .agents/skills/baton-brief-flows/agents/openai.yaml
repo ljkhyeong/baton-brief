@@ -1,4 +1,4 @@
 interface:
   display_name: "BATON BRIEF 공통 설정"
-  short_description: "BRIEF 빌드·인증·스테이징·운영 설정 변경"
+  short_description: "BRIEF 빌드·인증·스테이징 설정 변경"
   default_prompt: "$baton-brief-flows를 사용해 BATON BRIEF 공통 설정과 실행 구성을 변경해 주세요."

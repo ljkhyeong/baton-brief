@@ -19,6 +19,8 @@ description: BATON BRIEF의 현재 관심 항목·리비전 판정·상태 전�
 - 전이·해소 근거: [상태 전이](../../../docs/PRD/0016_attention-item-transitions/spec.md),
   [주간 해소](../../../docs/PRD/0030_weekly-resolution-summary/spec.md)
 - [보존·재구축](../../../docs/PRD/0008_retention-rebuild-boundary/spec.md)
+- 조회 경로·응답 필드를 바꾸면 [HTTP API 스킬](../baton-brief-api-flows/SKILL.md), SQL·잠금을 바꾸면
+  [저장소 스킬](../baton-brief-persistence-flows/SKILL.md)을 함께 사용한다.
 
 ## 유지할 규칙
 

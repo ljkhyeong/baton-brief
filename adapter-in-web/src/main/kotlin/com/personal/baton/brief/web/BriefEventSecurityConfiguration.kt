@@ -14,12 +14,12 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 
 @ConfigurationProperties("brief.event-receiver")
 class BriefEventReceiverSecurityProperties(
-    @DefaultValue("false") val authenticationRequired: Boolean,
+    @DefaultValue("false") private val authenticationRequired: Boolean,
     @DefaultValue("") private val bearerToken: String,
     @DefaultValue("") private val previousBearerToken: String,
 ) {
-    fun acceptedBearerTokens(): List<String> =
-        acceptedBearerTokens(bearerToken, previousBearerToken, "BRIEF 이벤트 수신")
+    fun requiredBearerTokens(): List<String>? =
+        requiredBearerTokens(authenticationRequired, bearerToken, previousBearerToken, "BRIEF 이벤트 수신")
 }
 
 @Configuration(proxyBeanMethods = false)
@@ -31,29 +31,12 @@ class BriefEventSecurityConfiguration {
     fun eventIngestionSecurityFilterChain(
         http: HttpSecurity,
         properties: BriefEventReceiverSecurityProperties,
-    ): SecurityFilterChain {
-        http
-            .securityMatcher(EVENT_INGESTION)
-            .configureStatelessApi()
-
-        if (!properties.authenticationRequired) {
-            return http
-                .authorizeHttpRequests { it.anyRequest().permitAll() }
-                .build()
-        }
-
-        val authenticationManager = staticBearerAuthenticationManager(
-            properties.acceptedBearerTokens(),
-            "baton-event-producer",
-            "BRIEF 이벤트 수신 인증 정보가 올바르지 않습니다",
-        )
-        return http
-            .authorizeHttpRequests { it.anyRequest().authenticated() }
-            .oauth2ResourceServer {
-                it.authenticationManagerResolver { authenticationManager }
-            }
-            .build()
-    }
+    ): SecurityFilterChain = http.staticBearerFilterChain(
+        EVENT_INGESTION,
+        properties.requiredBearerTokens(),
+        "baton-event-producer",
+        "BRIEF 이벤트 수신 인증 정보가 올바르지 않습니다",
+    )
 
     private companion object {
         val EVENT_INGESTION = PathPatternRequestMatcher.pathPattern(

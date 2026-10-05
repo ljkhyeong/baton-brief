@@ -57,26 +57,20 @@ jobs:
       - name: 지표 설정과 경보 규칙 검증
         run: |
           prometheus_image="$(docker compose --env-file .env.staging.example -f compose.staging.yml -f compose.observability.yml config --format json | jq -r '.services.prometheus.image')"
-          docker run --rm --network none --entrypoint /bin/promtool \
-            --volume "$PWD/ops/prometheus:/etc/prometheus:ro" \
-            "$prometheus_image" check config /etc/prometheus/prometheus.yml
-          docker run --rm --network none --entrypoint /bin/promtool \
-            --volume "$PWD/ops/prometheus:/etc/prometheus:ro" --workdir /etc/prometheus \
-            "$prometheus_image" test rules alerts.test.yml
-          alertmanager_image='prom/alertmanager:v0.32.1@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286'
+          promtool=(docker run --rm --network none --entrypoint /bin/promtool
+            --volume "$PWD/ops/prometheus:/etc/prometheus:ro" --workdir /etc/prometheus "$prometheus_image")
+          "${promtool[@]}" check config /etc/prometheus/prometheus.yml
+          "${promtool[@]}" test rules alerts.test.yml
+          amtool=(docker run --rm --network none --entrypoint /bin/amtool
+            --volume "$PWD/ops/alertmanager:/etc/alertmanager:ro"
+            'prom/alertmanager:v0.32.1@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286')
           for channel in slack discord slack-discord; do
             config="/etc/alertmanager/brief-$channel.example.yml"
-            docker run --rm --network none --entrypoint /bin/amtool \
-              --volume "$PWD/ops/alertmanager:/etc/alertmanager:ro" \
-              "$alertmanager_image" check-config "$config"
-            for service in brief relay; do
-              receiver=unmatched
-              if [ "$service" = brief ]; then receiver="brief-$channel"; fi
-              docker run --rm --network none --entrypoint /bin/amtool \
-                --volume "$PWD/ops/alertmanager:/etc/alertmanager:ro" \
-                "$alertmanager_image" config routes test --config.file="$config" \
-                --verify.receivers="$receiver" "service=$service" alertname=BriefServerErrors
-            done
+            "${amtool[@]}" check-config "$config"
+            "${amtool[@]}" config routes test --config.file="$config" \
+              --verify.receivers="brief-$channel" service=brief alertname=BriefServerErrors
+            "${amtool[@]}" config routes test --config.file="$config" \
+              --verify.receivers=unmatched service=relay alertname=BriefServerErrors
           done
           bash -n ops/backup-postgresql.sh
           bash -n ops/verify-postgresql-backup.sh
@@ -201,6 +195,23 @@ jobs:
               --resolve 'brief-service:8443:127.0.0.1' \
               "$@"
           }
+          public_curl() {
+            curl --silent --show-error --connect-timeout 5 --max-time 10 \
+              --cacert "$staging_dir/root.crt" \
+              --resolve 'localhost:38443:127.0.0.1' \
+              "$@"
+          }
+          http_status() {
+            "$@" --output /dev/null --write-out '%{http_code}'
+          }
+          assert_two_internal_networks() {
+            local networks
+            test "$(docker inspect "$1" | jq '.[0].NetworkSettings.Networks | length')" = "2"
+            networks="$(docker inspect "$1" | jq --raw-output '.[0].NetworkSettings.Networks | keys[]')"
+            while IFS= read -r network; do
+              test "$(docker network inspect --format '{{.Internal}}' "$network")" = "true"
+            done <<< "$networks"
+          }
           test -z "$(docker port "$brief_id")"
           test -z "$(docker port "$service_api_id")"
           test "$(docker inspect --format '{{.State.Status}}' "$service_api_id")" = "running"
@@ -210,17 +221,7 @@ jobs:
           docker inspect "$brief_id" | jq --exit-status \
             '.[0].HostConfig.ReadonlyRootfs == true and .[0].HostConfig.CapDrop == ["ALL"]'
 
-          test "$(
-            docker inspect "$brief_id" \
-              | jq '.[0].NetworkSettings.Networks | length'
-          )" = "2"
-          brief_networks="$(
-            docker inspect "$brief_id" \
-              | jq --raw-output '.[0].NetworkSettings.Networks | keys[]'
-          )"
-          while IFS= read -r network; do
-            test "$(docker network inspect --format '{{.Internal}}' "$network")" = "true"
-          done <<< "$brief_networks"
+          assert_two_internal_networks "$brief_id"
 
           docker inspect "$https_id" | jq --exit-status \
             '.[0].HostConfig.ReadonlyRootfs == true
@@ -236,17 +237,7 @@ jobs:
              and .[0].HostConfig.LogConfig.Type == "json-file"
              and .[0].HostConfig.LogConfig.Config["max-size"] == "10m"
              and .[0].HostConfig.LogConfig.Config["max-file"] == "3"'
-          test "$(
-            docker inspect "$service_api_id" \
-              | jq '.[0].NetworkSettings.Networks | length'
-          )" = "2"
-          service_api_networks="$(
-            docker inspect "$service_api_id" \
-              | jq --raw-output '.[0].NetworkSettings.Networks | keys[]'
-          )"
-          while IFS= read -r network; do
-            test "$(docker network inspect --format '{{.Internal}}' "$network")" = "true"
-          done <<< "$service_api_networks"
+          assert_two_internal_networks "$service_api_id"
 
           for _attempt in $(seq 1 30); do
             if docker cp \
@@ -258,23 +249,12 @@ jobs:
           done
           test -s "$staging_dir/root.crt"
 
-          unauthenticated_status="$(
-            curl --silent --show-error --connect-timeout 5 --max-time 10 \
-              --cacert "$staging_dir/root.crt" \
-              --resolve 'localhost:38443:127.0.0.1' \
-              --header 'Content-Type: application/json' \
-              --data-binary '@contracts/examples/role-unassigned.active-r1-critical.json' \
-              --output /dev/null \
-              --write-out '%{http_code}' \
-              https://localhost:38443/api/v1/events
-          )"
-          test "$unauthenticated_status" = "401"
+          test "$(http_status public_curl --header 'Content-Type: application/json' \
+            --data-binary '@contracts/examples/role-unassigned.active-r1-critical.json' \
+            https://localhost:38443/api/v1/events)" = "401"
 
           authenticated_status="$(
-            curl --silent --show-error --connect-timeout 5 --max-time 10 \
-              --cacert "$staging_dir/root.crt" \
-              --resolve 'localhost:38443:127.0.0.1' \
-              --header 'Content-Type: application/json' \
+            public_curl --header 'Content-Type: application/json' \
               --header "Authorization: Bearer $event_token" \
               --data-binary '@contracts/examples/role-unassigned.active-r1-critical.json' \
               --output "$staging_dir/event-response.json" \
@@ -302,15 +282,7 @@ jobs:
             exit 1
           fi
 
-          health_status="$(
-            curl --silent --show-error --connect-timeout 5 --max-time 10 \
-              --cacert "$staging_dir/root.crt" \
-              --resolve 'localhost:38443:127.0.0.1' \
-              --output /dev/null \
-              --write-out '%{http_code}' \
-              https://localhost:38443/actuator/health
-          )"
-          test "$health_status" = "404"
+          test "$(http_status public_curl https://localhost:38443/actuator/health)" = "404"
 
           service_response="$(
             service_api_curl --fail \
@@ -327,22 +299,9 @@ jobs:
           )"
           jq --exit-status '.highCount == 1 and .mediumCount == 0 and .revisionGapCount == 0' <<< "$summary_response"
 
-          public_summary_status="$(
-            curl --silent --show-error --connect-timeout 5 --max-time 10 \
-              --cacert "$staging_dir/root.crt" \
-              --resolve 'localhost:38443:127.0.0.1' \
-              --header "Authorization: Bearer $service_token" \
-              --output /dev/null --write-out '%{http_code}' \
-              "https://localhost:38443$summary_path"
-          )"
-          test "$public_summary_status" = "404"
-
-          service_unauthenticated_status="$(
-            service_api_curl \
-              --output /dev/null --write-out '%{http_code}' \
-              "https://brief-service:8443$summary_path"
-          )"
-          test "$service_unauthenticated_status" = "401"
+          test "$(http_status public_curl --header "Authorization: Bearer $service_token" \
+            "https://localhost:38443$summary_path")" = "404"
+          test "$(http_status service_api_curl "https://brief-service:8443$summary_path")" = "401"
 
           resolutions_path="${summary_path%/summary}/resolutions?weekStart=2026-08-24&zoneId=Asia/Seoul"
           resolutions_response="$(
@@ -350,43 +309,25 @@ jobs:
               "https://brief-service:8443$resolutions_path"
           )"
           jq --exit-status '.resolvedCount == 0 and .weekStart == "2026-08-24"' <<< "$resolutions_response"
-          test "$(service_api_curl --output /dev/null --write-out '%{http_code}' \
-            "https://brief-service:8443$resolutions_path")" = "401"
-          test "$(curl --silent --show-error --connect-timeout 5 --max-time 10 \
-            --cacert "$staging_dir/root.crt" --resolve 'localhost:38443:127.0.0.1' \
-            --header "Authorization: Bearer $service_token" --output /dev/null --write-out '%{http_code}' \
+          test "$(http_status service_api_curl "https://brief-service:8443$resolutions_path")" = "401"
+          test "$(http_status public_curl --header "Authorization: Bearer $service_token" \
             "https://localhost:38443$resolutions_path")" = "404"
-
-          service_health_status="$(
-            service_api_curl \
-              --header="Authorization: Bearer $service_token" \
-              --output /dev/null --write-out '%{http_code}' \
-              'https://brief-service:8443/actuator/health'
-          )"
-          test "$service_health_status" = "404"
+          test "$(http_status service_api_curl --header="Authorization: Bearer $service_token" \
+            'https://brief-service:8443/actuator/health')" = "404"
 
           # 로그 수집 실패는 즉시 중단하고 grep의 조기 종료와 분리한다.
           brief_logs="$(docker logs "$brief_id" 2>&1)"
           https_logs="$(docker logs "$https_id" 2>&1)"
           service_api_logs="$(docker logs "$service_api_id" 2>&1)"
 
-          if grep --fixed-strings --quiet "$event_token" <<< "$brief_logs"; then
-            echo "BRIEF 로그에 Bearer token이 노출됐습니다." >&2
-            exit 1
-          fi
-          if grep --fixed-strings --quiet "$event_token" <<< "$https_logs"; then
-            echo "Caddy 로그에 Bearer token이 노출됐습니다." >&2
-            exit 1
-          fi
-          if grep --fixed-strings --quiet "$service_token" <<< "$brief_logs"; then
-            echo "BRIEF 로그에 서비스 API Bearer token이 노출됐습니다." >&2
-            exit 1
-          fi
-          if grep --fixed-strings --quiet "$service_token" <<< "$https_logs"; then
-            echo "공개 Caddy 로그에 서비스 API Bearer token이 노출됐습니다." >&2
-            exit 1
-          fi
-          if grep --fixed-strings --quiet "$service_token" <<< "$service_api_logs"; then
-            echo "서비스 Caddy 로그에 Bearer token이 노출됐습니다." >&2
-            exit 1
-          fi
+          assert_token_absent() {
+            if grep --fixed-strings --quiet "$1" <<< "$2"; then
+              echo "$3" >&2
+              exit 1
+            fi
+          }
+          assert_token_absent "$event_token" "$brief_logs" "BRIEF 로그에 Bearer token이 노출됐습니다."
+          assert_token_absent "$event_token" "$https_logs" "Caddy 로그에 Bearer token이 노출됐습니다."
+          assert_token_absent "$service_token" "$brief_logs" "BRIEF 로그에 서비스 API Bearer token이 노출됐습니다."
+          assert_token_absent "$service_token" "$https_logs" "공개 Caddy 로그에 서비스 API Bearer token이 노출됐습니다."
+          assert_token_absent "$service_token" "$service_api_logs" "서비스 Caddy 로그에 Bearer token이 노출됐습니다."

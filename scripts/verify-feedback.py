@@ -46,6 +46,8 @@ def check_files(paths, allow_deleted=False):
                 tomllib.loads(path.read_text())
             elif path.suffix == ".json":
                 json.loads(path.read_text(), parse_constant=reject_json_constant)
+        elif path.is_symlink() and not path.exists():
+            raise ValueError(f"링크 대상이 없습니다: {name}")
         elif not path.exists() and not allow_deleted:
             run("git", "ls-files", "--error-unmatch", "--", name, capture=True)
 
@@ -83,7 +85,11 @@ def main():
         if untracked:
             print("새 파일:", flush=True)
         for path in untracked:
-            run("git", "diff", "--no-index", "--no-color", "--", "/dev/null", path, allowed=(0, 1))
+            if (ROOT / path).is_symlink():
+                # no-index는 디렉터리 링크를 따라가 비교하지 못하므로 링크 대상을 그대로 출력한다.
+                print(f"새 링크: {path} -> {(ROOT / path).readlink()}", flush=True)
+            else:
+                run("git", "diff", "--no-index", "--no-color", "--", "/dev/null", path, allowed=(0, 1))
         paths = (git_paths("diff", "--name-only", "--no-renames", base)
                  + git_paths("diff", "--cached", "--name-only", "--no-renames") + untracked)
 

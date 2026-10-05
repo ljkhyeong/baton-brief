@@ -22,14 +22,13 @@ class BriefService(
 ) : BriefUseCases, BriefQueries by persistence {
     override fun ingest(event: SourceEvent): IngestResult {
         val normalizedEvent = event.copy(occurredAt = event.occurredAt.truncatedTo(ChronoUnit.MICROS))
-        val currentTimestamp = { clock.instant().truncatedTo(ChronoUnit.MICROS) }
-        val receivedAt = currentTimestamp()
+        val receivedAt = now()
         val fingerprint = fingerprint(normalizedEvent)
         if (!normalizedEvent.isSupported) {
-            return persistence.recordUnsupported(normalizedEvent, fingerprint, receivedAt, currentTimestamp)
+            return persistence.recordUnsupported(normalizedEvent, fingerprint, receivedAt, ::now)
         }
 
-        return persistence.processEvent(normalizedEvent, fingerprint, receivedAt, currentTimestamp) { current ->
+        return persistence.processEvent(normalizedEvent, fingerprint, receivedAt, ::now) { current ->
             AttentionProjector.project(normalizedEvent, current)
         }
     }
@@ -39,22 +38,12 @@ class BriefService(
         after: AttentionItemCursor?,
         limit: Int,
         eventType: SourceEventType?,
-    ): WeeklyResolutionSummary = persistence.findWeeklyResolutions(
-        command.workspaceId, command.seasonId, WeeklyWindow.startingOn(command.weekStart, command.zoneId),
-        clock.instant().truncatedTo(ChronoUnit.MICROS), after, limit, eventType,
-    )
+    ): WeeklyResolutionSummary = persistence.findWeeklyResolutions(command, now(), after, limit, eventType)
 
     override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)
 
-    override fun generateEdition(command: GenerateEditionCommand): EditionResult {
-        val window = WeeklyWindow.startingOn(command.weekStart, command.zoneId)
-        return persistence.createEdition(
-            command,
-            window,
-            { clock.instant().truncatedTo(ChronoUnit.MICROS) },
-            { selectEditionContent(it, window) },
-        )
-    }
+    override fun generateEdition(command: GenerateEditionCommand): EditionResult =
+        persistence.createEdition(command, ::now) { selectEditionContent(it, command.window) }
 
     override fun compareEditions(
         baseEditionId: UUID,
@@ -66,13 +55,12 @@ class BriefService(
             return EditionComparisonResult.ScopeMismatch
         }
 
-        val baseItemsByKey = base.items.associateBy { it.reasonCode to it.sourceReference }
-        val targetItemsByKey = target.items.associateBy { it.reasonCode to it.sourceReference }
-        val added = target.items.filter { (it.reasonCode to it.sourceReference) !in baseItemsByKey }
-        val removed = base.items.filter { (it.reasonCode to it.sourceReference) !in targetItemsByKey }
+        val baseItemsByKey = base.items.associateBy { it.comparisonKey }
+        val targetItemsByKey = target.items.associateBy { it.comparisonKey }
+        val added = target.items.filter { it.comparisonKey !in baseItemsByKey }
+        val removed = base.items.filter { it.comparisonKey !in targetItemsByKey }
         val changed = target.items.mapNotNull { after ->
-            val before = baseItemsByKey[after.reasonCode to after.sourceReference] ?: return@mapNotNull null
-            if (before == after) null else EditionItemChange(before, after)
+            baseItemsByKey[after.comparisonKey]?.takeIf { it != after }?.let { EditionItemChange(it, after) }
         }
 
         return EditionComparisonResult.Found(
@@ -85,6 +73,11 @@ class BriefService(
             ),
         )
     }
+
+    private fun now() = clock.instant().truncatedTo(ChronoUnit.MICROS)
+
+    private val BriefEditionItem.comparisonKey
+        get() = reasonCode to sourceReference
 
     private fun selectEditionContent(items: List<AttentionItem>, window: WeeklyWindow): EditionContent {
         val selected = items

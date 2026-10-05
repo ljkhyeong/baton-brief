@@ -1,6 +1,6 @@
 ---
 name: baton-brief-documentation-flows
-description: BATON BRIEF의 문서·AGENTS.md·로컬 스킬을 수정할 때 사용한다. 기준 문서, 현재 검증 상태와 링크를 정리한다.
+description: BATON BRIEF의 문서·AGENTS.md·CLAUDE.md·로컬 스킬을 수정할 때 사용한다. 기준 문서, 현재 검증 상태와 링크를 정리한다.
 ---
 
 # BATON BRIEF 문서 관리
@@ -13,6 +13,9 @@ description: BATON BRIEF의 문서·AGENTS.md·로컬 스킬을 수정할 때 �
   미검증 범위·다음 작업을 갱신한다. 완료 기능·과거 실행 목록은 복제하지 않고 Git 이력에 보존한다.
 - `AGENTS.md`에는 공통 작업 규칙, 스킬에는 작업별 주의점과 관련 문서 경로를 둔다.
   버전·완료 이력·범용 개발 조언을 반복하지 않는다.
+- `CLAUDE.md`는 `@AGENTS.md` import와 Claude Code에만 다른 점을 둔다. 스킬 원본은 `.agents/skills/<이름>`,
+  `.claude/skills/<이름>`은 원본을 가리키는 상대 심볼릭 링크다. 스킬을 추가·이름 변경·삭제하면 링크와
+  AGENTS.md 표를 함께 맞춘다.
 - 계약 버전의 기준은 `contracts/VERSION`이다. 안내문에는 `<VERSION>`을 사용하고
   실제 JSON 계약 데이터의 버전은 그대로 둔다.
 
@@ -25,5 +28,6 @@ description: BATON BRIEF의 문서·AGENTS.md·로컬 스킬을 수정할 때 �
 - 지시는 실제 작업 판단에 필요한 내용만 남긴다. 사용자 요청보다 앞서는 권고, 근거 없는
   승인 단계, 무조건 전체 테스트·전체 문서 읽기와 중복 규칙을 제거한다.
 - 수정한 링크·경로와 `git diff --check`를 확인한다. 스킬은 frontmatter·참조 경로·
-  `agents/openai.yaml`의 설명과 기본 요청이 실제 범위에 맞는지도 확인한다.
+  `agents/openai.yaml`의 설명과 기본 요청이 실제 범위에 맞는지도 확인한다. 공유 SKILL.md에는 공식
+  `quick_validate.py`가 허용하지 않는 Claude Code 전용 frontmatter를 넣지 않는다.
 - 계약 ZIP에 포함되는 문서나 링크를 바꾼 경우에만 `contractsZip`을 생성해 ZIP 내부 경로를 확인한다.

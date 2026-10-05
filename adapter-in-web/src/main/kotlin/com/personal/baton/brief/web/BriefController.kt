@@ -15,7 +15,6 @@ import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.Severity
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
-import com.personal.baton.brief.domain.WeeklyWindow
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
@@ -109,7 +108,7 @@ class BriefController(
     fun findAttentionItems(
         @PathVariable("workspaceId") workspaceId: UUID,
         @PathVariable("seasonId") seasonId: UUID,
-        @Valid @ModelAttribute request: AttentionItemCursorRequest,
+        @Valid @ModelAttribute cursor: AttentionItemCursorRequest,
         @RequestParam("status", defaultValue = "ACTIVE") status: SourceEventState,
         @RequestParam("eventType", required = false) eventType: SourceEventType?,
         @RequestParam("severity", required = false) severity: Severity?,
@@ -123,7 +122,7 @@ class BriefController(
             eventType,
             severity,
             revisionGap,
-            request.toCursor(),
+            cursor.toCursor(),
             limit,
         ),
     )
@@ -176,12 +175,12 @@ class BriefController(
         @Valid @RequestBody request: EditionWeekRequest,
     ): ResponseEntity<BriefEditionResponse> {
         val result = brief.generateEdition(request.toCommand(workspaceId, seasonId))
-        val response = if (result.created) {
+        val builder = if (result.created) {
             ResponseEntity.created(URI.create("/api/v1/editions/${result.edition.editionId}"))
         } else {
             ResponseEntity.ok()
         }
-        return result.edition.toResponse(response)
+        return result.edition.toResponse(builder)
     }
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest")
@@ -190,7 +189,7 @@ class BriefController(
         @PathVariable("seasonId") seasonId: UUID,
     ): ResponseEntity<BriefEditionResponse> = brief.findLatestEdition(workspaceId, seasonId)
         ?.toResponse()
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
+        ?: editionNotFound()
 
     @GetMapping("/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest")
     fun findLatestEditionForWeek(
@@ -200,7 +199,7 @@ class BriefController(
     ): ResponseEntity<BriefEditionResponse> =
         brief.findLatestEditionForWeek(request.toCommand(workspaceId, seasonId))
             ?.toResponse()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
+            ?: editionNotFound()
 
     @GetMapping(
         "/workspaces/{workspaceId}/seasons/{seasonId}/editions",
@@ -223,23 +222,20 @@ class BriefController(
         @Valid @ModelAttribute request: EditionWeekRequest,
         @RequestParam("beforeGeneration", required = false) @Positive beforeGeneration: Long?,
         @RequestParam("limit", defaultValue = "20") @Min(1) @Max(100) limit: Int,
-    ): EditionHistoryResult {
-        val command = request.toCommand(workspaceId, seasonId)
-        return brief.findEditionHistory(
-            workspaceId,
-            seasonId,
-            beforeGeneration,
-            limit,
-            WeeklyWindow.startingOn(command.weekStart, command.zoneId),
-        )
-    }
+    ): EditionHistoryResult = brief.findEditionHistory(
+        workspaceId,
+        seasonId,
+        beforeGeneration,
+        limit,
+        request.toCommand(workspaceId, seasonId).window,
+    )
 
     @GetMapping("/editions/{editionId}")
     fun findEdition(
         @PathVariable("editionId") editionId: UUID,
     ): ResponseEntity<BriefEditionResponse> = brief.findEdition(editionId)
         ?.toResponse()
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
+        ?: editionNotFound()
 
     @GetMapping("/editions/{targetEditionId}/changes")
     fun compareEditions(
@@ -249,14 +245,16 @@ class BriefController(
         is EditionComparisonResult.Found -> ResponseEntity.ok()
             .eTag("brief-edition-comparison-v1-$fromEditionId-$targetEditionId")
             .body(result.comparison)
-        EditionComparisonResult.NotFound ->
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
+        EditionComparisonResult.NotFound -> editionNotFound()
         EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(
             HttpStatus.BAD_REQUEST,
             "브리프는 같은 작업공간과 시즌에 속해야 합니다",
         )
     }
 }
+
+private fun editionNotFound(): Nothing =
+    throw ResponseStatusException(HttpStatus.NOT_FOUND, "브리프를 찾을 수 없습니다")
 
 private fun BriefEdition.toResponse(
     builder: ResponseEntity.BodyBuilder = ResponseEntity.ok(),

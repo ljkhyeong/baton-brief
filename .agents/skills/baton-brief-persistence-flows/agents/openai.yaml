@@ -1,0 +1,4 @@
+interface:
+  display_name: "BATON BRIEF 저장소"
+  short_description: "BRIEF Flyway·JDBC 쿼리·잠금·트랜잭션 변경"
+  default_prompt: "$baton-brief-persistence-flows를 사용해 BATON BRIEF 저장 구조와 마이그레이션을 변경해 주세요."

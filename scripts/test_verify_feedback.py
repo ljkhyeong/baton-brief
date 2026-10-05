@@ -92,6 +92,20 @@ class FeedbackTest(unittest.TestCase):
         self.assertIn("스테이징 내용", result.stdout)
         self.assertIn(".gitignore", result.stdout)
 
+    def test_final_shows_new_directory_link_target_and_rejects_broken_link(self):
+        self.write("skills/example/SKILL.md", "스킬\n")
+        (self.root / "links").mkdir()
+        (self.root / "links/example").symlink_to("../skills/example")
+        result = self.verify("final", self.base)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("새 링크: links/example -> ../skills/example", result.stdout)
+        self.assertNotIn("Could not access", result.stderr)
+
+        (self.root / "links/missing").symlink_to("../skills/missing")
+        result = self.verify("final", self.base)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("링크 대상이 없습니다: links/missing", result.stderr)
+
     def test_invalid_file_or_base_stops_before_gradle(self):
         self.write("broken.sh", "if true; then\n")
         self.write("spaces.md", "문장  \n")

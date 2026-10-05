@@ -53,7 +53,7 @@ class JdbcBriefPersistenceAdapter(
         receivedAt: Instant,
         conflictDetectedAt: () -> Instant,
     ): IngestResult {
-        lockExclusive("event:${event.eventId}")
+        lock("event:${event.eventId}")
         findExistingEventResult(
             event.eventId,
             fingerprint,
@@ -73,8 +73,8 @@ class JdbcBriefPersistenceAdapter(
         conflictDetectedAt: () -> Instant,
         project: (AttentionItem?) -> ProjectionDecision,
     ): IngestResult {
-        lockShared(PROJECTION_LOCK)
-        lockExclusive("event:${event.eventId}")
+        lock(PROJECTION_LOCK, shared = true)
+        lock("event:${event.eventId}")
         findExistingEventResult(
             event.eventId,
             fingerprint,
@@ -82,9 +82,7 @@ class JdbcBriefPersistenceAdapter(
             conflictDetectedAt,
         )?.let { return it }
 
-        lockExclusive(
-            "attention:${event.workspaceId}:${event.seasonId}:${event.eventType.name}:${event.sourceReference}",
-        )
+        lock("attention:${event.workspaceId}:${event.seasonId}:${event.eventType.name}:${event.sourceReference}")
         val current = findAttentionItem(
             event.workspaceId,
             event.seasonId,
@@ -98,11 +96,7 @@ class JdbcBriefPersistenceAdapter(
             }
 
             is ProjectionDecision.Applied -> {
-                val status = if (decision.hasRevisionGap) {
-                    IngestStatus.APPLIED_WITH_GAP
-                } else {
-                    IngestStatus.APPLIED
-                }
+                val status = if (decision.hasRevisionGap) IngestStatus.APPLIED_WITH_GAP else IngestStatus.APPLIED
                 insertReceipt(event, fingerprint, status, receivedAt)
                 jdbc.sql(UPSERT_ATTENTION).params(decision.item.jdbcParameters()).update()
                 IngestResult(event.eventId, status, decision.item)
@@ -126,12 +120,9 @@ class JdbcBriefPersistenceAdapter(
         beforeIngestionSequence: Long?,
         limit: Int,
     ): EventReceiptAnomalyResult {
-        val beforeClause = if (beforeIngestionSequence == null) {
-            ""
-        } else {
+        val beforeClause = if (beforeIngestionSequence == null) "" else
             "AND receipt.ingestion_sequence < :beforeIngestionSequence"
-        }
-        val fetched = jdbc.sql(
+        val (receipts, next) = jdbc.sql(
             """
             $SOURCE_EVENT_RECEIPT_SELECT
              WHERE receipt.workspace_id = :workspaceId
@@ -150,12 +141,8 @@ class JdbcBriefPersistenceAdapter(
             .param("fetchLimit", limit + 1)
             .query(SOURCE_EVENT_RECEIPT_MAPPER)
             .list()
-        val hasNextPage = fetched.size > limit
-        val receipts = fetched.take(limit)
-        return EventReceiptAnomalyResult(
-            receipts = receipts,
-            nextBeforeIngestionSequence = if (hasNextPage) receipts.last().ingestionSequence else null,
-        )
+            .toPage(limit) { it.ingestionSequence }
+        return EventReceiptAnomalyResult(receipts, next)
     }
 
     override fun findAttentionItem(
@@ -171,14 +158,13 @@ class JdbcBriefPersistenceAdapter(
            AND event_type = :eventType
            AND source_reference = :sourceReference
         """.trimIndent(),
-    ).params(
-        mapOf(
-            "workspaceId" to workspaceId,
-            "seasonId" to seasonId,
-            "eventType" to eventType.name,
-            "sourceReference" to sourceReference,
-        ),
-    ).query(ATTENTION_ITEM_MAPPER).optional().getOrNull()
+    ).param("workspaceId", workspaceId)
+        .param("seasonId", seasonId)
+        .param("eventType", eventType.name)
+        .param("sourceReference", sourceReference)
+        .query(ATTENTION_ITEM_MAPPER)
+        .optional()
+        .getOrNull()
 
     override fun findAttentionItems(
         workspaceId: UUID,
@@ -205,7 +191,7 @@ class JdbcBriefPersistenceAdapter(
             }
         }.joinToString("\n")
 
-        val fetched = jdbc.sql(
+        val (items, next) = jdbc.sql(
             """
             $ATTENTION_ITEM_SELECT
              WHERE workspace_id = :workspaceId
@@ -226,15 +212,8 @@ class JdbcBriefPersistenceAdapter(
             .param("fetchLimit", limit + 1)
             .query(ATTENTION_ITEM_MAPPER)
             .list()
-        val items = fetched.take(limit)
-        return CurrentAttentionItemPage(
-            items = items,
-            nextCursor = if (fetched.size > limit) {
-                items.last().let { AttentionItemCursor(it.eventType, it.sourceReference) }
-            } else {
-                null
-            },
-        )
+            .toPage(limit) { AttentionItemCursor(it.eventType, it.sourceReference) }
+        return CurrentAttentionItemPage(items, next)
     }
 
     override fun findAttentionItemSummary(
@@ -259,14 +238,13 @@ class JdbcBriefPersistenceAdapter(
         .single()
 
     override fun findWeeklyResolutions(
-        workspaceId: UUID,
-        seasonId: UUID,
-        window: WeeklyWindow,
+        command: GenerateEditionCommand,
         evaluatedAt: Instant,
         after: AttentionItemCursor?,
         limit: Int,
         eventType: SourceEventType?,
     ): WeeklyResolutionSummary {
+        val window = command.window
         val afterClause = if (after == null) "" else
             "WHERE (reason_code, source_reference) > (:afterEventType, :afterSourceReference)"
         val rows = jdbc.sql(
@@ -306,8 +284,8 @@ class JdbcBriefPersistenceAdapter(
           ) page ON TRUE
          ORDER BY page.reason_code, page.source_reference
             """.trimIndent(),
-        ).param("workspaceId", workspaceId)
-            .param("seasonId", seasonId)
+        ).param("workspaceId", command.workspaceId)
+            .param("seasonId", command.seasonId)
             .param("windowStart", window.start.jdbcValue())
             .param("windowEnd", window.end.jdbcValue())
             .param("evaluatedAt", evaluatedAt.jdbcValue())
@@ -320,12 +298,12 @@ class JdbcBriefPersistenceAdapter(
                     RESOLUTION_ITEM_MAPPER.mapRow(result, rowNumber)
                 }
             }.list()
-        val candidates = rows.mapNotNull { it.second }
-        val items = candidates.take(limit)
+        // 건수는 모든 행에 같은 값으로 붙고, 빈 페이지에서도 LEFT JOIN으로 한 행이 남는다.
+        val resolvedCount = rows.first().first
+        val (items, next) = rows.mapNotNull { (_, item) -> item }
+            .toPage(limit) { AttentionItemCursor(it.reasonCode, it.sourceReference) }
         return WeeklyResolutionSummary(
-            window.weekStart, window.zoneId, window.start, window.end, evaluatedAt,
-            rows.first().first, items,
-            if (candidates.size > limit) items.last().let { AttentionItemCursor(it.reasonCode, it.sourceReference) } else null,
+            window.weekStart, window.zoneId, window.start, window.end, evaluatedAt, resolvedCount, items, next,
         )
     }
 
@@ -337,12 +315,9 @@ class JdbcBriefPersistenceAdapter(
         beforeAggregateRevision: Long?,
         limit: Int,
     ): AttentionItemTransitionHistory {
-        val beforeClause = if (beforeAggregateRevision == null) {
-            ""
-        } else {
+        val beforeClause = if (beforeAggregateRevision == null) "" else
             "AND aggregate_revision < :beforeAggregateRevision"
-        }
-        val fetched = jdbc.sql(
+        val (transitions, next) = jdbc.sql(
             """
             SELECT event_id, aggregate_revision, event_state AS state, occurred_at AS observed_at,
                    processing_outcome = 'APPLIED_WITH_GAP' AS detected_revision_gap, source_severity
@@ -364,22 +339,15 @@ class JdbcBriefPersistenceAdapter(
             .param("fetchLimit", limit + 1)
             .query(ATTENTION_ITEM_TRANSITION_MAPPER)
             .list()
-        val transitions = fetched.take(limit)
-        return AttentionItemTransitionHistory(
-            transitions = transitions,
-            nextBeforeAggregateRevision = if (fetched.size > limit) {
-                transitions.last().aggregateRevision
-            } else {
-                null
-            },
-        )
+            .toPage(limit) { it.aggregateRevision }
+        return AttentionItemTransitionHistory(transitions, next)
     }
 
     @Transactional
     override fun rebuild(
         project: (SourceEvent, AttentionItem?) -> ProjectionDecision,
     ): RebuildResult {
-        lockExclusive(PROJECTION_LOCK)
+        lock(PROJECTION_LOCK)
         val current = linkedMapOf<EventIdentity, AttentionItem>()
         var receiptCount = 0
         jdbc.sql(
@@ -420,13 +388,12 @@ class JdbcBriefPersistenceAdapter(
     @Transactional
     override fun createEdition(
         command: GenerateEditionCommand,
-        window: WeeklyWindow,
         currentTime: () -> Instant,
         selectContent: (List<AttentionItem>) -> EditionContent,
     ): EditionResult {
-        lockExclusive(PROJECTION_LOCK)
+        lock(PROJECTION_LOCK)
 
-        val candidates = findAttentionForWindow(command, window)
+        val candidates = findAttentionForWindow(command)
         val content = selectContent(candidates)
         findLatestEditionByState(command, content.stateFingerprint)?.let { existing ->
             return EditionResult(existing, created = false)
@@ -440,7 +407,7 @@ class JdbcBriefPersistenceAdapter(
             workspaceId = command.workspaceId,
             seasonId = command.seasonId,
             generation = generation,
-            window = window,
+            window = command.window,
             ruleVersion = BriefEdition.RULE_VERSION,
             sourceCursor = sourceCursor,
             generatedAt = generatedAt,
@@ -488,17 +455,10 @@ class JdbcBriefPersistenceAdapter(
         limit: Int,
         window: WeeklyWindow?,
     ): EditionHistoryResult {
-        val beforeClause = if (beforeGeneration == null) {
-            ""
-        } else {
-            "AND edition.generation < :beforeGeneration"
-        }
-        val weekClause = if (window == null) {
-            ""
-        } else {
+        val beforeClause = if (beforeGeneration == null) "" else "AND edition.generation < :beforeGeneration"
+        val weekClause = if (window == null) "" else
             "AND edition.week_start = :weekStart AND edition.zone_id = :zoneId"
-        }
-        val summaries = jdbc.sql(
+        val (editions, next) = jdbc.sql(
             """
             SELECT edition.edition_id, edition.generation, edition.week_start, edition.zone_id,
                    edition.generated_at, edition.source_cursor, edition.rule_version,
@@ -523,20 +483,9 @@ class JdbcBriefPersistenceAdapter(
             .param("fetchLimit", limit + 1)
             .query(EDITION_SUMMARY_MAPPER)
             .list()
-        val hasNextPage = summaries.size > limit
-        val editions = summaries.take(limit)
-        return EditionHistoryResult(
-            editions = editions,
-            nextBeforeGeneration = if (hasNextPage) editions.last().generation else null,
-        )
+            .toPage(limit) { it.generation }
+        return EditionHistoryResult(editions, next)
     }
-
-    private fun findReceiptFingerprint(eventId: UUID): String? = jdbc.sql(
-        "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
-    ).param("eventId", eventId)
-        .query(String::class.java)
-        .optional()
-        .getOrNull()
 
     private fun findExistingEventResult(
         eventId: UUID,
@@ -544,7 +493,13 @@ class JdbcBriefPersistenceAdapter(
         replayStatus: IngestStatus,
         conflictDetectedAt: () -> Instant,
     ): IngestResult? {
-        val existingFingerprint = findReceiptFingerprint(eventId) ?: return null
+        val existingFingerprint = jdbc.sql(
+            "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
+        ).param("eventId", eventId)
+            .query(String::class.java)
+            .optional()
+            .getOrNull()
+            ?: return null
         if (existingFingerprint == fingerprint) {
             return IngestResult(eventId, replayStatus)
         }
@@ -600,19 +555,13 @@ class JdbcBriefPersistenceAdapter(
             VALUES (:eventId, :fingerprint, :detectedAt)
             ON CONFLICT (event_id) DO NOTHING
             """.trimIndent(),
-        ).params(
-            mapOf(
-                "eventId" to eventId,
-                "fingerprint" to fingerprint,
-                "detectedAt" to detectedAt.jdbcValue(),
-            ),
-        ).update()
+        ).param("eventId", eventId)
+            .param("fingerprint", fingerprint)
+            .param("detectedAt", detectedAt.jdbcValue())
+            .update()
     }
 
-    private fun findAttentionForWindow(
-        command: GenerateEditionCommand,
-        window: WeeklyWindow,
-    ): List<AttentionItem> = jdbc.sql(
+    private fun findAttentionForWindow(command: GenerateEditionCommand): List<AttentionItem> = jdbc.sql(
         """
         $ATTENTION_ITEM_SELECT
          WHERE workspace_id = :workspaceId
@@ -620,13 +569,11 @@ class JdbcBriefPersistenceAdapter(
            AND item_status = 'ACTIVE'
            AND observed_at < :windowEnd
         """.trimIndent(),
-    ).params(
-        mapOf(
-            "workspaceId" to command.workspaceId,
-            "seasonId" to command.seasonId,
-            "windowEnd" to window.end.jdbcValue(),
-        ),
-    ).query(ATTENTION_ITEM_MAPPER).list()
+    ).param("workspaceId", command.workspaceId)
+        .param("seasonId", command.seasonId)
+        .param("windowEnd", command.window.end.jdbcValue())
+        .query(ATTENTION_ITEM_MAPPER)
+        .list()
 
     private fun AttentionItem.jdbcParameters(): Map<String, Any> = mapOf(
         "workspaceId" to workspaceId,
@@ -649,12 +596,10 @@ class JdbcBriefPersistenceAdapter(
            AND season_id = :seasonId
            AND processing_outcome <> 'UNSUPPORTED'
         """.trimIndent(),
-    ).params(
-        mapOf(
-            "workspaceId" to command.workspaceId,
-            "seasonId" to command.seasonId,
-        ),
-    ).query(Long::class.java).single()
+    ).param("workspaceId", command.workspaceId)
+        .param("seasonId", command.seasonId)
+        .query(Long::class.java)
+        .single()
 
     private fun nextGeneration(command: GenerateEditionCommand): Long = jdbc.sql(
         """
@@ -662,7 +607,8 @@ class JdbcBriefPersistenceAdapter(
           FROM brief_edition
          WHERE workspace_id = :workspaceId AND season_id = :seasonId
         """.trimIndent(),
-    ).params(mapOf("workspaceId" to command.workspaceId, "seasonId" to command.seasonId))
+    ).param("workspaceId", command.workspaceId)
+        .param("seasonId", command.seasonId)
         .query(Long::class.java)
         .single()
 
@@ -772,7 +718,24 @@ class JdbcBriefPersistenceAdapter(
               $whereClause
             """.trimIndent(),
         ).params(parameters)
-            .query(::mapEditionWithoutItems)
+            .query { result, _ ->
+                BriefEdition(
+                    editionId = result.getObject("edition_id", UUID::class.java),
+                    workspaceId = result.getObject("workspace_id", UUID::class.java),
+                    seasonId = result.getObject("season_id", UUID::class.java),
+                    generation = result.getLong("generation"),
+                    window = WeeklyWindow(
+                        weekStart = result.getObject("week_start", LocalDate::class.java),
+                        zoneId = ZoneId.of(result.getString("zone_id")),
+                        start = result.instant("window_start"),
+                        end = result.instant("window_end"),
+                    ),
+                    ruleVersion = result.getInt("rule_version"),
+                    sourceCursor = result.getLong("source_cursor"),
+                    generatedAt = result.instant("generated_at"),
+                    items = emptyList(),
+                )
+            }
             .optional()
             .getOrNull()
             ?: return null
@@ -791,42 +754,12 @@ class JdbcBriefPersistenceAdapter(
         .query(EDITION_ITEM_MAPPER)
         .list()
 
-    private fun lockExclusive(key: String) {
-        jdbc.sql("SELECT pg_advisory_xact_lock(hashtextextended(:lockKey, 0))")
+    private fun lock(key: String, shared: Boolean = false) {
+        val function = if (shared) "pg_advisory_xact_lock_shared" else "pg_advisory_xact_lock"
+        jdbc.sql("SELECT $function(hashtextextended(:lockKey, 0))")
             .param("lockKey", key)
             .query()
             .singleValue()
-    }
-
-    private fun lockShared(key: String) {
-        jdbc.sql("SELECT pg_advisory_xact_lock_shared(hashtextextended(:lockKey, 0))")
-            .param("lockKey", key)
-            .query()
-            .singleValue()
-    }
-
-    private fun mapEditionWithoutItems(
-        result: ResultSet,
-        @Suppress("UNUSED_PARAMETER") rowNumber: Int,
-    ): BriefEdition {
-        val weekStart = result.getObject("week_start", LocalDate::class.java)
-        val zoneId = ZoneId.of(result.getString("zone_id"))
-        return BriefEdition(
-            editionId = result.getObject("edition_id", UUID::class.java),
-            workspaceId = result.getObject("workspace_id", UUID::class.java),
-            seasonId = result.getObject("season_id", UUID::class.java),
-            generation = result.getLong("generation"),
-            window = WeeklyWindow(
-                weekStart = weekStart,
-                zoneId = zoneId,
-                start = result.instant("window_start"),
-                end = result.instant("window_end"),
-            ),
-            ruleVersion = result.getInt("rule_version"),
-            sourceCursor = result.getLong("source_cursor"),
-            generatedAt = result.instant("generated_at"),
-            items = emptyList(),
-        )
     }
 
     private fun ResultSet.instant(column: String): Instant =
@@ -882,6 +815,12 @@ class JdbcBriefPersistenceAdapter(
               LEFT JOIN source_event_conflict conflict ON conflict.event_id = receipt.event_id
         """.trimIndent()
     }
+}
+
+/** `limit + 1`건을 조회한 결과를 현재 페이지와 다음 페이지 기준으로 나눈다. */
+private fun <T, C> List<T>.toPage(limit: Int, nextCursor: (T) -> C): Pair<List<T>, C?> {
+    val page = take(limit)
+    return page to if (size > limit) nextCursor(page.last()) else null
 }
 
 private class PostgresDataClassRowMapper<T : Any>(mappedClass: Class<T>) : DataClassRowMapper<T>(mappedClass) {

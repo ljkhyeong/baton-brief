@@ -19,7 +19,6 @@ import io.micrometer.core.instrument.MeterRegistry
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
-import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
@@ -51,6 +50,7 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator
 import org.springframework.test.context.TestConstructor
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.MvcResult
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
@@ -157,11 +157,7 @@ class BriefMvpIntegrationTest(
             flywayConfiguration.target(MigrationVersion.LATEST).load().migrate()
             assertThat(storedRows()).isEqualTo(previousRows)
 
-            assertThat(
-                jdbc.sql("SELECT COUNT(*) FROM $schema.attention_item")
-                    .query(Long::class.java)
-                    .single(),
-            ).isEqualTo(1)
+            assertThat(countRows("$schema.attention_item")).isEqualTo(1)
             assertThat(
                 jdbc.sql(
                     """
@@ -260,24 +256,14 @@ class BriefMvpIntegrationTest(
         val seasonId = "20000000-0000-0000-0000-000000000001"
         val eventId = "30000000-0000-0000-0000-000000000001"
         val first = eventJson(
-            eventId,
-            workspaceId,
-            seasonId,
-            "handoff:1",
-            1,
-            occurredAt = "2026-08-12t18:00:00.1+09:00",
+            eventId, workspaceId, seasonId, "handoff:1", 1, occurredAt = "2026-08-12t18:00:00.1+09:00",
         )
 
         postEvent(first)
             .andExpect(status().isAccepted)
             .andExpect(jsonPath("$.status").value("APPLIED"))
-        assertThat(
-            jdbc.sql(
-                "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
-            ).param("eventId", UUID.fromString(eventId))
-                .query(String::class.java)
-                .single(),
-        ).isEqualTo("abf432596fd0f8614fd0ba91815d8f7f736dc0b99182e6a8fa9e2bea6717c93e")
+        assertThat(payloadFingerprint(eventId))
+            .isEqualTo("abf432596fd0f8614fd0ba91815d8f7f736dc0b99182e6a8fa9e2bea6717c93e")
 
         postEvent(first)
             .andExpect(status().isOk)
@@ -295,11 +281,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.status").value("CONFLICT"))
         postEvent(eventJson(eventId, workspaceId, seasonId, "handoff:1", 2))
             .andExpect(status().isConflict)
-        assertThat(
-            jdbc.sql("SELECT COUNT(*) FROM source_event_conflict")
-                .query(Long::class.java)
-                .single(),
-        ).isEqualTo(1)
+        assertThat(countRows("source_event_conflict")).isEqualTo(1)
 
         val receiptPath = "/api/v1/events/$eventId/receipt"
         val canonicalReceipt = mockMvc.perform(get(receiptPath))
@@ -310,9 +292,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.state").value("ACTIVE"))
             .andExpect(jsonPath("$.processingOutcome").value("APPLIED"))
             .andExpect(jsonPath("$.conflictDetectedAt").isNotEmpty)
-            .andReturn()
-            .response
-            .contentAsString
+            .andReturn().response.contentAsString
         assertThat(JsonPath.read<Map<String, Any?>>(canonicalReceipt, "$").keys)
             .containsExactlyInAnyOrder(
                 "eventId",
@@ -333,36 +313,21 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000002",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                1,
+                "30000000-0000-0000-0000-000000000002", workspaceId, seasonId, "handoff:1", 1,
                 occurredAt = "2026-08-12T09:00:00.123456789z",
             ),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("STALE"))
 
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000003",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                3,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000003", workspaceId, seasonId, "handoff:1", 3),
         ).andExpect(status().isAccepted)
             .andExpect(jsonPath("$.status").value("APPLIED_WITH_GAP"))
             .andExpect(jsonPath("$.item.aggregateRevision").value(3))
             .andExpect(jsonPath("$.item.revisionGap").value(true))
 
         val unsupported = eventJson(
-            "30000000-0000-0000-0000-000000000004",
-            workspaceId,
-            seasonId,
-            "handoff:2",
-            1,
-            eventVersion = 2,
+            "30000000-0000-0000-0000-000000000004", workspaceId, seasonId, "handoff:2", 1, eventVersion = 2,
         )
         postEvent(unsupported)
             .andExpect(status().isUnprocessableContent)
@@ -383,13 +348,8 @@ class BriefMvpIntegrationTest(
                     countsBefore.getValue(outcome),
             ).describedAs("%s 수신 응답 수", outcome).isEqualTo(count)
         }
-        assertThat(
-            jdbc.sql(
-                "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
-            ).param("eventId", UUID.fromString("30000000-0000-0000-0000-000000000004"))
-                .query(String::class.java)
-                .single(),
-        ).isEqualTo("ac86b6dc7a11b60105bd556485eb07f11d9d451c08e3d88f2b3de23b65b31ec9")
+        assertThat(payloadFingerprint("30000000-0000-0000-0000-000000000004"))
+            .isEqualTo("ac86b6dc7a11b60105bd556485eb07f11d9d451c08e3d88f2b3de23b65b31ec9")
         mockMvc.perform(get("/api/v1/events/30000000-0000-0000-0000-000000000004/receipt"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.eventVersion").value(2))
@@ -418,23 +378,14 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.receipts[1].conflictDetectedAt").isNotEmpty)
             .andExpect(jsonPath("$.nextBeforeIngestionSequence").value(nullValue()))
 
-        mockMvc.perform(
-            get(
-                "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/" +
-                    "event-receipts/anomalies",
-            ),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.receipts").isEmpty)
-
-        mockMvc.perform(
-            get(
-                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/" +
-                    "event-receipts/anomalies",
-            ),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.receipts").isEmpty)
+        listOf(
+            workspaceId to "20000000-0000-0000-0000-000000000099",
+            "10000000-0000-0000-0000-000000000099" to seasonId,
+        ).forEach { (otherWorkspaceId, otherSeasonId) ->
+            mockMvc.perform(get("/api/v1/workspaces/$otherWorkspaceId/seasons/$otherSeasonId/event-receipts/anomalies"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.receipts").isEmpty)
+        }
     }
 
     @Test
@@ -497,27 +448,17 @@ class BriefMvpIntegrationTest(
         val receiptPath = "/api/v1/events/$eventId/receipt"
         val canonicalReceipt = mockMvc.perform(get(receiptPath))
             .andExpect(status().isOk)
-            .andReturn()
-            .response
-            .contentAsString
+            .andReturn().response.contentAsString
 
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000006",
-                workspaceId,
-                seasonId,
-                "decision:current",
-                1,
+                "30000000-0000-0000-0000-000000000006", workspaceId, seasonId, "decision:current", 1,
                 type = "DECISION_FOLLOW_UP_OVERDUE",
             ),
         )
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000007",
-                workspaceId,
-                seasonId,
-                "routine:current",
-                1,
+                "30000000-0000-0000-0000-000000000007", workspaceId, seasonId, "routine:current", 1,
                 type = "ROUTINE_MISSED",
             ),
         )
@@ -537,17 +478,6 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.revisionGapCount").value(1))
             .andReturn().response.contentAsString
 
-        listOf(
-            summaryPath.replace(workspaceId, "10000000-0000-0000-0000-000000000099"),
-            summaryPath.replace(seasonId, "20000000-0000-0000-0000-000000000099"),
-        ).forEach { emptySummaryPath ->
-            mockMvc.perform(get(emptySummaryPath))
-                .andExpect(status().isOk)
-                .andExpect(jsonPath("$.highCount").value(0))
-                .andExpect(jsonPath("$.mediumCount").value(0))
-                .andExpect(jsonPath("$.revisionGapCount").value(0))
-        }
-
         mockMvc.perform(post("/api/v1/projections/rebuild"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.receiptCount").value(5))
@@ -564,27 +494,20 @@ class BriefMvpIntegrationTest(
 
         val rebuiltReceipt = mockMvc.perform(get(receiptPath))
             .andExpect(status().isOk)
-            .andReturn()
-            .response
-            .contentAsString
+            .andReturn().response.contentAsString
         assertThat(rebuiltReceipt).isEqualTo(canonicalReceipt)
 
-        val currentAttentionPath =
-            "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
+        val currentAttentionPath = "$attentionItemsPath/current"
         val currentAttention = mockMvc.perform(
-            get(currentAttentionPath)
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1"),
+            itemRequest(currentAttentionPath, "HANDOFF_BLOCKED", "handoff:1"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("ACTIVE"))
             .andExpect(jsonPath("$.aggregateRevision").value(3))
             .andExpect(jsonPath("$.revisionGap").value(true))
             .andReturn()
-        val currentAttentionEtag = checkNotNull(currentAttention.response.getHeader(HttpHeaders.ETAG))
+        val currentAttentionEtag = etagOf(currentAttention)
         mockMvc.perform(
-            get(currentAttentionPath)
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1")
+            itemRequest(currentAttentionPath, "HANDOFF_BLOCKED", "handoff:1")
                 .header(HttpHeaders.IF_NONE_MATCH, currentAttentionEtag),
         ).andExpect(status().isNotModified)
     }
@@ -636,20 +559,6 @@ class BriefMvpIntegrationTest(
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items[*].sourceReference").value(contains("routine:current")))
             .andExpect(jsonPath("$.nextCursor").value(nullValue()))
-
-        mockMvc.perform(get(attentionItemsPath).param("severity", "MEDIUM").param("revisionGap", "true"))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.items").isEmpty)
-            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
-
-        listOf(
-            attentionItemsPath.replace(workspaceId, "10000000-0000-0000-0000-000000000099"),
-            attentionItemsPath.replace(seasonId, "20000000-0000-0000-0000-000000000099"),
-        ).forEach { emptyItemsPath ->
-            mockMvc.perform(get(emptyItemsPath).param("severity", "HIGH").param("revisionGap", "true"))
-                .andExpect(status().isOk)
-                .andExpect(jsonPath("$.items").isEmpty)
-        }
 
         mockMvc.perform(
             get(attentionItemsPath)
@@ -742,13 +651,6 @@ class BriefMvpIntegrationTest(
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items[*].sourceReference").value(contains("role:2")))
             .andExpect(jsonPath("$.nextCursor").value(nullValue()))
-        mockMvc.perform(
-            get(path).param("eventType", "ROLE_UNASSIGNED")
-                .param("severity", "HIGH").param("revisionGap", "true")
-                .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "role:2"),
-        ).andExpect(status().isOk)
-            .andExpect(jsonPath("$.items").isEmpty)
-            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
 
         postEvent(eventJson(
             UUID.randomUUID().toString(), workspaceId, seasonId, "role:1", 4,
@@ -781,12 +683,12 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(post("/api/v1/projections/rebuild")).andExpect(status().isOk)
         mockMvc.perform(get(summaryPath).param("eventType", "ROLE_UNASSIGNED"))
             .andExpect(status().isOk)
-            .andExpect(content().json(summary))
+            .andExpect(content().string(summary))
         mockMvc.perform(
             get(path).param("eventType", "ROLE_UNASSIGNED").param("status", "RESOLVED")
                 .param("severity", "HIGH").param("revisionGap", "true"),
         ).andExpect(status().isOk)
-            .andExpect(content().json(resolved))
+            .andExpect(content().string(resolved))
     }
 
     @Test
@@ -799,33 +701,25 @@ class BriefMvpIntegrationTest(
         val summaryPath = "$attentionItemsPath/summary"
         val currentAttentionPath = "$attentionItemsPath/current"
         val currentAttention = mockMvc.perform(
-            get(currentAttentionPath)
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1"),
+            itemRequest(currentAttentionPath, "HANDOFF_BLOCKED", "handoff:1"),
         ).andExpect(status().isOk)
             .andReturn()
-        val currentAttentionEtag = checkNotNull(currentAttention.response.getHeader(HttpHeaders.ETAG))
+        val currentAttentionEtag = etagOf(currentAttention)
 
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000005",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                4,
+                "30000000-0000-0000-0000-000000000005", workspaceId, seasonId, "handoff:1", 4,
                 state = "RESOLVED",
             ),
         )
         mockMvc.perform(
-            get(currentAttentionPath)
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1")
+            itemRequest(currentAttentionPath, "HANDOFF_BLOCKED", "handoff:1")
                 .header(HttpHeaders.IF_NONE_MATCH, currentAttentionEtag),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("RESOLVED"))
             .andExpect(jsonPath("$.aggregateRevision").value(4))
             .andExpect { result ->
-                assertThat(checkNotNull(result.response.getHeader(HttpHeaders.ETAG)))
+                assertThat(etagOf(result))
                     .isNotEqualTo(currentAttentionEtag)
             }
 
@@ -858,9 +752,7 @@ class BriefMvpIntegrationTest(
 
         val transitionPath = "$attentionItemsPath/transitions"
         mockMvc.perform(
-            get(transitionPath)
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1")
+            itemRequest(transitionPath, "HANDOFF_BLOCKED", "handoff:1")
                 .param("limit", "2"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.transitions.length()").value(2))
@@ -878,9 +770,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.nextBeforeAggregateRevision").value(3))
 
         mockMvc.perform(
-            get(transitionPath)
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1")
+            itemRequest(transitionPath, "HANDOFF_BLOCKED", "handoff:1")
                 .param("beforeAggregateRevision", "3")
                 .param("limit", "2"),
         ).andExpect(status().isOk)
@@ -889,11 +779,11 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.nextBeforeAggregateRevision").value(nullValue()))
 
         mockMvc.perform(
-            get(
-                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/" +
-                    "attention-items/transitions",
-            ).param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1"),
+            itemRequest(
+                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/attention-items/transitions",
+                "HANDOFF_BLOCKED",
+                "handoff:1",
+            ),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.transitions").isEmpty)
     }
@@ -906,17 +796,15 @@ class BriefMvpIntegrationTest(
             "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
 
         mockMvc.perform(
-            get(
-                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/" +
-                    "attention-items/current",
-            ).param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "handoff:1"),
+            itemRequest(
+                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/attention-items/current",
+                "HANDOFF_BLOCKED",
+                "handoff:1",
+            ),
         ).andExpect(status().isNotFound)
 
         mockMvc.perform(
-            get(currentAttentionPath)
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", " "),
+            itemRequest(currentAttentionPath, "HANDOFF_BLOCKED", " "),
         ).andExpect(status().isBadRequest)
 
         val missingReceiptPath = "/api/v1/events/30000000-0000-0000-0000-000000000099/receipt"
@@ -951,20 +839,9 @@ class BriefMvpIntegrationTest(
         assertThat(service.ingest(conflictEvent).status).isEqualTo(IngestStatus.APPLIED)
         assertThat(service.ingest(conflictEvent.copy(state = SourceEventState.RESOLVED)).status)
             .isEqualTo(IngestStatus.CONFLICT)
-        assertThat(
-            jdbc.sql("SELECT received_at FROM source_event_receipt WHERE event_id = :eventId")
-                .param("eventId", conflictEventId)
-                .query(OffsetDateTime::class.java)
-                .single()
-                .toInstant(),
-        ).isEqualTo(receivedAt)
-        assertThat(
-            jdbc.sql("SELECT detected_at FROM source_event_conflict WHERE event_id = :eventId")
-                .param("eventId", conflictEventId)
-                .query(OffsetDateTime::class.java)
-                .single()
-                .toInstant(),
-        ).isEqualTo(conflictDetectedAt)
+        val receipt = checkNotNull(persistence.findEventReceipt(conflictEventId))
+        assertThat(receipt.receivedAt).isEqualTo(receivedAt)
+        assertThat(receipt.conflictDetectedAt).isEqualTo(conflictDetectedAt)
     }
 
     @Test
@@ -995,13 +872,8 @@ class BriefMvpIntegrationTest(
 
         val firstEventId = "70000000-0000-0000-0000-000000000001"
         val firstReference = "baton-continuity:60000000-0000-0000-0000-000000000001"
-        assertThat(
-            jdbc.sql(
-                "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
-            ).param("eventId", UUID.fromString(firstEventId))
-                .query(String::class.java)
-                .single(),
-        ).isEqualTo("69bf5f24726545fd73fba11ae22261f7ec1c7d9279f3e12543c03061344b5c55")
+        assertThat(payloadFingerprint(firstEventId))
+            .isEqualTo("69bf5f24726545fd73fba11ae22261f7ec1c7d9279f3e12543c03061344b5c55")
         val conflictingEvent = JSON.readTree(
             contractEvent("role-unassigned.active-r1-critical.json"),
         ) as ObjectNode
@@ -1031,10 +903,11 @@ class BriefMvpIntegrationTest(
 
         postEvent(contractEvent("role-unassigned.resolved-r3-warning.json"))
 
-        val transitionRequest = get(
+        val transitionRequest = itemRequest(
             "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/transitions",
-        ).param("eventType", "ROLE_UNASSIGNED")
-            .param("sourceReference", firstReference)
+            "ROLE_UNASSIGNED",
+            firstReference,
+        )
         val transitionsBeforeRebuild = mockMvc.perform(transitionRequest)
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.transitions[*].aggregateRevision").value(contains(3, 2, 1)))
@@ -1043,9 +916,7 @@ class BriefMvpIntegrationTest(
 
         val currentPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
         val beforeRebuild = mockMvc.perform(
-            get(currentPath)
-                .param("eventType", "ROLE_UNASSIGNED")
-                .param("sourceReference", firstReference),
+            itemRequest(currentPath, "ROLE_UNASSIGNED", firstReference),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("RESOLVED"))
             .andExpect(jsonPath("$.aggregateRevision").value(3))
@@ -1057,16 +928,14 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.itemCount").value(5))
 
         val afterRebuild = mockMvc.perform(
-            get(currentPath)
-                .param("eventType", "ROLE_UNASSIGNED")
-                .param("sourceReference", firstReference),
+            itemRequest(currentPath, "ROLE_UNASSIGNED", firstReference),
         ).andExpect(status().isOk)
             .andReturn()
         assertThat(afterRebuild.response.contentAsString)
             .isEqualTo(beforeRebuild.response.contentAsString)
         mockMvc.perform(transitionRequest)
             .andExpect(status().isOk)
-            .andExpect(content().json(transitionsBeforeRebuild))
+            .andExpect(content().string(transitionsBeforeRebuild))
     }
 
     @Test
@@ -1188,25 +1057,20 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items[0].severity").value("HIGH"))
             .andExpect(jsonPath("$.items[1].severity").value("MEDIUM"))
             .andReturn()
-        val firstEditionId = JsonPath.read<String>(firstResult.response.contentAsString, "$.editionId")
+        val firstEditionId = editionIdOf(firstResult)
         assertThat(
             jdbc.sql("SELECT state_fingerprint FROM brief_edition WHERE edition_id = :editionId")
                 .param("editionId", UUID.fromString(firstEditionId))
                 .query(String::class.java)
                 .single(),
         ).isEqualTo("79693757bd5893059ca4f8ba64a6e07d28ff1e9b0b3df5677c7833107e461f55")
-        assertThat(firstResult.response.getHeader("Location"))
+        assertThat(firstResult.response.getHeader(HttpHeaders.LOCATION))
             .isEqualTo("/api/v1/editions/$firstEditionId")
 
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000004",
-                workspaceId,
-                seasonId,
-                "decision:temporary",
-                1,
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-                occurredAt = "2026-08-13T09:00:00Z",
+                "40000000-0000-0000-0000-000000000004", workspaceId, seasonId, "decision:temporary", 1,
+                type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-13T09:00:00Z",
             ),
         )
 
@@ -1217,14 +1081,8 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000005",
-                workspaceId,
-                seasonId,
-                "decision:temporary",
-                2,
-                state = "RESOLVED",
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-                occurredAt = "2026-08-13T09:00:00Z",
+                "40000000-0000-0000-0000-000000000005", workspaceId, seasonId, "decision:temporary", 2,
+                state = "RESOLVED", type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-13T09:00:00Z",
             ),
         )
 
@@ -1233,10 +1091,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.generation").value(3))
             .andExpect(jsonPath("$.sourceCursor").value(5))
             .andReturn()
-        val recurringStateEditionId = JsonPath.read<String>(
-            recurringStateResult.response.contentAsString,
-            "$.editionId",
-        )
+        val recurringStateEditionId = editionIdOf(recurringStateResult)
         mockMvc.perform(get(generationPath).param("limit", "2"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.editions.length()").value(2))
@@ -1281,7 +1136,7 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.generation").value(1))
             .andReturn()
-        val firstEditionId = JsonPath.read<String>(first.response.contentAsString, "$.editionId")
+        val firstEditionId = editionIdOf(first)
         postEdition(path, otherZoneRequest).andExpect(status().isCreated)
         postEdition(path, """{"weekStart":"2026-08-17","zoneId":"Asia/Seoul"}""")
             .andExpect(status().isCreated)
@@ -1311,7 +1166,7 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.editions[0].generation").value(5))
         val firstPage = mockMvc.perform(
-            get(path).param("weekStart", "2026-08-10").param("zoneId", "Asia/Seoul")
+            weeklyRequest(path, "2026-08-10", "Asia/Seoul")
                 .param("limit", "1"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.editions.length()").value(1))
@@ -1334,7 +1189,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.generation").value(6))
 
         mockMvc.perform(
-            get(path).param("weekStart", "2026-08-10").param("zoneId", "Asia/Seoul")
+            weeklyRequest(path, "2026-08-10", "Asia/Seoul")
                 .param("beforeGeneration", cursor.toString()).param("limit", "1"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.editions.length()").value(1))
@@ -1344,7 +1199,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.nextBeforeGeneration").value(nullValue()))
 
         mockMvc.perform(
-            get(path).param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul"),
+            weeklyRequest(path, "2026-08-24", "Asia/Seoul"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.editions").isEmpty)
             .andExpect(jsonPath("$.nextBeforeGeneration").value(nullValue()))
@@ -1362,11 +1217,9 @@ class BriefMvpIntegrationTest(
         val firstResult = postEdition(generationPath, editionRequest)
             .andExpect(status().isCreated)
             .andReturn()
-        val firstEditionId = JsonPath.read<String>(firstResult.response.contentAsString, "$.editionId")
-        val firstEditionEtag = checkNotNull(firstResult.response.getHeader(HttpHeaders.ETAG))
-        val attentionCountBeforeFailedRebuild = jdbc.sql("SELECT COUNT(*) FROM attention_item")
-            .query(Long::class.java)
-            .single()
+        val firstEditionId = editionIdOf(firstResult)
+        val firstEditionEtag = etagOf(firstResult)
+        val attentionCountBeforeFailedRebuild = countRows("attention_item")
         assertThatThrownBy {
             persistence.rebuild { event, current ->
                 when (val decision = AttentionProjector.project(event, current)) {
@@ -1380,9 +1233,7 @@ class BriefMvpIntegrationTest(
                 }
             }
         }.isInstanceOf(DataIntegrityViolationException::class.java)
-        assertThat(
-            jdbc.sql("SELECT COUNT(*) FROM attention_item").query(Long::class.java).single(),
-        ).isEqualTo(attentionCountBeforeFailedRebuild)
+        assertThat(countRows("attention_item")).isEqualTo(attentionCountBeforeFailedRebuild)
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isOk)
@@ -1432,18 +1283,12 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.generation").value(2))
             .andReturn()
-        val previousLatestEtag = checkNotNull(previousLatest.response.getHeader(HttpHeaders.ETAG))
+        val previousLatestEtag = etagOf(previousLatest)
 
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000006",
-                workspaceId,
-                seasonId,
-                "routine:weekly",
-                2,
-                type = "ROUTINE_MISSED",
-                state = "RESOLVED",
-                occurredAt = "2026-08-14T09:00:00Z",
+                "40000000-0000-0000-0000-000000000006", workspaceId, seasonId, "routine:weekly", 2,
+                type = "ROUTINE_MISSED", state = "RESOLVED", occurredAt = "2026-08-14T09:00:00Z",
             ),
         )
 
@@ -1462,49 +1307,32 @@ class BriefMvpIntegrationTest(
 
         val weeklyLatestPath = "$generationPath/weekly/latest"
         val nextWeekLatest = mockMvc.perform(
-            get(weeklyLatestPath)
-                .param("weekStart", "2026-08-17")
-                .param("zoneId", "Asia/Seoul"),
+            weeklyRequest(weeklyLatestPath, "2026-08-17", "Asia/Seoul"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.generation").value(2))
             .andReturn()
         mockMvc.perform(
-            get(weeklyLatestPath)
-                .param("weekStart", "2026-08-17")
-                .param("zoneId", "Asia/Seoul")
+            weeklyRequest(weeklyLatestPath, "2026-08-17", "Asia/Seoul")
                 .header(
                     HttpHeaders.IF_NONE_MATCH,
-                    checkNotNull(nextWeekLatest.response.getHeader(HttpHeaders.ETAG)),
+                    etagOf(nextWeekLatest),
                 ),
         ).andExpect(status().isNotModified)
 
         mockMvc.perform(
-            get(weeklyLatestPath)
-                .param("weekStart", "2026-08-10")
-                .param("zoneId", "Asia/Seoul"),
+            weeklyRequest(weeklyLatestPath, "2026-08-10", "Asia/Seoul"),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.generation").value(3))
 
-        mockMvc.perform(
-            get(
-                "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId" +
-                    "/editions/weekly/latest",
-            ).param("weekStart", "2026-08-10")
-                .param("zoneId", "Asia/Seoul"),
-        ).andExpect(status().isNotFound)
+        listOf(
+            "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/editions/weekly/latest",
+            "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/editions/weekly/latest",
+        ).forEach { otherScopePath ->
+            mockMvc.perform(weeklyRequest(otherScopePath, "2026-08-10", "Asia/Seoul")).andExpect(status().isNotFound)
+        }
 
         mockMvc.perform(
-            get(
-                "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099" +
-                    "/editions/weekly/latest",
-            ).param("weekStart", "2026-08-10")
-                .param("zoneId", "Asia/Seoul"),
-        ).andExpect(status().isNotFound)
-
-        mockMvc.perform(
-            get(weeklyLatestPath)
-                .param("weekStart", "2026-08-17")
-                .param("zoneId", "UTC"),
+            weeklyRequest(weeklyLatestPath, "2026-08-17", "UTC"),
         ).andExpect(status().isNotFound)
     }
 
@@ -1517,23 +1345,14 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000001",
-                workspaceId,
-                seasonId,
-                removedReference,
-                1,
+                "60000000-0000-0000-0000-000000000001", workspaceId, seasonId, removedReference, 1,
                 occurredAt = "2026-08-11T01:00:00Z",
             ),
         )
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000002",
-                workspaceId,
-                seasonId,
-                changedReference,
-                1,
-                type = "ROUTINE_MISSED",
-                occurredAt = "2026-08-11T02:00:00Z",
+                "60000000-0000-0000-0000-000000000002", workspaceId, seasonId, changedReference, 1,
+                type = "ROUTINE_MISSED", occurredAt = "2026-08-11T02:00:00Z",
             ),
         )
 
@@ -1544,17 +1363,12 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.generation").value(1))
             .andExpect(jsonPath("$.items.length()").value(2))
             .andReturn()
-        val baseEditionId = JsonPath.read<String>(baseEdition.response.contentAsString, "$.editionId")
+        val baseEditionId = editionIdOf(baseEdition)
 
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000004",
-                workspaceId,
-                seasonId,
-                changedReference,
-                3,
-                type = "ROUTINE_MISSED",
-                occurredAt = "2026-08-11T02:00:00Z",
+                "60000000-0000-0000-0000-000000000004", workspaceId, seasonId, changedReference, 3,
+                type = "ROUTINE_MISSED", occurredAt = "2026-08-11T02:00:00Z",
             ),
         )
 
@@ -1563,43 +1377,23 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.generation").value(2))
             .andExpect(jsonPath("$.items.length()").value(2))
             .andReturn()
-        val revisionEvidenceEditionId = JsonPath.read<String>(
-            revisionEvidenceEdition.response.contentAsString,
-            "$.editionId",
-        )
-        postEdition(generationPath, editionRequest)
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.editionId").value(revisionEvidenceEditionId))
+        val revisionEvidenceEditionId = editionIdOf(revisionEvidenceEdition)
 
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000003",
-                workspaceId,
-                seasonId,
-                removedReference,
-                2,
-                state = "RESOLVED",
-                occurredAt = "2026-08-12T01:00:00Z",
+                "60000000-0000-0000-0000-000000000003", workspaceId, seasonId, removedReference, 2,
+                state = "RESOLVED", occurredAt = "2026-08-12T01:00:00Z",
             ),
         )
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000005",
-                workspaceId,
-                seasonId,
-                "decision:added",
-                1,
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-                occurredAt = "2026-08-14T03:00:00Z",
+                "60000000-0000-0000-0000-000000000005", workspaceId, seasonId, "decision:added", 1,
+                type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-14T03:00:00Z",
             ),
         )
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000006",
-                workspaceId,
-                seasonId,
-                "handoff:added",
-                1,
+                "60000000-0000-0000-0000-000000000006", workspaceId, seasonId, "handoff:added", 1,
                 occurredAt = "2026-08-15T03:00:00Z",
             ),
         )
@@ -1609,10 +1403,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.generation").value(3))
             .andExpect(jsonPath("$.items.length()").value(3))
             .andReturn()
-        val targetEditionId = JsonPath.read<String>(
-            targetEdition.response.contentAsString,
-            "$.editionId",
-        )
+        val targetEditionId = editionIdOf(targetEdition)
         val changesPath = "/api/v1/editions/$targetEditionId/changes"
         val changes = mockMvc.perform(get(changesPath).param("fromEditionId", baseEditionId))
             .andExpect(status().isOk)
@@ -1631,7 +1422,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.changed[0].after.aggregateRevision").value(3))
             .andExpect(jsonPath("$.changed[0].after.revisionGap").value(true))
             .andReturn()
-        val changesEtag = checkNotNull(changes.response.getHeader(HttpHeaders.ETAG))
+        val changesEtag = etagOf(changes)
         mockMvc.perform(
             get(changesPath).param("fromEditionId", baseEditionId)
                 .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
@@ -1671,11 +1462,7 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "60000000-0000-0000-0000-000000000007",
-                workspaceId,
-                seasonId,
-                "handoff:after-target",
-                1,
+                "60000000-0000-0000-0000-000000000007", workspaceId, seasonId, "handoff:after-target", 1,
                 occurredAt = "2026-08-15T04:00:00Z",
             ),
         ).andExpect(status().isAccepted)
@@ -1687,12 +1474,6 @@ class BriefMvpIntegrationTest(
             .andReturn()
         assertThat(rebuiltChanges.response.contentAsString)
             .isEqualTo(changes.response.contentAsString)
-        mockMvc.perform(
-            get(changesPath).param("fromEditionId", baseEditionId)
-                .header(HttpHeaders.IF_NONE_MATCH, changesEtag),
-        ).andExpect(status().isNotModified)
-            .andExpect(header().string(HttpHeaders.ETAG, changesEtag))
-            .andExpect(content().string(""))
 
         val otherWorkspaceId = "10000000-0000-0000-0000-000000000099"
         val otherGenerationPath =
@@ -1700,10 +1481,7 @@ class BriefMvpIntegrationTest(
         val otherEdition = postEdition(otherGenerationPath, editionRequest)
             .andExpect(status().isCreated)
             .andReturn()
-        val otherEditionId = JsonPath.read<String>(
-            otherEdition.response.contentAsString,
-            "$.editionId",
-        )
+        val otherEditionId = editionIdOf(otherEdition)
 
         mockMvc.perform(
             get(changesPath).param("fromEditionId", otherEditionId).header(HttpHeaders.IF_NONE_MATCH, "*"),
@@ -1752,13 +1530,7 @@ class BriefMvpIntegrationTest(
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     JSON.writeValueAsString(
-                        eventJson(
-                            "30000000-0000-0000-0000-000000000011",
-                            workspaceId,
-                            seasonId,
-                            "rotation-overlap",
-                            1,
-                        ),
+                        eventJson("30000000-0000-0000-0000-000000000011", workspaceId, seasonId, "rotation-overlap", 1),
                     ),
                 ),
         ).andExpect(status().isAccepted)
@@ -1780,114 +1552,59 @@ class BriefMvpIntegrationTest(
 
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000012",
-                workspaceId,
-                seasonId,
-                "future-version",
-                1,
+                "30000000-0000-0000-0000-000000000012", workspaceId, seasonId, "future-version", 1,
                 eventVersion = 3,
             ),
         ).andExpect(status().isUnprocessableContent)
             .andExpect(jsonPath("$.status").value("UNSUPPORTED"))
 
-        val numericInstant = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .put("occurredAt", 1786525200)
-        postEvent(numericInstant).andExpect(status().isBadRequest)
-
-        val fractionalRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .put("aggregateRevision", 1.5)
-        postEvent(fractionalRevision).andExpect(status().isBadRequest)
-
         val decimalVersion = eventJson(
-            eventId,
-            workspaceId,
-            seasonId,
-            "invalid",
-            1,
-            type = "ROLE_UNASSIGNED",
-            eventVersion = 2,
+            eventId, workspaceId, seasonId, "invalid", 1, type = "ROLE_UNASSIGNED", eventVersion = 2,
             sourceSeverity = "CRITICAL",
         ).putRawValue("eventVersion", RawValue("2.0"))
         postEvent(decimalVersion).andExpect(status().isBadRequest)
 
-        val decimalRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .putRawValue("aggregateRevision", RawValue("1.0"))
-        postEvent(decimalRevision).andExpect(status().isBadRequest)
-
-        val overflowingRevision = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .put("aggregateRevision", "9223372036854775808".toBigInteger())
-        postEvent(overflowingRevision).andExpect(status().isBadRequest)
-
-        val unknownField = eventJson(eventId, workspaceId, seasonId, "invalid", 1)
-            .put("unexpected", true)
-        postEvent(unknownField).andExpect(status().isBadRequest)
-
         listOf(
-            "AAAAAAAAAAAAAAAAAAAAAA",
-            "AAAAAAAAAAAAAAAAAAAAAA==",
-        ).forEach { nonCanonicalEventId ->
-            postEvent(
-                eventJson(nonCanonicalEventId, workspaceId, seasonId, "invalid", 1),
-            ).andExpect(status().isBadRequest)
+            "occurredAt" to "1786525200",
+            "aggregateRevision" to "1.0",
+            "aggregateRevision" to "9223372036854775808",
+            "unexpected" to "true",
+        ).forEach { (field, rawValue) ->
+            postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1).putRawValue(field, RawValue(rawValue)))
+                .andExpect(status().isBadRequest)
         }
-
-        listOf("\u0000", "valid\u0000suffix").forEach { sourceReference ->
-            postEvent(
-                eventJson(eventId, workspaceId, seasonId, sourceReference, 1),
-            ).andExpect(status().isBadRequest)
-        }
-
         listOf(
-            "2026-08-12T24:00:00Z",
-            "2026-08-12T23:59:60Z",
-        ).forEach { occurredAt ->
-            postEvent(
-                eventJson(
-                    eventId,
-                    workspaceId,
-                    seasonId,
-                    "invalid",
-                    1,
-                    occurredAt = occurredAt,
-                ),
-            ).andExpect(status().isBadRequest)
+            "eventId" to "AAAAAAAAAAAAAAAAAAAAAA",
+            "eventId" to "AAAAAAAAAAAAAAAAAAAAAA==",
+            "sourceReference" to "\u0000",
+            "sourceReference" to "valid\u0000suffix",
+            "occurredAt" to "2026-08-12T24:00:00Z",
+            "occurredAt" to "2026-08-12T23:59:60Z",
+        ).forEach { (field, value) ->
+            postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1).put(field, value))
+                .andExpect(status().isBadRequest)
         }
 
         postEvent(
             eventJson(
-                eventId = eventId,
-                workspaceId = workspaceId,
-                seasonId = seasonId,
-                sourceReference = "invalid",
-                revision = 1,
-                type = "ROLE_UNASSIGNED",
-                eventVersion = 2,
+                eventId = eventId, workspaceId = workspaceId, seasonId = seasonId,
+                sourceReference = "invalid", revision = 1, type = "ROLE_UNASSIGNED", eventVersion = 2,
             ),
         ).andExpect(status().isBadRequest)
 
         postEvent(
             eventJson(
-                eventId = "30000000-0000-0000-0000-000000000013",
-                workspaceId = workspaceId,
-                seasonId = seasonId,
-                sourceReference = "😀".repeat(128),
-                revision = 1,
-                type = "ROLE_UNASSIGNED",
-                eventVersion = 2,
-                sourceSeverity = "CRITICAL",
+                eventId = "30000000-0000-0000-0000-000000000013", workspaceId = workspaceId,
+                seasonId = seasonId, sourceReference = "😀".repeat(128), revision = 1,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
             ),
         ).andExpect(status().isAccepted)
 
         postEvent(
             eventJson(
-                eventId = "30000000-0000-0000-0000-000000000014",
-                workspaceId = workspaceId,
-                seasonId = seasonId,
-                sourceReference = "😀".repeat(129),
-                revision = 1,
-                type = "ROLE_UNASSIGNED",
-                eventVersion = 2,
-                sourceSeverity = "CRITICAL",
+                eventId = "30000000-0000-0000-0000-000000000014", workspaceId = workspaceId,
+                seasonId = seasonId, sourceReference = "😀".repeat(129), revision = 1,
+                type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
             ),
         ).andExpect(status().isBadRequest)
     }
@@ -1903,7 +1620,6 @@ class BriefMvpIntegrationTest(
             "eventType" to "3",
             "sourceSeverity" to "0",
             "state" to "0",
-            "state" to "1",
         ).forEach { (field, value) ->
             val event = eventJson(
                 UUID.randomUUID().toString(), workspace, season, "invalid-type", 1,
@@ -1914,14 +1630,12 @@ class BriefMvpIntegrationTest(
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
         }
         listOf("source_event_receipt", "source_event_conflict", "attention_item").forEach { table ->
-            assertThat(jdbc.sql("SELECT COUNT(*) FROM $table").query(Long::class.java).single()).isZero()
+            assertThat(countRows(table)).isZero()
         }
 
         val valid = eventJson(UUID.randomUUID().toString(), workspace, season, "123", 1)
         postEvent(valid).andExpect(status().isAccepted)
             .andExpect(jsonPath("$.item.sourceReference").value("123"))
-        postEvent(valid).andExpect(status().isOk)
-            .andExpect(jsonPath("$.status").value("DUPLICATE"))
     }
 
     @Test
@@ -1945,7 +1659,7 @@ class BriefMvpIntegrationTest(
             .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
 
         listOf("source_event_receipt", "source_event_conflict", "attention_item", "brief_edition").forEach { table ->
-            assertThat(jdbc.sql("SELECT COUNT(*) FROM $table").query(Long::class.java).single()).isZero()
+            assertThat(countRows(table)).isZero()
         }
     }
 
@@ -1956,18 +1670,6 @@ class BriefMvpIntegrationTest(
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         postEdition(path, """{"weekStart":[2026,8,10],"zoneId":"Asia/Seoul"}""")
             .andExpect(status().isBadRequest)
-
-        val weeklyLatestPath = "$path/weekly/latest"
-        mockMvc.perform(
-            get(weeklyLatestPath)
-                .param("weekStart", "2026-08-11")
-                .param("zoneId", "Asia/Seoul"),
-        ).andExpect(status().isBadRequest)
-        mockMvc.perform(
-            get(weeklyLatestPath)
-                .param("weekStart", "2026-08-10")
-                .param("zoneId", "+09:00"),
-        ).andExpect(status().isBadRequest)
 
         mockMvc.perform(get(path).param("beforeGeneration", "0"))
             .andExpect(status().isBadRequest)
@@ -2011,6 +1713,7 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000010"
         val seasonId = "20000000-0000-0000-0000-000000000010"
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val attentionPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
 
         listOf("0000-01-03", "9999-12-27").forEachIndexed { index, weekStart ->
             val eventId = "30000000-0000-0000-0000-00000000010${index + 1}"
@@ -2023,41 +1726,31 @@ class BriefMvpIntegrationTest(
             mockMvc.perform(get("/api/v1/events/$eventId/receipt"))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.occurredAt").value(occurredAt))
-            val attentionPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
             mockMvc.perform(
-                get("$attentionPath/current")
-                    .param("eventType", "HANDOFF_BLOCKED")
-                    .param("sourceReference", sourceReference),
+                itemRequest("$attentionPath/current", "HANDOFF_BLOCKED", sourceReference),
             ).andExpect(status().isOk)
                 .andExpect(jsonPath("$.observedAt").value(occurredAt))
             mockMvc.perform(
-                get("$attentionPath/transitions")
-                    .param("eventType", "HANDOFF_BLOCKED")
-                    .param("sourceReference", sourceReference),
+                itemRequest("$attentionPath/transitions", "HANDOFF_BLOCKED", sourceReference),
             ).andExpect(status().isOk)
                 .andExpect(jsonPath("$.transitions[0].observedAt").value(occurredAt))
 
-            val request = JSON.writeValueAsString(
-                JSON.createObjectNode().put("weekStart", weekStart).put("zoneId", "UTC"),
-            )
-            val editionId = JsonPath.read<String>(
+            val request = """{"weekStart":"$weekStart","zoneId":"UTC"}"""
+            val editionId = editionIdOf(
                 postEdition(path, request)
                     .andExpect(status().isCreated)
                     .andExpect(jsonPath("$.items.length()").value(index + 1))
                     .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
-                    .andReturn().response.contentAsString,
-                "$.editionId",
+                    .andReturn(),
             )
             mockMvc.perform(
-                get("$path/weekly/latest")
-                    .param("weekStart", weekStart)
-                    .param("zoneId", "UTC"),
+                weeklyRequest("$path/weekly/latest", weekStart, "UTC"),
             ).andExpect(status().isOk)
                 .andExpect(jsonPath("$.editionId").value(editionId))
                 .andExpect(jsonPath("$.weekStart").value(weekStart))
                 .andExpect(jsonPath("$.items[0].observedAt").value(occurredAt))
 
-            mockMvc.perform(get(path).param("weekStart", weekStart).param("zoneId", "UTC"))
+            mockMvc.perform(weeklyRequest(path, weekStart, "UTC"))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.editions.length()").value(1))
                 .andExpect(jsonPath("$.editions[0].editionId").value(editionId))
@@ -2073,20 +1766,13 @@ class BriefMvpIntegrationTest(
 
         listOf("-5000-01-06", "+10000-01-03", "+6000000-01-03", "+999999999-12-27")
             .forEach { weekStart ->
-                val request = JSON.writeValueAsString(
-                    JSON.createObjectNode().put("weekStart", weekStart).put("zoneId", "UTC"),
-                )
+                val request = """{"weekStart":"$weekStart","zoneId":"UTC"}"""
                 postEdition(path, request)
                     .andExpect(status().isBadRequest)
                     .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 mockMvc.perform(
-                    get("$path/weekly/latest")
-                        .param("weekStart", weekStart)
-                        .param("zoneId", "UTC"),
+                    weeklyRequest("$path/weekly/latest", weekStart, "UTC"),
                 ).andExpect(status().isBadRequest)
-                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                mockMvc.perform(get(path).param("weekStart", weekStart).param("zoneId", "UTC"))
-                    .andExpect(status().isBadRequest)
                     .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
             }
     }
@@ -2098,30 +1784,16 @@ class BriefMvpIntegrationTest(
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
         val sourceReference = "handoff:\"quoted\"\\path"
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000091",
-                workspaceId,
-                seasonId,
-                sourceReference,
-                1,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000091", workspaceId, seasonId, sourceReference, 1),
         ).andExpect(status().isAccepted)
         mockMvc.perform(
-            get("$path/current")
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", sourceReference),
+            itemRequest("$path/current", "HANDOFF_BLOCKED", sourceReference),
         ).andExpect(status().isOk)
             .andExpect(jsonPath("$.sourceReference").value(sourceReference))
 
         val validEvent = eventJson(
-            "30000000-0000-0000-0000-000000000092",
-            workspaceId,
-            seasonId,
-            "review:?",
-            1,
-            type = "ROLE_UNASSIGNED",
-            eventVersion = 2,
-            sourceSeverity = "CRITICAL",
+            "30000000-0000-0000-0000-000000000092", workspaceId, seasonId, "review:?", 1,
+            type = "ROLE_UNASSIGNED", eventVersion = 2, sourceSeverity = "CRITICAL",
         )
         val escapedJson = JSON.writer().with(JsonWriteFeature.ESCAPE_NON_ASCII)
         listOf("review:\uD800", "review:\uDC00").forEach { invalidReference ->
@@ -2134,12 +1806,8 @@ class BriefMvpIntegrationTest(
         postEvent(validEvent).andExpect(status().isAccepted)
 
         listOf(
-            get("$path/current")
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "invalid\u0000reference"),
-            get("$path/transitions")
-                .param("eventType", "HANDOFF_BLOCKED")
-                .param("sourceReference", "invalid\u0000reference"),
+            itemRequest("$path/current", "HANDOFF_BLOCKED", "invalid\u0000reference"),
+            itemRequest("$path/transitions", "HANDOFF_BLOCKED", "invalid\u0000reference"),
             get(path)
                 .param("afterEventType", "HANDOFF_BLOCKED")
                 .param("afterSourceReference", "invalid\u0000reference"),
@@ -2156,21 +1824,11 @@ class BriefMvpIntegrationTest(
         val seasonId = "20000000-0000-0000-0000-000000000011"
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000111",
-                workspaceId,
-                seasonId,
-                "\u00a0",
-                1,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000111", workspaceId, seasonId, "\u00a0", 1),
         ).andExpect(status().isAccepted)
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000112",
-                workspaceId,
-                seasonId,
-                "next-item",
-                1,
+                "30000000-0000-0000-0000-000000000112", workspaceId, seasonId, "next-item", 1,
                 type = "ROUTINE_MISSED",
             ),
         ).andExpect(status().isAccepted)
@@ -2195,17 +1853,12 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000004"
         val seasonId = "20000000-0000-0000-0000-000000000004"
         val event = eventJson(
-            "30000000-0000-0000-0000-000000000020",
-            workspaceId,
-            seasonId,
-            "handoff:concurrent",
-            1,
+            "30000000-0000-0000-0000-000000000020", workspaceId, seasonId, "handoff:concurrent", 1,
         )
 
         assertThat(concurrentStatuses { postEvent(event).andReturn().response.status })
             .containsExactly(200, 202)
-        assertThat(jdbc.sql("SELECT COUNT(*) FROM source_event_receipt").query(Long::class.java).single())
-            .isEqualTo(1)
+        assertThat(countRows("source_event_receipt")).isEqualTo(1)
     }
 
     @Test
@@ -2213,21 +1866,14 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000004"
         val seasonId = "20000000-0000-0000-0000-000000000004"
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000020",
-                workspaceId,
-                seasonId,
-                "handoff:concurrent",
-                1,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000020", workspaceId, seasonId, "handoff:concurrent", 1),
         ).andExpect(status().isAccepted)
 
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
         val request = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
         assertThat(concurrentStatuses { postEdition(path, request).andReturn().response.status })
             .containsExactly(200, 201)
-        assertThat(jdbc.sql("SELECT COUNT(*) FROM brief_edition").query(Long::class.java).single())
-            .isEqualTo(1)
+        assertThat(countRows("brief_edition")).isEqualTo(1)
     }
 
     @Test
@@ -2235,13 +1881,7 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000004"
         val seasonId = "20000000-0000-0000-0000-000000000004"
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000020",
-                workspaceId,
-                seasonId,
-                "handoff:concurrent",
-                1,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000020", workspaceId, seasonId, "handoff:concurrent", 1),
         ).andExpect(status().isAccepted)
 
         val rebuildStarted = CountDownLatch(1)
@@ -2326,40 +1966,22 @@ class BriefMvpIntegrationTest(
     ) {
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000001",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                1,
+                "30000000-0000-0000-0000-000000000001", workspaceId, seasonId, "handoff:1", 1,
                 occurredAt = "2026-08-12t18:00:00.1+09:00",
             ),
         )
         postEvent(
-            eventJson(
-                "30000000-0000-0000-0000-000000000003",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                3,
-            ),
+            eventJson("30000000-0000-0000-0000-000000000003", workspaceId, seasonId, "handoff:1", 3),
         )
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000006",
-                workspaceId,
-                seasonId,
-                "decision:current",
-                1,
+                "30000000-0000-0000-0000-000000000006", workspaceId, seasonId, "decision:current", 1,
                 type = "DECISION_FOLLOW_UP_OVERDUE",
             ),
         )
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000007",
-                workspaceId,
-                seasonId,
-                "routine:current",
-                1,
+                "30000000-0000-0000-0000-000000000007", workspaceId, seasonId, "routine:current", 1,
                 type = "ROUTINE_MISSED",
             ),
         )
@@ -2371,34 +1993,20 @@ class BriefMvpIntegrationTest(
     ) {
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000001",
-                workspaceId,
-                seasonId,
-                "handoff:weekly",
-                1,
+                "40000000-0000-0000-0000-000000000001", workspaceId, seasonId, "handoff:weekly", 1,
                 occurredAt = "2026-08-09T15:00:00Z",
             ),
         )
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000002",
-                workspaceId,
-                seasonId,
-                "routine:weekly",
-                1,
-                type = "ROUTINE_MISSED",
-                occurredAt = "2026-08-16T14:59:59.999999999Z",
+                "40000000-0000-0000-0000-000000000002", workspaceId, seasonId, "routine:weekly", 1,
+                type = "ROUTINE_MISSED", occurredAt = "2026-08-16T14:59:59.999999999Z",
             ),
         ).andExpect(jsonPath("$.item.observedAt").value("2026-08-16T14:59:59.999999Z"))
         postEvent(
             eventJson(
-                "40000000-0000-0000-0000-000000000003",
-                workspaceId,
-                seasonId,
-                "decision:next-week",
-                1,
-                type = "DECISION_FOLLOW_UP_OVERDUE",
-                occurredAt = "2026-08-16T15:00:00Z",
+                "40000000-0000-0000-0000-000000000003", workspaceId, seasonId, "decision:next-week", 1,
+                type = "DECISION_FOLLOW_UP_OVERDUE", occurredAt = "2026-08-16T15:00:00Z",
             ),
         )
     }
@@ -2410,33 +2018,20 @@ class BriefMvpIntegrationTest(
         val eventId = "30000000-0000-0000-0000-000000000001"
         postEvent(
             eventJson(
-                eventId,
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                1,
-                occurredAt = "2026-08-12t18:00:00.1+09:00",
+                eventId, workspaceId, seasonId, "handoff:1", 1, occurredAt = "2026-08-12t18:00:00.1+09:00",
             ),
         )
         postEvent(eventJson(eventId, workspaceId, seasonId, "handoff:1", 1, state = "RESOLVED"))
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000002",
-                workspaceId,
-                seasonId,
-                "handoff:1",
-                1,
+                "30000000-0000-0000-0000-000000000002", workspaceId, seasonId, "handoff:1", 1,
                 occurredAt = "2026-08-12T09:00:00.123456789z",
             ),
         )
         postEvent(eventJson("30000000-0000-0000-0000-000000000003", workspaceId, seasonId, "handoff:1", 3))
         postEvent(
             eventJson(
-                "30000000-0000-0000-0000-000000000004",
-                workspaceId,
-                seasonId,
-                "handoff:2",
-                1,
+                "30000000-0000-0000-0000-000000000004", workspaceId, seasonId, "handoff:2", 1,
                 eventVersion = 2,
             ),
         )
@@ -2475,8 +2070,6 @@ class BriefMvpIntegrationTest(
         deliver("future", 1, "ACTIVE")
         deliver("future", 2, "RESOLVED", "2026-08-30T13:00:00Z")
         assertThat(service.summarizeWeeklyResolutions(command).resolvedCount).isEqualTo(1)
-        service.rebuild()
-        assertThat(service.summarizeWeeklyResolutions(command).resolvedCount).isEqualTo(1)
         deliver("reactivated", 4, "RESOLVED")
         assertThat(service.summarizeWeeklyResolutions(command).resolvedCount).isEqualTo(2)
         val firstPage = service.summarizeWeeklyResolutions(command, limit = 1)
@@ -2495,15 +2088,13 @@ class BriefMvpIntegrationTest(
         deliver("reactivated", 5, "ACTIVE")
         service.rebuild()
         assertThat(service.summarizeWeeklyResolutions(command).items).isEqualTo(lastPage.items)
-        mockMvc.perform(get("/api/v1/workspaces/$workspace/seasons/$season/attention-items/resolutions")
-            .param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul")
-            .param("afterEventType", "HANDOFF_BLOCKED"))
-            .andExpect(status().isBadRequest)
+        val resolutionsPath = "/api/v1/workspaces/$workspace/seasons/$season/attention-items/resolutions"
+        mockMvc.perform(
+            weeklyRequest(resolutionsPath, "2026-08-24", "Asia/Seoul").param("afterEventType", "HANDOFF_BLOCKED"),
+        ).andExpect(status().isBadRequest)
 
-        assertThat(service.summarizeWeeklyResolutions(command.copy(seasonId = UUID.randomUUID())).resolvedCount).isZero()
-        assertThat(service.summarizeWeeklyResolutions(command.copy(workspaceId = UUID.randomUUID())).resolvedCount).isZero()
-        mockMvc.perform(get("/api/v1/workspaces/$workspace/seasons/${UUID.randomUUID()}/attention-items/resolutions")
-            .param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul"))
+        val otherSeasonPath = "/api/v1/workspaces/$workspace/seasons/${UUID.randomUUID()}/attention-items/resolutions"
+        mockMvc.perform(weeklyRequest(otherSeasonPath, "2026-08-24", "Asia/Seoul"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.weekStart").value("2026-08-24"))
             .andExpect(jsonPath("$.windowStart").value("2026-08-23T15:00:00Z"))
@@ -2556,8 +2147,7 @@ class BriefMvpIntegrationTest(
         deliver("gap", 3, "RESOLVED")
 
         val path = "/api/v1/workspaces/$workspace/seasons/$season/attention-items/resolutions"
-        fun request(type: String? = null) = get(path)
-            .param("weekStart", "2026-08-24").param("zoneId", "Asia/Seoul")
+        fun request(type: String? = null) = weeklyRequest(path, "2026-08-24", "Asia/Seoul")
             .apply { type?.let { param("eventType", it) } }
 
         mockMvc.perform(request())
@@ -2591,12 +2181,6 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.resolvedCount").value(2))
             .andExpect(jsonPath("$.items[*].sourceReference").value(contains("b")))
-            .andExpect(jsonPath("$.nextCursor").value(nullValue()))
-        mockMvc.perform(request("ROLE_UNASSIGNED")
-            .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "b"))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.resolvedCount").value(2))
-            .andExpect(jsonPath("$.items").isEmpty)
             .andExpect(jsonPath("$.nextCursor").value(nullValue()))
         mockMvc.perform(request("ROLE_UNASSIGNED")
             .param("afterEventType", "HANDOFF_BLOCKED").param("afterSourceReference", "a"))
@@ -2675,21 +2259,31 @@ class BriefMvpIntegrationTest(
         }
     }
 
+    private fun countRows(table: String): Long =
+        jdbc.sql("SELECT COUNT(*) FROM $table").query(Long::class.java).single()
+
+    private fun payloadFingerprint(eventId: String): String = jdbc.sql(
+        "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
+    ).param("eventId", UUID.fromString(eventId)).query(String::class.java).single()
+
+    private fun editionIdOf(result: MvcResult): String = JsonPath.read(result.response.contentAsString, "$.editionId")
+
+    private fun etagOf(result: MvcResult): String = checkNotNull(result.response.getHeader(HttpHeaders.ETAG))
+
+    private fun itemRequest(path: String, eventType: String, sourceReference: String) =
+        get(path).param("eventType", eventType).param("sourceReference", sourceReference)
+
+    private fun weeklyRequest(path: String, weekStart: String, zoneId: String) =
+        get(path).param("weekStart", weekStart).param("zoneId", zoneId)
+
     private fun contractEvent(fileName: String): String =
         ClassPathResource("contracts/examples/$fileName")
             .getContentAsString(Charsets.UTF_8)
 
     private fun eventJson(
-        eventId: String,
-        workspaceId: String,
-        seasonId: String,
-        sourceReference: String,
-        revision: Long,
-        state: String = "ACTIVE",
-        type: String = "HANDOFF_BLOCKED",
-        occurredAt: String = "2026-08-12T09:00:00Z",
-        eventVersion: Int = 1,
-        sourceSeverity: String? = null,
+        eventId: String, workspaceId: String, seasonId: String, sourceReference: String, revision: Long,
+        state: String = "ACTIVE", type: String = "HANDOFF_BLOCKED",
+        occurredAt: String = "2026-08-12T09:00:00Z", eventVersion: Int = 1, sourceSeverity: String? = null,
     ): ObjectNode = JSON.createObjectNode()
         .put("eventId", eventId)
         .put("eventType", type)

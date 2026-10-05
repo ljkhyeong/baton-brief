@@ -16,7 +16,9 @@ description: BATON BRIEF의 이벤트 계약·멱등 수신·지문·수신 증�
   [이상 이력](../../../docs/PRD/0011_event-receipt-anomalies/spec.md)
 - 기록 보존: [보존·재구축](../../../docs/PRD/0008_retention-rebuild-boundary/spec.md)
 - BATON 연동: [생산자 선행조건](../../../docs/PRD/0018_baton-producer-compatibility/spec.md)
-- Bearer 인증·Caddy 변경은 [공통 설정 스킬](../baton-brief-flows/SKILL.md)을 함께 사용한다.
+- Bearer 인증·Caddy 변경은 [공통 설정 스킬](../baton-brief-flows/SKILL.md), 수신 기록 열·제약 변경은
+  [저장소 스킬](../baton-brief-persistence-flows/SKILL.md), 수신 결과 지표는 [운영 스킬](../baton-brief-operations-flows/SKILL.md)을
+  함께 사용한다.
 
 ## 수신 시 유지할 규칙
 
