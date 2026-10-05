@@ -11,7 +11,9 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 [필수 CI](https://github.com/ljkhyeong/baton-brief/actions/runs/34675956047)는 통과했다.
 후속 보안 패치·실행 설정·연동 준비와 코드 정리는 [PR #18](https://github.com/ljkhyeong/baton-brief/pull/18)로
 원격 `main`의 `2a96b04`에 병합했다. 최종 CI 상태는 해당 PR, 각 변경의 로컬 검증 범위는 아래 표를 따른다.
-이후 Claude Code 스킬 공유와 코드 정리는 [PR #23](https://github.com/ljkhyeong/baton-brief/pull/23)으로 묶었다.
+2026-10-05 Jackson 보안 패치([PR #24](https://github.com/ljkhyeong/baton-brief/pull/24))와 Claude Code 스킬 공유·코드 정리
+([PR #23](https://github.com/ljkhyeong/baton-brief/pull/23))를 원격 `main`의 `6f1c88b`에 병합했고 두 PR의 필수 CI는 통과했다.
+병합 뒤 의존성 제출에서 Dependabot 경고 7건이 모두 닫혔다.
 BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
 이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
@@ -35,6 +37,7 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF 브리프 최신 여부·범위 지정 비교, 2026-10-05 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 45건·ArchUnit 4건 통과, domain 6건은 변경 없어 기존 결과 재사용. 서비스 Caddy `adapt` 통과와 허용 정규식의 허용 8개·거부 7개 경로 확인 | JDK 21·Testcontainers PostgreSQL 18.6. PRD-0031·0032 신규 경로, `SERVICE_API`·`Caddyfile.service`·PRD-0025 허용 목록 갱신. CI 스테이징에서 서비스 Caddy를 지나 앱 `401`까지 도달하는지 확인을 추가했다. BATON 클라이언트 반영과 원격 배포는 미실행 |
 | BRIEF 코드 정리 PR #23, 2026-10-05 | 마지막 제품 코드 변경 뒤 `46473c7`에서 `./gradlew test :bootstrap:bootJar` 성공. bootstrap 44건·ArchUnit 4건 통과, domain 6건은 변경 없어 기존 결과 재사용, 실행 JAR 생성. 이후 Gradle 설정 정리 뒤 같은 명령의 테스트·구조 검사·JAR가 모두 UP-TO-DATE. `caddy adapt` JSON과 세 조합의 `docker compose config` 출력이 변경 전과 같음. CI 지표·경보 단계는 로컬 실행 통과, `verify-feedback.py final` 통과 | JDK 21·Testcontainers PostgreSQL 18.6. 페이지 계산·잠금·Bearer 체인·토큰 판정·404 생성 통합, 에디션 명령의 주간 구간 파생, 중복 단언 삭제와 요청 빌더 정리, CI·Caddy·Compose·Gradle 설정의 반복 정리. SQL·잠금 순서·인증 판정과 테스트 수는 바꾸지 않았다. CI 스테이징 단계의 실제 실행은 [PR #23](https://github.com/ljkhyeong/baton-brief/pull/23) CI에서 확인한다. 이미지 배포 미실행 |
 | BRIEF `2de8dd5` 비교 조회 정리, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefMvpIntegrationTest.에디션 비교는*'` 성공(7초), 통합 1건·ArchUnit 4건 통과. 기준 미존재 시 임시 저장 포트 대역의 조회 2→1회와 `NotFound` 유지 확인 | 기존 정상·역방향 비교, 범위 오류·미존재·ETag 동작 유지. 로그 `/tmp/brief-comparison-cleanup-tests-20260912.log`·`/tmp/brief-comparison-cleanup-before-20260912.log`·`/tmp/brief-comparison-cleanup-after-20260912.log`. 전체 diff 확인. 함께 검토한 지표 테스트의 `use` 전환은 `SimpleMeterRegistry`가 AutoCloseable을 구현하지 않아 컴파일 실패 후 원복·재컴파일 확인. 테스트 변경 없음. 전체 테스트·JAR 재생성·원격 CI·배포 제외. 기존 실행 JAR는 `d3adabf` 기준이며 이번 비교 변경은 미포함 |
 | BRIEF `d3adabf` 인증 설정 정리, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefSecurityConfigurationTest' --tests '*BriefServiceApiSecurityIntegrationTest' --tests '*BriefMvpIntegrationTest.이벤트 수신 Bearer*' :bootstrap:bootJar` 성공(13초). 인증 4건·ArchUnit 4건 통과, 실행 JAR 생성 | Spring Security 7.1.1·JDK 21.0.10·PostgreSQL 18.6. 중복 Bearer 오류 설정과 미사용 import 8줄 제거. 토큰 누락·오입력 401과 Bearer 헤더, 직전 토큰·API 간 인증 분리·기동 거부 확인. 로그 `/tmp/brief-auth-cleanup-tests-20260912.log`. 파일·전체 diff 검사 통과. 인증 설정만 변경해 전체 제품 테스트·별도 JAR 기동·이미지 빌드·원격 CI·배포는 제외 |
@@ -104,6 +107,9 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
    정상 Bearer 성공·잘못된 Bearer `401`·동일 이벤트 재전달 `200`, 비밀 로그 비노출과 실패 시 outbox 재시도를 확인한다.
 4. 로그인한 BATON 화면의 요약·필터·전이·해소 상세·조회·생성과 열람자 제한을 확인한다.
    장애 주입은 실행 기록을 보존하고 별도 진행한다. 원격 전달 검증 전에는 계약 팩을 안정 버전으로 올리지 않는다.
+5. BATON이 [PRD-0032](docs/PRD/0032_scoped-edition-comparison/spec.md) 범위 지정 비교로 두 브리프의 사전 조회를 줄이고,
+   [PRD-0031](docs/PRD/0031_edition-freshness/spec.md) 최신 여부를 추가 전달 안내와 함께 표시하도록 BATON PRD-0010과
+   BRIEF 클라이언트를 갱신한다. BATON 저장소 작업은 요청이 있을 때 진행한다.
 
 ## 다음 세션의 환경 참고
 

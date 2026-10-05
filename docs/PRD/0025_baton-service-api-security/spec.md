@@ -17,6 +17,7 @@ BATON 사용자 계정이나 멤버십을 복제하지 않는다.
 - 점검 항목 단건·상태별 목록·전이 이력과 PRD-0027의 활성 요약 `GET`
 - PRD-0030의 `GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions`
 - 브리프 전역 최신·주간 최신·단건·이력·비교 `GET`
+- PRD-0032의 범위 지정 비교와 PRD-0031의 최신 여부 확인 `GET`
 - `POST /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions`
 
 이벤트 수신·수신 기록·이상 수신 기록·투영 재구축·Actuator는 서비스 API 권한에 포함하지
