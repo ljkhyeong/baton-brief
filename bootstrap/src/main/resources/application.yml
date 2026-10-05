@@ -17,6 +17,8 @@ spring:
     mapper:
       allow-coercion-of-scalars: false
   mvc:
+    format:
+      date: iso
     problemdetails:
       enabled: true
 server:

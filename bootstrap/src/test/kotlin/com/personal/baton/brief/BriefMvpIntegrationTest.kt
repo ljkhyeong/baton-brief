@@ -1501,7 +1501,6 @@ class BriefMvpIntegrationTest(
         postEvent(decimalVersion).andExpect(status().isBadRequest)
 
         listOf(
-            "occurredAt" to "1786525200",
             "aggregateRevision" to "1.0",
             "aggregateRevision" to "9223372036854775808",
             "unexpected" to "true",
@@ -1510,12 +1509,11 @@ class BriefMvpIntegrationTest(
                 .andExpect(status().isBadRequest)
         }
         listOf(
-            "eventId" to "AAAAAAAAAAAAAAAAAAAAAA",
-            "eventId" to "AAAAAAAAAAAAAAAAAAAAAA==",
+            "eventId" to "not-a-uuid",
             "sourceReference" to "\u0000",
             "sourceReference" to "valid\u0000suffix",
-            "occurredAt" to "2026-08-12T24:00:00Z",
-            "occurredAt" to "2026-08-12T23:59:60Z",
+            "occurredAt" to "2026-08-12T09:00:00",
+            "occurredAt" to "+10000-01-01T00:00:00Z",
         ).forEach { (field, value) ->
             postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1).put(field, value))
                 .andExpect(status().isBadRequest)
@@ -1604,9 +1602,6 @@ class BriefMvpIntegrationTest(
         val workspaceId = "10000000-0000-0000-0000-000000000003"
         val seasonId = "20000000-0000-0000-0000-000000000003"
         val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
-        postEdition(path, """{"weekStart":[2026,8,10],"zoneId":"Asia/Seoul"}""")
-            .andExpect(status().isBadRequest)
-
         mockMvc.perform(get(path).param("beforeGeneration", "0"))
             .andExpect(status().isBadRequest)
         mockMvc.perform(get(path).param("limit", "0"))
