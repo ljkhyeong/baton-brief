@@ -33,18 +33,19 @@ import org.hamcrest.Matchers.contains
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.nullValue
 import org.hamcrest.Matchers.startsWith
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Import
 import org.springframework.core.io.ClassPathResource
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.test.context.TestConstructor
+import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.jdbc.JdbcTestUtils.countRowsInTable
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.MvcResult
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -53,15 +54,18 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
-import org.testcontainers.postgresql.PostgreSQLContainer
 import tools.jackson.core.json.JsonWriteFeature
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.databind.node.ObjectNode
 import tools.jackson.databind.util.RawValue
 
-@Testcontainers
+@Import(BriefPostgresConfiguration::class)
+@Sql(
+    statements = [
+        "TRUNCATE TABLE brief_edition_item, brief_edition, attention_item, source_event_conflict, " +
+            "source_event_receipt RESTART IDENTITY",
+    ],
+)
 @SpringBootTest(
     properties = [
         "brief.event-receiver.authentication-required=true",
@@ -77,21 +81,6 @@ class BriefMvpIntegrationTest(
     private val persistence: BriefPersistencePort,
     private val meterRegistry: MeterRegistry,
 ) {
-    @BeforeEach
-    fun clearDatabase() {
-        jdbc.sql(
-            """
-            TRUNCATE TABLE
-                brief_edition_item,
-                brief_edition,
-                attention_item,
-                source_event_conflict,
-                source_event_receipt
-            RESTART IDENTITY
-            """.trimIndent(),
-        ).update()
-    }
-
     @Test
     fun `상태 확인은 배포 probe 없이 aggregate 상태를 제공한다`() {
         mockMvc.perform(get("/actuator/health"))
@@ -142,7 +131,7 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.status").value("CONFLICT"))
         postEvent(eventJson(eventId, workspaceId, seasonId, "handoff:1", 2))
             .andExpect(status().isConflict)
-        assertThat(countRows("source_event_conflict")).isEqualTo(1)
+        assertThat(countRowsInTable(jdbc, "source_event_conflict")).isEqualTo(1)
 
         val receiptPath = "/api/v1/events/$eventId/receipt"
         val canonicalReceipt = mockMvc.perform(get(receiptPath))
@@ -883,7 +872,7 @@ class BriefMvpIntegrationTest(
         freshness(firstEditionId).andExpect(jsonPath("$.upToDate").value(true))
         freshness(secondEditionId).andExpect(jsonPath("$.upToDate").value(false))
 
-        val editionCount = countRows("brief_edition")
+        val editionCount = countRowsInTable(jdbc, "brief_edition")
         listOf(
             "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/editions/$firstEditionId/freshness",
             "$editionsPath/50000000-0000-0000-0000-000000000099/freshness",
@@ -892,7 +881,7 @@ class BriefMvpIntegrationTest(
                 .andExpect(status().isNotFound)
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
         }
-        assertThat(countRows("brief_edition")).isEqualTo(editionCount)
+        assertThat(countRowsInTable(jdbc, "brief_edition")).isEqualTo(editionCount)
     }
 
     @Test
@@ -1132,7 +1121,7 @@ class BriefMvpIntegrationTest(
             .andReturn()
         val firstEditionId = editionIdOf(firstResult)
         val firstEditionEtag = etagOf(firstResult)
-        val attentionCountBeforeFailedRebuild = countRows("attention_item")
+        val attentionCountBeforeFailedRebuild = countRowsInTable(jdbc, "attention_item")
         assertThatThrownBy {
             persistence.rebuild { event, current ->
                 when (val decision = AttentionProjector.project(event, current)) {
@@ -1146,7 +1135,7 @@ class BriefMvpIntegrationTest(
                 }
             }
         }.isInstanceOf(DataIntegrityViolationException::class.java)
-        assertThat(countRows("attention_item")).isEqualTo(attentionCountBeforeFailedRebuild)
+        assertThat(countRowsInTable(jdbc, "attention_item")).isEqualTo(attentionCountBeforeFailedRebuild)
 
         postEdition(generationPath, editionRequest)
             .andExpect(status().isOk)
@@ -1556,7 +1545,7 @@ class BriefMvpIntegrationTest(
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
         }
         listOf("source_event_receipt", "source_event_conflict", "attention_item").forEach { table ->
-            assertThat(countRows(table)).isZero()
+            assertThat(countRowsInTable(jdbc, table)).isZero()
         }
 
         val valid = eventJson(UUID.randomUUID().toString(), workspace, season, "123", 1)
@@ -1585,7 +1574,7 @@ class BriefMvpIntegrationTest(
             .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
 
         listOf("source_event_receipt", "source_event_conflict", "attention_item", "brief_edition").forEach { table ->
-            assertThat(countRows(table)).isZero()
+            assertThat(countRowsInTable(jdbc, table)).isZero()
         }
     }
 
@@ -1783,7 +1772,7 @@ class BriefMvpIntegrationTest(
 
         assertThat(concurrentStatuses { postEvent(event).andReturn().response.status })
             .containsExactly(200, 202)
-        assertThat(countRows("source_event_receipt")).isEqualTo(1)
+        assertThat(countRowsInTable(jdbc, "source_event_receipt")).isEqualTo(1)
     }
 
     @Test
@@ -1798,7 +1787,7 @@ class BriefMvpIntegrationTest(
         val request = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
         assertThat(concurrentStatuses { postEdition(path, request).andReturn().response.status })
             .containsExactly(200, 201)
-        assertThat(countRows("brief_edition")).isEqualTo(1)
+        assertThat(countRowsInTable(jdbc, "brief_edition")).isEqualTo(1)
     }
 
     @Test
@@ -2183,9 +2172,6 @@ class BriefMvpIntegrationTest(
         }
     }
 
-    private fun countRows(table: String): Long =
-        jdbc.sql("SELECT COUNT(*) FROM $table").query(Long::class.java).single()
-
     private fun editionIdOf(result: MvcResult): String = JsonPath.read(result.response.contentAsString, "$.editionId")
 
     private fun etagOf(result: MvcResult): String = checkNotNull(result.response.getHeader(HttpHeaders.ETAG))
@@ -2218,10 +2204,6 @@ class BriefMvpIntegrationTest(
 
     companion object {
         private val JSON = JsonMapper.builder().build()
-
-        @Container
-        @ServiceConnection
-        val postgres = PostgreSQLContainer("postgres:18.6-alpine")
     }
 }
 

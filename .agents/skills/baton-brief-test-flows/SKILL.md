@@ -12,7 +12,10 @@ description: BATON BRIEF 테스트를 추가·분리·정리할 때 사용한다
 - 투영 판정·주간 구간·이벤트 형식 같은 순수 규칙은 `domain` 단위 테스트에 둔다. Spring·DB가 필요 없는
   규칙을 통합 테스트로 올리지 않는다. `application`은 별도 테스트 모듈이 없다.
 - HTTP·DB·트랜잭션·잠금·마이그레이션은 `bootstrap`의 Testcontainers PostgreSQL 통합 테스트에 둔다.
-  `BriefMvpIntegrationTest`는 `@BeforeEach`에서 테이블을 비우고 같은 컨테이너·`MockMvc`를 공유한다.
+  통합 테스트 클래스는 `@Import(BriefPostgresConfiguration::class)`의 `@ServiceConnection` 빈으로
+  컨텍스트마다 PostgreSQL을 띄운다. `BriefMvpIntegrationTest`는 클래스 수준 `@Sql`의
+  `TRUNCATE ... RESTART IDENTITY`로 매 테스트 전에 테이블과 순번을 비우고 같은 컨테이너·`MockMvc`를
+  공유한다. 테이블을 추가하면 이 목록에도 넣고, 메서드 수준 `@Sql`을 붙이면 `@SqlMergeMode`를 확인한다.
   인증 설정처럼 다른 Spring 컨텍스트가 필요할 때만 테스트 클래스를 나눈다.
 - 시간 경계는 `BriefService`에 고정 `Clock`을 주입해 직전·정각·직후를 만든다. 실제 시간 경과를 기다리지 않는다.
 - 구조 규칙은 `BriefArchitectureTest`에 둔다. 일반 `test`에서 제외되고 `:bootstrap:architectureTest`로 실행된다.

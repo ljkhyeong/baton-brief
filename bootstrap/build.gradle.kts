@@ -20,7 +20,6 @@ dependencies {
         exclude(group = "tools.jackson.dataformat", module = "jackson-dataformat-yaml")
     }
     testImplementation("org.springframework:spring-jdbc")
-    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
 }
 
