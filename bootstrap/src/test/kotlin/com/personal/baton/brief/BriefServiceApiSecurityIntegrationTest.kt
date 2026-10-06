@@ -110,6 +110,9 @@ class BriefServiceApiSecurityIntegrationTest(
                 .content("{}"),
         ).andExpect(status().isUnauthorized)
 
+        mockMvc.perform(post("/api/v1/projections/rebuild"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
         mockMvc.perform(
             post("/api/v1/projections/rebuild")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"),
