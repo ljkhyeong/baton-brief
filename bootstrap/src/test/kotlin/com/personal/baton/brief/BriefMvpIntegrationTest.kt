@@ -125,8 +125,6 @@ class BriefMvpIntegrationTest(
         postEvent(first)
             .andExpect(status().isAccepted)
             .andExpect(jsonPath("$.status").value("APPLIED"))
-        assertThat(payloadFingerprint(eventId))
-            .isEqualTo("4d19e0ec49d9eef94dadef018d64ad89837e39c07d911daa583918c180c9da15")
 
         postEvent(first)
             .andExpect(status().isOk)
@@ -212,8 +210,6 @@ class BriefMvpIntegrationTest(
                     countsBefore.getValue(outcome),
             ).describedAs("%s 수신 응답 수", outcome).isEqualTo(count)
         }
-        assertThat(payloadFingerprint("30000000-0000-0000-0000-000000000004"))
-            .isEqualTo("c2ce3738a8199882e2557a151464dd244083289ce737e5e0c4d9e5c8c6531f31")
         mockMvc.perform(get("/api/v1/events/30000000-0000-0000-0000-000000000004/receipt"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.eventVersion").value(3))
@@ -280,7 +276,7 @@ class BriefMvpIntegrationTest(
             val before = currentItem()
 
             assertThatThrownBy {
-                persistence.processEvent(event, "a".repeat(64), now, { now }) { current ->
+                persistence.processEvent(event, now, { now }) { current ->
                     val decision = AttentionProjector.project(event, current) as ProjectionDecision.Applied
                     decision.copy(item = decision.item.copy(ruleVersion = 0))
                 }
@@ -737,8 +733,6 @@ class BriefMvpIntegrationTest(
 
         val firstEventId = "70000000-0000-0000-0000-000000000001"
         val firstReference = "baton-continuity:60000000-0000-0000-0000-000000000001"
-        assertThat(payloadFingerprint(firstEventId))
-            .isEqualTo("69bf5f24726545fd73fba11ae22261f7ec1c7d9279f3e12543c03061344b5c55")
         val conflictingEvent = JSON.readTree(
             contractEvent("role-unassigned.active-r1-critical.json"),
         ) as ObjectNode
@@ -812,11 +806,10 @@ class BriefMvpIntegrationTest(
             """
             INSERT INTO brief_edition (
                 edition_id, workspace_id, season_id, generation, week_start, zone_id,
-                window_start, window_end, rule_version, source_cursor, state_fingerprint, generated_at
+                window_start, window_end, rule_version, source_cursor, generated_at
             ) VALUES (
                 :editionId, :workspaceId, :seasonId, 1, DATE '2026-08-10', 'Asia/Seoul',
                 TIMESTAMPTZ '2026-08-09T15:00:00Z', TIMESTAMPTZ '2026-08-16T15:00:00Z', 1, 0,
-                'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
                 TIMESTAMPTZ '2026-08-12T09:00:00Z'
             )
             """.trimIndent(),
@@ -839,7 +832,7 @@ class BriefMvpIntegrationTest(
         mockMvc.perform(get("/api/v1/editions/$oldEditionId"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.ruleVersion").value(1))
-        // 빈 선정이라 지문은 같지만 규칙 버전이 달라 다시 만들면 새 에디션이 된다.
+        // 빈 선정이라 항목은 같지만 규칙 버전이 달라 다시 만들면 새 에디션이 된다.
         mockMvc.perform(get("$path/$oldEditionId/freshness"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.upToDate").value(false))
@@ -847,7 +840,7 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
-    fun `브리프 최신 여부는 지금 다시 선정한 내용의 지문을 저장된 지문과 비교한다`() {
+    fun `브리프 최신 여부는 지금 다시 선정한 항목을 저장된 항목과 비교한다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000002"
         val seasonId = "20000000-0000-0000-0000-000000000002"
         seedWeeklyEditionScenario(workspaceId, seasonId)
@@ -984,12 +977,6 @@ class BriefMvpIntegrationTest(
             .andExpect(jsonPath("$.items[1].severity").value("MEDIUM"))
             .andReturn()
         val firstEditionId = editionIdOf(firstResult)
-        assertThat(
-            jdbc.sql("SELECT state_fingerprint FROM brief_edition WHERE edition_id = :editionId")
-                .param("editionId", UUID.fromString(firstEditionId))
-                .query(String::class.java)
-                .single(),
-        ).isEqualTo("1db5d549902f103be9d7ae0b2359e13e082a8a0e6d28fb8d8040a661da45c5c4")
         assertThat(firstResult.response.getHeader(HttpHeaders.LOCATION))
             .isEqualTo("/api/v1/editions/$firstEditionId")
 
@@ -1655,10 +1642,12 @@ class BriefMvpIntegrationTest(
             val eventId = "30000000-0000-0000-0000-00000000010${index + 1}"
             val sourceReference = "time-boundary:$weekStart"
             val occurredAt = "${weekStart}T00:00:00Z"
-            postEvent(
-                eventJson(eventId, workspaceId, seasonId, sourceReference, 1, occurredAt = occurredAt),
-            ).andExpect(status().isAccepted)
+            val event = eventJson(eventId, workspaceId, seasonId, sourceReference, 1, occurredAt = occurredAt)
+            postEvent(event).andExpect(status().isAccepted)
                 .andExpect(jsonPath("$.item.observedAt").value(occurredAt))
+            // 재전달 판정은 저장한 필드와 비교하므로 경계 연도의 시각도 손실 없이 왕복해야 한다.
+            postEvent(event).andExpect(status().isOk)
+                .andExpect(jsonPath("$.status").value("DUPLICATE"))
             mockMvc.perform(get("/api/v1/events/$eventId/receipt"))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.occurredAt").value(occurredAt))
@@ -1849,7 +1838,6 @@ class BriefMvpIntegrationTest(
             val ingest = executor.submit<IngestResult> {
                 persistence.processEvent(
                     event = supportedEvent,
-                    fingerprint = "a".repeat(64),
                     receivedAt = receivedAt,
                     conflictDetectedAt = { receivedAt },
                 ) { current ->
@@ -2197,10 +2185,6 @@ class BriefMvpIntegrationTest(
 
     private fun countRows(table: String): Long =
         jdbc.sql("SELECT COUNT(*) FROM $table").query(Long::class.java).single()
-
-    private fun payloadFingerprint(eventId: String): String = jdbc.sql(
-        "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
-    ).param("eventId", UUID.fromString(eventId)).query(String::class.java).single()
 
     private fun editionIdOf(result: MvcResult): String = JsonPath.read(result.response.contentAsString, "$.editionId")
 

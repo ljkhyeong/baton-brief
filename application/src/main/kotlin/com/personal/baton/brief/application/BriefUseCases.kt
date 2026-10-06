@@ -178,20 +178,6 @@ data class EditionFreshness(
     val evaluatedAt: Instant,
 )
 
-data class StoredEditionState(
-    val workspaceId: UUID,
-    val seasonId: UUID,
-    val weekStart: LocalDate,
-    val zoneId: ZoneId,
-    val ruleVersion: Int,
-    val stateFingerprint: String,
-)
-
-data class EditionContent(
-    val items: List<BriefEditionItem>,
-    val stateFingerprint: String,
-)
-
 interface BriefQueries {
     fun findEventReceipt(eventId: UUID): SourceEventReceipt?
 
@@ -289,14 +275,12 @@ interface BriefUseCases : BriefQueries {
 interface BriefPersistencePort : BriefQueries {
     fun recordUnsupported(
         event: SourceEvent,
-        fingerprint: String,
         receivedAt: Instant,
         conflictDetectedAt: () -> Instant,
     ): IngestResult
 
     fun processEvent(
         event: SourceEvent,
-        fingerprint: String,
         receivedAt: Instant,
         conflictDetectedAt: () -> Instant,
         project: (AttentionItem?) -> ProjectionDecision,
@@ -312,13 +296,12 @@ interface BriefPersistencePort : BriefQueries {
 
     fun rebuild(project: (SourceEvent, AttentionItem?) -> ProjectionDecision): RebuildResult
 
-    fun findStoredEditionState(editionId: UUID): StoredEditionState?
-
+    /** 선정 규칙 대상인 `ACTIVE`이고 `observedAt < window.end`인 현재 항목을 반환한다. */
     fun findEditionCandidates(command: GenerateEditionCommand): List<AttentionItem>
 
     fun createEdition(
         command: GenerateEditionCommand,
         currentTime: () -> Instant,
-        selectContent: (List<AttentionItem>) -> EditionContent,
+        selectItems: (List<AttentionItem>) -> List<BriefEditionItem>,
     ): EditionResult
 }
