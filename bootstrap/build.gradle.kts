@@ -24,6 +24,10 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-postgresql")
 }
 
+tasks.bootJar {
+    archiveFileName = "baton-brief.jar"
+}
+
 tasks.processTestResources {
     from(rootProject.layout.projectDirectory.dir("contracts")) {
         into("contracts")

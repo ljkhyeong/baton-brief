@@ -22,10 +22,7 @@ COPY adapter-out-persistence/src/main ./adapter-out-persistence/src/main
 COPY bootstrap/src/main ./bootstrap/src/main
 
 RUN --mount=type=cache,target=/root/.gradle \
-    ./gradlew --no-daemon :bootstrap:bootJar \
-    && find bootstrap/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' \
-        -exec cp '{}' /workspace/baton-brief.jar \; \
-    && test -s /workspace/baton-brief.jar
+    ./gradlew --no-daemon :bootstrap:bootJar
 
 FROM ${JAVA_RUNTIME_IMAGE} AS runtime
 
@@ -35,7 +32,7 @@ RUN command -v wget >/dev/null \
 
 WORKDIR /opt/baton-brief
 COPY --from=build --chown=10001:10001 --chmod=0444 \
-    /workspace/baton-brief.jar ./baton-brief.jar
+    /workspace/bootstrap/build/libs/baton-brief.jar ./baton-brief.jar
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -Djava.io.tmpdir=/tmp"
 USER 10001:10001
