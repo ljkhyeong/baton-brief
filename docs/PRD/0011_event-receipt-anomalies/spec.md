@@ -45,10 +45,10 @@ BRIEF가 PRD-0008에 따라 보존하는 최초 수신 기록과 이벤트별 �
 - 저장된 `processingOutcome`이 `APPLIED_WITH_GAP`, `STALE`, `UNSUPPORTED` 중 하나다.
 - 해당 `eventId`에 최초 충돌 기록이 있어 `conflictDetectedAt`이 존재한다.
 
-따라서 최초 결과가 `APPLIED`여도 나중에 다른 지문의 충돌을 처음 탐지했다면 포함한다.
+따라서 최초 결과가 `APPLIED`여도 나중에 수신 필드가 다른 충돌을 처음 탐지했다면 포함한다.
 충돌이 없는 `APPLIED`는 포함하지 않는다.
 
-완전히 같은 이벤트의 재전달 결과인 `DUPLICATE`와 다른 지문의 요청 결과인 `CONFLICT`는
+완전히 같은 이벤트의 재전달 결과인 `DUPLICATE`와 수신 필드가 다른 요청 결과인 `CONFLICT`는
 최초 수신 기록의 `processingOutcome`으로 저장되지 않는다. 두 요청 결과를 이상 유형이나
 필터 값으로 새로 만들지 않으며, 충돌은 기존의 선택적인 `conflictDetectedAt`으로만
 표현한다.
@@ -78,9 +78,9 @@ BRIEF가 PRD-0008에 따라 보존하는 최초 수신 기록과 이벤트별 �
 | `state` | 최초 저장한 `ACTIVE` 또는 `RESOLVED` 상태 |
 | `processingOutcome` | 최초 기록에 저장된 처리 결과 |
 | `receivedAt` | 최초 수신 기록을 저장한 시각 |
-| `conflictDetectedAt` | 다른 지문의 충돌을 처음 탐지한 시각, 없으면 `null` |
+| `conflictDetectedAt` | 수신 필드가 다른 충돌을 처음 탐지한 시각, 없으면 `null` |
 
-fingerprint, 원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 증명, 원문 URL과
+원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 증명, 원문 URL과
 불필요한 PII는 반환하지 않는다.
 
 ## 페이지와 시점 의미
@@ -132,5 +132,5 @@ fingerprint, 원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 �
 - `limit`을 넘지 않으며 빈 범위는 `200 OK`와 빈 배열을 반환한다.
 - 충돌이 나중에 발견된 기록은 첫 페이지부터 다시 시작한 탐색에서 현재 자격에 따라
   나타나며, 커서를 스냅샷 토큰으로 해석하지 않는다.
-- 응답은 PRD-0007의 안전한 필드만 포함하고 fingerprint와 원문 payload를 노출하지 않는다.
+- 응답은 PRD-0007의 안전한 필드만 포함하고 원문 payload를 노출하지 않는다.
 - 조회 전후에 수신 기록, 충돌 기록, 투영과 브리프 저장 상태가 바뀌지 않는다.

@@ -66,8 +66,8 @@ DTO 검증·이벤트 처리·브리프 생성 전에 거부하며 별도 본문
 
 ## 민감정보 제한
 
-- 원문 요청 본문, `sourceReference`, 페이로드 지문, PII, 자격 증명과 원문 URL을 오류
-  확장 속성에 복사하지 않는다.
+- 원문 요청 본문, `sourceReference`, PII, 자격 증명과 원문 URL을 오류 확장 속성에
+  복사하지 않는다.
 - SQL, PostgreSQL 진단, 예외 클래스, 예외 메시지와 스택 트레이스를 응답에 포함하지 않는다.
 - `spring.web.error.include-message`, `include-binding-errors`, `include-exception`,
   `include-stacktrace`를 활성화하지 않는다.

@@ -77,7 +77,7 @@ PRD-0013은 복합 식별자를 아는 호출자가 점검 항목 한 건을 확
 
 각 항목은 `reasonCode`, `severity`, `sourceReference`, `status`, `observedAt`,
 `aggregateRevision`, `ruleVersion`, `revisionGap`만 반환한다. 작업공간·시즌은 경로 범위이며
-원본 payload, fingerprint, 수신 시각, 충돌 기록과 SQL·예외 상세는 노출하지 않는다.
+원본 payload, 수신 시각, 충돌 기록과 SQL·예외 상세는 노출하지 않는다.
 
 ## 변경 중 페이지 의미
 

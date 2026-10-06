@@ -62,7 +62,7 @@
 | [PRD-0010 브리프 리비전 근거](PRD/0010_edition-revision-evidence/spec.md) | 채택됨 | 브리프 항목의 집계 리비전·공백 고정 |
 | [PRD-0012 브리프 조건부 조회](PRD/0012_edition-etag/spec.md) | 채택됨 | 브리프 본문·비교 결과의 `ETag`와 `If-None-Match` |
 | [PRD-0029 주간 변경·이전 미해소 구분](PRD/0029_edition-carry-over/spec.md) | 채택됨 | 브리프 선정 규칙 v2와 생성 당시 항목 분류 |
-| [PRD-0031 브리프 최신 여부 확인](PRD/0031_edition-freshness/spec.md) | 채택됨 | 지금 다시 선정한 내용의 지문과 저장된 지문 비교 |
+| [PRD-0031 브리프 최신 여부 확인](PRD/0031_edition-freshness/spec.md) | 채택됨 | 지금 다시 선정한 항목과 저장된 항목 비교 |
 | [PRD-0032 범위 지정 브리프 비교](PRD/0032_scoped-edition-comparison/spec.md) | 채택됨 | 작업공간·시즌 경로 안에서 범위 확인과 비교를 한 번에 조회 |
 
 ## 스테이징 실행

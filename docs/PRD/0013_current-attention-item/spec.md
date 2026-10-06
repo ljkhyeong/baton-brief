@@ -44,7 +44,7 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 적용된 원본 집계 리비전이 만든 현재 투영이며 `ACTIVE`와 `RESOLVED`를 모두 반환한다.
 
 - 더 큰 리비전의 `APPLIED` 또는 `APPLIED_WITH_GAP` 수신은 조회 결과를 갱신한다.
-- `STALE`, 같은 이벤트의 `DUPLICATE`, 다른 지문의 `CONFLICT`와 `UNSUPPORTED`는 현재
+- `STALE`, 같은 이벤트의 `DUPLICATE`, 수신 필드가 다른 `CONFLICT`와 `UNSUPPORTED`는 현재
   투영을 바꾸지 않는다.
 - 전체 재구축은 보존 수신 기록과 같은 규칙으로 현재 결과를 재현한다.
 - 현재 항목은 변경 가능하며 과거 상태 이력이나 생성 당시 스냅샷이 아니다. 과거 고정
@@ -70,7 +70,7 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 | `ruleVersion` | 현재 투영 규칙 버전 |
 | `revisionGap` | 지금까지 적용한 리비전에 공백이 있었는지 여부 |
 
-원본 payload, fingerprint, 수신 시각, 충돌 지문, SQL·예외 상세와 불필요한 PII는
+원본 payload, 수신 시각, 충돌 기록, SQL·예외 상세와 불필요한 PII는
 반환하지 않는다.
 
 ## 영속성과 호환성

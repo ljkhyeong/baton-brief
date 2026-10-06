@@ -71,7 +71,7 @@ surrogate를 거부한다. 조회를 위해 원본 참조를 정규화하거나 
   현재 표시 심각도로 과거 값을 재계산하지 않는다.
 
 2026-09-05 `sourceSeverity`를 추가했다. 상태가 `ACTIVE`로 같아도 심각도가 달라진 전이를
-설명할 수 있게 한다. 저장 열·투영 규칙·이벤트 요청 계약·기존 지문은 바꾸지 않는다.
+설명할 수 있게 한다. 저장 열·투영 규칙·이벤트 요청 계약·중복·충돌 판정은 바꾸지 않는다.
 BATON은 응답 필드를 중계하도록 갱신하고, 기존 필드 거부 정책이 있다면 배포 전에 호환성을
 확인해야 한다.
 
@@ -83,8 +83,7 @@ BATON은 응답 필드를 중계하도록 갱신하고, 기존 필드 거부 정
 
 - 기존 `source_event_receipt`의 복합 식별자, `aggregate_revision`, `event_state`,
   `occurred_at`, `processing_outcome`, `source_severity`를 읽는다.
-- `processingOutcome` 전체나 수신 시각, fingerprint, 원문 payload와 충돌 기록은 응답에
-  노출하지 않는다.
+- `processingOutcome` 전체나 수신 시각, 원문 payload와 충돌 기록은 응답에 노출하지 않는다.
 - 재구축은 수신 기록을 바꾸지 않으므로 성공·실패 재구축 전후 전이 이력도 바뀌지 않는다.
 - 새 테이블·열을 추가하지 않는다. 작업공간·시즌별 조회 인덱스는
   [ADR-0002](../../ADR/0002_technology-stack/adr.md)를 따른다.
