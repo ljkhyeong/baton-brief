@@ -12,7 +12,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-jackson")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
-    testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    testImplementation("org.springframework.boot:spring-boot-security")
     testImplementation(libs.archunit)
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
@@ -20,8 +20,11 @@ dependencies {
         exclude(group = "tools.jackson.dataformat", module = "jackson-dataformat-yaml")
     }
     testImplementation("org.springframework:spring-jdbc")
-    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
+}
+
+tasks.bootJar {
+    archiveFileName = "baton-brief.jar"
 }
 
 tasks.processTestResources {

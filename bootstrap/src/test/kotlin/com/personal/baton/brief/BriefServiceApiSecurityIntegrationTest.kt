@@ -4,8 +4,8 @@ import com.jayway.jsonpath.JsonPath
 import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.context.TestConstructor
@@ -16,11 +16,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
-import org.testcontainers.postgresql.PostgreSQLContainer
 
-@Testcontainers
+@Import(BriefPostgresConfiguration::class)
 @SpringBootTest(
     properties = [
         "brief.event-receiver.authentication-required=true",
@@ -110,6 +107,9 @@ class BriefServiceApiSecurityIntegrationTest(
                 .content("{}"),
         ).andExpect(status().isUnauthorized)
 
+        mockMvc.perform(post("/api/v1/projections/rebuild"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")))
         mockMvc.perform(
             post("/api/v1/projections/rebuild")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"),
@@ -119,12 +119,6 @@ class BriefServiceApiSecurityIntegrationTest(
             get("/api/v1/events/30000000-0000-0000-0000-000000000051/receipt")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"),
         ).andExpect(status().isForbidden)
-    }
-
-    companion object {
-        @Container
-        @ServiceConnection
-        val postgres = PostgreSQLContainer("postgres:18.6-alpine")
     }
 }
 

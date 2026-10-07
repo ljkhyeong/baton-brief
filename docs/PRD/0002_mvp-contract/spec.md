@@ -119,12 +119,12 @@ UUID·시점 필드는 Jackson 표준 `UUID`·`Instant` 해석을 따른다. 따
 
 ### 수신 결과
 
-BRIEF는 정규 이벤트 페이로드의 지문을 이벤트 식별자와 함께 보존하고 다음 결과를
+BRIEF는 정규화한 이벤트 수신 필드를 이벤트 식별자와 함께 보존하고 다음 결과를
 구분한다.
 
-지문은 `eventId`, `eventType`, `eventVersion`, `workspaceId`, `seasonId`, `sourceReference`,
-`aggregateRevision`, 정규화한 `occurredAt`, `state`, `sourceSeverity` 순서의 값을 SHA-256으로
-계산한다. `sourceSeverity`가 없으면 `null`을 넣는다.
+같은 `eventId`의 저장된 최초 수신 필드인 `eventId`, `eventType`, `eventVersion`, `workspaceId`,
+`seasonId`, `sourceReference`, `aggregateRevision`, 정규화한 `occurredAt`, `state`, `sourceSeverity`를
+새 요청 값과 그대로 비교한다. 모두 같으면 같은 이벤트이고, `sourceSeverity`가 없으면 `null`로 비교한다.
 
 PostgreSQL `TIMESTAMPTZ`와 저장·응답 데이터의 정밀도를 맞추기 위해 모든 이벤트·생성 시각은
 애플리케이션에서 마이크로초 미만을 버린 값으로 처리한다.
@@ -133,10 +133,10 @@ PostgreSQL `TIMESTAMPTZ`와 저장·응답 데이터의 정밀도를 맞추기 �
 - `APPLIED`: 지원하는 새 이벤트를 수신 기록에 남기고 리비전 규칙에 따라 투영에
   반영했다.
 - `APPLIED_WITH_GAP`: 새 이벤트를 적용했지만 직전 적용 리비전과 사이에 간격이 있다.
-- `DUPLICATE`: 지원하는 이벤트에서 같은 `eventId`와 정규화된 본문 지문을 다시 받았다.
+- `DUPLICATE`: 지원하는 이벤트에서 같은 `eventId`와 정규화된 수신 필드를 다시 받았다.
   성공으로 처리하며 현재 점검 항목을 다시 갱신하지 않는다.
-- `CONFLICT`: 같은 `eventId`에 다른 지문이 들어왔다. 기존 수신 기록과 점검 항목을 유지하고,
-  최초 충돌의 지문·탐지 시각만 저장한다. 원문 본문이나 비밀 값은 저장하지 않는다.
+- `CONFLICT`: 같은 `eventId`에 수신 필드가 하나라도 다른 이벤트가 들어왔다. 기존 수신 기록과
+  점검 항목을 유지하고, 최초 충돌의 탐지 시각만 저장한다. 원문 본문이나 비밀 값은 저장하지 않는다.
 - `UNSUPPORTED`: `eventVersion`이 `3` 이상이다.
   수신 기록을 `UNSUPPORTED` 결과로 보존하고 투영을 부분 적용하지 않는다.
 - `STALE`: 이미 적용한 현재 리비전 이하의 이벤트다. 수신 기록에는 결과를 남기지만
@@ -160,10 +160,10 @@ HTTP 상태와 응답 본문은 다음과 같다.
 `revisionGap`을 포함한다.
 
 지원하지 않는 이벤트의 완전히 같은 재생은 `DUPLICATE`로 바꾸지 않고 저장된 `UNSUPPORTED` 결과를
-그대로 반환한다. 같은 `eventId`로 지문이 다른 이벤트가 오면 최초 수신 기록의 지원
-여부와 관계없이 `CONFLICT`다. 격리 증거는 이벤트별 최초 충돌의 지문과
+그대로 반환한다. 같은 `eventId`로 수신 필드가 다른 이벤트가 오면 최초 수신 기록의 지원
+여부와 관계없이 `CONFLICT`다. 격리 증거는 이벤트별 최초 충돌의
 탐지 시각 한 건만 보존해 크기를 제한한다. 최초 수신 기록의 `receivedAt`은 요청을 받은
-시각이고, `conflictDetectedAt`은 기존 지문과 다르다고 판정한 시각이다.
+시각이고, `conflictDetectedAt`은 저장된 수신 필드와 다르다고 판정한 시각이다.
 
 ### 리비전과 간격
 
@@ -257,22 +257,22 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
   `occurredAt`(`observedAt`)이 `windowEnd`보다 이른 항목을 선택한다. `[windowStart, windowEnd)`는
   `CURRENT_WEEK`, `windowStart` 이전은 `CARRY_OVER`로 구분한다. 기존 규칙 v1은 해당 주간의
   항목만 선정했으며 저장된 이전 브리프는 바꾸지 않는다.
-- 정렬·선택된 고정 항목 상태를 정규화해 `stateFingerprint`를 계산한다. 같은 작업공간,
-  시즌, `weekStart`, `zoneId`와 규칙 버전의 가장 최근 브리프가 같은
-  `stateFingerprint`를 가질 때만 반복 생성 요청으로 판단한다. 이 경우 기존 브리프를 반환한다.
+- 같은 작업공간, 시즌, `weekStart`, `zoneId`와 규칙 버전의 가장 최근 브리프 항목 목록이
+  지금 선정·정렬한 항목 목록과 필드·순서까지 같을 때만 반복 생성 요청으로 판단한다.
+  이 경우 기존 브리프를 반환한다.
   생성 시각이나 수신 커서만 달라졌다는 이유로 새 브리프를 만들지 않는다.
-- PRD-0010을 적용한 상태 지문에는 선택 항목의 `aggregateRevision`과 `revisionGap`도
+- PRD-0010을 적용한 항목 비교에는 선택 항목의 `aggregateRevision`과 `revisionGap`도
   포함한다. 표시 필드가 같더라도 리비전 근거가 달라지면 새 브리프를 생성하고, 같은 근거의
   반복 생성은 가장 최근 브리프를 멱등하게 반환한다.
 - `CURRENT_WEEK`, `CARRY_OVER` 그룹 순서 안에서 `severity` 내림차순(`HIGH`가 `MEDIUM`보다
-  먼저), `reasonCode`, `sourceReference` 오름차순으로 안정 정렬한다. `section`도 상태 지문에
+  먼저), `reasonCode`, `sourceReference` 오름차순으로 안정 정렬한다. `section`도 항목 비교에
   포함하며 새 브리프의 `ruleVersion=2`와 항목의 투영 `ruleVersion=1`을 구분한다.
 - 생성이 완료되면 선택한 항목과 표시 필드, PRD-0010의 집계 리비전·리비전 공백 근거,
   구간, 시간대, 규칙 버전과 원본 커서를 고정한다. 이후 투영 변경이나 재구축이 기존
   브리프를 수정하지 않는다.
 - 선택 상태가 달라지거나 정정이 필요하면 기존 브리프를 덮어쓰지 않고 해당
   작업공간·시즌의 다음 생성 번호로 새 브리프를 저장한다. 상태가 `A → B → A`로 되돌아와 과거와
-  같은 지문이 다시 나타나더라도 직전 브리프와 다르므로 과거 `A` 브리프를 재사용하지
+  같은 항목 목록이 다시 나타나더라도 직전 브리프와 다르므로 과거 `A` 브리프를 재사용하지
   않고 새 브리프를 만든다.
 - 전역 최신 브리프는 해당 작업공간·시즌에서 완료된 브리프 중 생성 번호가 가장 큰
   브리프다.
@@ -312,13 +312,13 @@ MVC의 표준 처리로 `304 Not Modified`를 반환하며, 브리프 선택 결
 
 - 첫 전달, 완전히 같은 중복, 식별자 충돌과 지원하지 않는 버전 결과가 구분된다.
 - 지원하지 않는 이벤트의 완전히 같은 재생은 안정적으로 `UNSUPPORTED`를 반환하고 같은
-  식별자의 다른 지문은 `CONFLICT`가 된다. 충돌 기록은 이벤트별 한 건을 넘지 않는다.
+  식별자의 다른 수신 필드는 `CONFLICT`가 된다. 충돌 기록은 이벤트별 한 건을 넘지 않는다.
 - 오래된 리비전은 투영을 변경하지 않고, 리비전 간격은 명시적인 증거를 남긴다.
 - 이벤트 v2 다섯 종류의 `ACTIVE`/`RESOLVED`가 BATON 원본 심각도 대응과 함께 적용되고
   재구축된다.
 - 재구축 결과가 같은 수락 수신 기록의 실시간 투영과 같다.
 - 월요일 검증, IANA 시간대와 DST 경계의 `[start, end)` 계산이 고정 시간 테스트로 확인된다.
-- 같은 요청 범위의 직전 `stateFingerprint`와 동일한 반복 요청은 브리프를 중복 생성하지
+- 같은 요청 범위의 직전 브리프와 선정 항목이 같은 반복 요청은 브리프를 중복 생성하지
   않고, 선택 상태가 달라지거나 `A → B → A`로 되돌아오면 생성 번호가 증가한다.
 - PRD-0010 적용 뒤 표시 필드가 같더라도 `aggregateRevision` 또는 `revisionGap`이 달라지면
   새 브리프가 생성되고, 이후 동일한 근거의 반복 생성은 멱등하다.

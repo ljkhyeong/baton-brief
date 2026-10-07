@@ -5,8 +5,9 @@
 BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [README](README.md),
 계약·구조 결정은 [문서 색인](docs/README.md), 계약 버전은 [VERSION](contracts/VERSION)을 따른다.
 스키마는 Flyway `V1__create_brief_schema.sql` 하나이고 이벤트는 v2만 투영한다. 보존할 데이터와 운영 소비자가
-없어 이벤트 v1·이전 데이터 호환은 두지 않는다. 이전 V1~V10 이력이 남은 로컬·스테이징 DB는
-Flyway 검증에서 기동이 거부되므로 볼륨을 지우고 다시 만든다. 계약 팩은 원격 호환 검증 전인 RC 상태다.
+없어 이벤트 v1·이전 데이터 호환은 두지 않는다. 2026-10-06 운영 전 정리로 V1 내용(지문 열 삭제·열거형 DOMAIN)을
+다시 고쳤다. 이전 V1~V10 이력이나 그 전 V1로 만든 로컬·스테이징 DB는 Flyway 체크섬 검증에서 기동이 거부되므로
+볼륨을 지우고 다시 만든다. 계약 팩은 원격 호환 검증 전인 RC 상태다.
 
 2026-09-12 조회·운영 연동과 입력 검증 개선을 원격 `main`의 `791c8f4`에 병합했다
 ([PR #17](https://github.com/ljkhyeong/baton-brief/pull/17)). 해당 PR의
@@ -39,6 +40,7 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF 표준 API 정리 `e848173`, 2026-10-06 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 45건·ArchUnit 4건·domain 8건 통과, `baton-brief.jar` 생성. `contractsZip` 성공(문서 5개·내부 링크 9개 확인). 실제 JAR에서 yml placeholder 없이 환경변수만으로 두 경계의 인증 켜기·token 누락 기동 실패 문구, 이벤트·서비스 무인증 `401`·정상 token 통과, 목록 밖 경로 무인증 `401`·서비스 token `403`, 로그 token 비노출·기본 사용자 미생성 확인. `docker build` 성공, 이미지 안 JAR 경로·`0444`·UID 10001과 기동 확인 | JDK 21·Testcontainers PostgreSQL 18.6, 빈 DB. JAR·이미지 확인은 DB 없이 Flyway를 끈 기동이라 수신·조회 동작은 통합 테스트 근거다. 수신 중복·충돌은 저장 필드 동등 비교, 브리프 재사용·최신 여부는 항목 목록 비교로 바뀌어 0000·9999년 재전달 `DUPLICATE`를 추가 검증했다. 스테이징 Compose 실행·원격 CI·배포는 미실행 |
 | BRIEF 이전 호환 제거·타입 바인딩, 2026-10-05 | `ea6b4e2`·`61ac26c` 각각 `./gradlew test :bootstrap:bootJar` 성공. bootstrap 44건·ArchUnit 4건·domain 7건 통과, 실행 JAR 생성. 이후 테스트만 추가해 형식 오류 통합 1건·운영 설정 4건·`WeeklyWindowTest` 3건을 선택 실행해 통과했고, 문자열 숫자 변환 금지·DTO 리비전 양수·운영 `limit`·기준 순번·주간 월요일 검사를 지우면 각각 실패함을 확인했다 | JDK 21·Testcontainers PostgreSQL 18.6. 단일 V1 스키마를 빈 DB에 적용한 결과로 검증했고 보존 데이터 업그레이드는 대상이 없다. 이벤트 v1 제거, 요청 UUID·`Instant`·`LocalDate` 타입 바인딩 전환. 원격 배포 미실행 |
 | BRIEF `98005ac` 독립 실행 환경변수, 2026-09-12 | `:bootstrap:test`의 인증 설정·서비스 인증·이벤트 계약 8건 통과, `:bootstrap:bootJar`는 입력 불변으로 기존 JAR 재사용(13초). 실제 JAR에서 서비스 토큰 누락 기동 실패, 인증 분리·수신 202·중복 200·요약 조회·브리프 생성, DB 중단 시 readiness 503·liveness 200과 앱 재시작 없는 복구 확인 | JDK 21.0.10·PostgreSQL 18.6. 임시 환경의 DB·HTTP 주소는 loopback과 시험 포트 사용. 최초 DB 재시작 때 Docker 자동 포트 재할당으로 복구 확인 실패해 원인 재현 후 고정 포트로 해당 범위만 재검증. 로그 `/tmp/brief-runtime-env-build-20260912.log`·`/tmp/brief-runtime-env-check-20260912.log`·`/tmp/brief-runtime-env-port-check-20260912.log`·`/tmp/brief-runtime-env-recovery-check-20260912.log`. 임시 프로세스·DB·볼륨 정리, 로그 비밀 비노출·문서 링크·전체 diff 확인. 이미지 빌드·k3s·실제 웹훅 발송·공인 HTTPS·원격 CI 미실행 |
 | BRIEF `7c02472` CI 실패 보고서·`53a6aa1` 컨테이너 진단, 2026-09-12 | actionlint 1.7.12 통과. 워크플로의 보관 경로로 기존 도메인·통합·ArchUnit 보고서 25개(83,263바이트)를 선택하며 HTML의 CSS/JS 포함·Gradle 바이너리 결과 제외 확인. 로그 `/tmp/brief-ci-test-reports-actionlint-20260912.log`·`/tmp/brief-ci-test-reports-paths-20260912.log` | 공식 upload-artifact v7.0.1 커밋 고정·Gradle 실패 조건·3일 보관 설정 확인. 실제 원격 업로드·전체 CI·배포는 미실행. 기존 cleanup 6개 실패 조합·Bash 검사의 `53a6aa1` 근거(`/tmp/brief-ci-cleanup-before-20260912.log`·`/tmp/brief-ci-cleanup-after-20260912.log`) 유지. 검사 도구 `/tmp/brief-ci-diagnostics-tools-20260912/actionlint`. 전체 diff·문서 링크 확인. 제품 입력 불변으로 Gradle·JAR 검증 재실행 제외 |

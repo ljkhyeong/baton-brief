@@ -109,7 +109,7 @@ BRIEF는 `contracts/VERSION`을 기준으로 이벤트 v2 JSON Schema와 예시�
 테스트를 통과한 뒤에만 직렬화 호환을 주장할 수 있다. 현재 교차 검증 범위는
 `HANDOFF.md`를 따른다.
 
-- 이번 결정은 PRD-0002의 수신 결과, fingerprint, 투영 규칙과 HTTP 상태를 변경하지 않는다.
+- 이번 결정은 PRD-0002의 수신 결과, 중복·충돌 판정, 투영 규칙과 HTTP 상태를 변경하지 않는다.
 - BATON 신호를 정보 손실 없이 현재 이벤트 버전에 대응시킬 수 없으면 BRIEF가 임의 매핑을
   수용하지 않고 새 이벤트 버전의 생산자·소비자 호환 계약을 먼저 채택한다.
 - BRIEF에는 생산 방향을 뒤집는 BATON client, broker adapter, 인증 예외, 추측 enum,

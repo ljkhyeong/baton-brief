@@ -14,7 +14,6 @@ import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventType
 import jakarta.validation.constraints.AssertTrue
-import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
 import java.time.DayOfWeek
@@ -34,7 +33,6 @@ private val SUPPORTED_YEARS = 0..9999
 data class SourceEventRequest(
     val eventId: UUID,
     val eventType: SourceEventType,
-    @field:Min(SourceEvent.SUPPORTED_VERSION.toLong())
     val eventVersion: Int,
     val sourceSeverity: SourceEventSeverity? = null,
     val workspaceId: UUID,
@@ -51,9 +49,9 @@ data class SourceEventRequest(
     val supportedOccurredAt: Boolean
         get() = occurredAt.atOffset(ZoneOffset.UTC).year in SUPPORTED_YEARS
 
-    @get:AssertTrue(message = "eventVersion 2에는 sourceSeverity가 필요합니다")
+    @get:AssertTrue(message = "eventVersion은 2 이상이어야 하며 2에는 sourceSeverity가 필요합니다")
     val validVersionContract: Boolean
-        get() = eventVersion < SourceEvent.SUPPORTED_VERSION || SourceEvent.isReceivable(eventVersion, sourceSeverity)
+        get() = SourceEvent.isReceivable(eventVersion, sourceSeverity)
 
     fun toDomain(): SourceEvent = SourceEvent(
         eventId = eventId,

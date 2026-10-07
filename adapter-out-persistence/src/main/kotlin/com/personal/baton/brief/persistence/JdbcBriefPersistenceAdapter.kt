@@ -6,7 +6,6 @@ import com.personal.baton.brief.application.AttentionItemTransitionHistory
 import com.personal.baton.brief.application.BriefPersistencePort
 import com.personal.baton.brief.application.CurrentAttentionItemPage
 import com.personal.baton.brief.application.CurrentAttentionItemSummary
-import com.personal.baton.brief.application.EditionContent
 import com.personal.baton.brief.application.EditionHistoryResult
 import com.personal.baton.brief.application.EditionResult
 import com.personal.baton.brief.application.EditionSummary
@@ -18,7 +17,6 @@ import com.personal.baton.brief.application.WeeklyResolutionSummary
 import com.personal.baton.brief.application.ResolutionItem
 import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.application.SourceEventReceipt
-import com.personal.baton.brief.application.StoredEditionState
 import com.personal.baton.brief.domain.AttentionItem
 import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
@@ -50,38 +48,26 @@ class JdbcBriefPersistenceAdapter(
     @Transactional
     override fun recordUnsupported(
         event: SourceEvent,
-        fingerprint: String,
         receivedAt: Instant,
         conflictDetectedAt: () -> Instant,
     ): IngestResult {
         lock("event:${event.eventId}")
-        findExistingEventResult(
-            event.eventId,
-            fingerprint,
-            IngestStatus.UNSUPPORTED,
-            conflictDetectedAt,
-        )?.let { return it }
+        findExistingEventResult(event, IngestStatus.UNSUPPORTED, conflictDetectedAt)?.let { return it }
 
-        insertReceipt(event, fingerprint, IngestStatus.UNSUPPORTED, receivedAt)
+        insertReceipt(event, IngestStatus.UNSUPPORTED, receivedAt)
         return IngestResult(event.eventId, IngestStatus.UNSUPPORTED)
     }
 
     @Transactional
     override fun processEvent(
         event: SourceEvent,
-        fingerprint: String,
         receivedAt: Instant,
         conflictDetectedAt: () -> Instant,
         project: (AttentionItem?) -> ProjectionDecision,
     ): IngestResult {
         lock(PROJECTION_LOCK, shared = true)
         lock("event:${event.eventId}")
-        findExistingEventResult(
-            event.eventId,
-            fingerprint,
-            IngestStatus.DUPLICATE,
-            conflictDetectedAt,
-        )?.let { return it }
+        findExistingEventResult(event, IngestStatus.DUPLICATE, conflictDetectedAt)?.let { return it }
 
         lock("attention:${event.workspaceId}:${event.seasonId}:${event.eventType.name}:${event.sourceReference}")
         val current = findAttentionItem(
@@ -92,13 +78,13 @@ class JdbcBriefPersistenceAdapter(
         )
         return when (val decision = project(current)) {
             ProjectionDecision.Stale -> {
-                insertReceipt(event, fingerprint, IngestStatus.STALE, receivedAt)
+                insertReceipt(event, IngestStatus.STALE, receivedAt)
                 IngestResult(event.eventId, IngestStatus.STALE)
             }
 
             is ProjectionDecision.Applied -> {
                 val status = if (decision.hasRevisionGap) IngestStatus.APPLIED_WITH_GAP else IngestStatus.APPLIED
-                insertReceipt(event, fingerprint, status, receivedAt)
+                insertReceipt(event, status, receivedAt)
                 jdbc.sql(UPSERT_ATTENTION).params(decision.item.jdbcParameters()).update()
                 IngestResult(event.eventId, status, decision.item)
             }
@@ -235,7 +221,7 @@ class JdbcBriefPersistenceAdapter(
     ).param("workspaceId", workspaceId)
         .param("seasonId", seasonId)
         .param("eventType", eventType?.name)
-        .query(ATTENTION_ITEM_SUMMARY_MAPPER)
+        .query(CurrentAttentionItemSummary::class.java)
         .single()
 
     override fun findWeeklyResolutions(
@@ -353,9 +339,7 @@ class JdbcBriefPersistenceAdapter(
         var receiptCount = 0
         jdbc.sql(
             """
-            SELECT event_id, event_type, event_version, source_severity, workspace_id, season_id,
-                   source_reference, aggregate_revision, occurred_at, event_state AS state
-              FROM source_event_receipt
+            $SOURCE_EVENT_SELECT
              WHERE processing_outcome <> 'UNSUPPORTED'
              ORDER BY ingestion_sequence
             """.trimIndent(),
@@ -390,13 +374,12 @@ class JdbcBriefPersistenceAdapter(
     override fun createEdition(
         command: GenerateEditionCommand,
         currentTime: () -> Instant,
-        selectContent: (List<AttentionItem>) -> EditionContent,
+        selectItems: (List<AttentionItem>) -> List<BriefEditionItem>,
     ): EditionResult {
         lock(PROJECTION_LOCK)
 
-        val candidates = findEditionCandidates(command)
-        val content = selectContent(candidates)
-        findLatestEditionByState(command, content.stateFingerprint)?.let { existing ->
+        val items = selectItems(findEditionCandidates(command))
+        findLatestEditionForRule(command)?.takeIf { it.items == items }?.let { existing ->
             return EditionResult(existing, created = false)
         }
 
@@ -412,9 +395,9 @@ class JdbcBriefPersistenceAdapter(
             ruleVersion = BriefEdition.RULE_VERSION,
             sourceCursor = sourceCursor,
             generatedAt = generatedAt,
-            items = content.items,
+            items = items,
         )
-        insertEdition(edition, content.stateFingerprint)
+        insertEdition(edition)
         insertEditionItems(edition)
         return EditionResult(edition, created = true)
     }
@@ -488,30 +471,28 @@ class JdbcBriefPersistenceAdapter(
         return EditionHistoryResult(editions, next)
     }
 
+    /** 같은 `eventId`의 최초 수신 필드가 모두 같으면 재전달, 하나라도 다르면 충돌로 판정한다. */
     private fun findExistingEventResult(
-        eventId: UUID,
-        fingerprint: String,
+        event: SourceEvent,
         replayStatus: IngestStatus,
         conflictDetectedAt: () -> Instant,
     ): IngestResult? {
-        val existingFingerprint = jdbc.sql(
-            "SELECT payload_fingerprint FROM source_event_receipt WHERE event_id = :eventId",
-        ).param("eventId", eventId)
-            .query(String::class.java)
+        val stored = jdbc.sql("$SOURCE_EVENT_SELECT WHERE event_id = :eventId")
+            .param("eventId", event.eventId)
+            .query(SOURCE_EVENT_MAPPER)
             .optional()
             .getOrNull()
             ?: return null
-        if (existingFingerprint == fingerprint) {
-            return IngestResult(eventId, replayStatus)
+        if (stored == event) {
+            return IngestResult(event.eventId, replayStatus)
         }
 
-        recordConflict(eventId, fingerprint, conflictDetectedAt())
-        return IngestResult(eventId, IngestStatus.CONFLICT)
+        recordConflict(event.eventId, conflictDetectedAt())
+        return IngestResult(event.eventId, IngestStatus.CONFLICT)
     }
 
     private fun insertReceipt(
         event: SourceEvent,
-        fingerprint: String,
         outcome: IngestStatus,
         receivedAt: Instant,
     ) {
@@ -519,11 +500,10 @@ class JdbcBriefPersistenceAdapter(
             """
             INSERT INTO source_event_receipt (
                 event_id, event_type, event_version, source_severity, workspace_id, season_id, source_reference,
-                aggregate_revision, occurred_at, event_state, payload_fingerprint,
-                processing_outcome, received_at
+                aggregate_revision, occurred_at, event_state, processing_outcome, received_at
             ) VALUES (
                 :eventId, :eventType, :eventVersion, :sourceSeverity, :workspaceId, :seasonId, :sourceReference,
-                :aggregateRevision, :occurredAt, :eventState, :fingerprint, :outcome, :receivedAt
+                :aggregateRevision, :occurredAt, :eventState, :outcome, :receivedAt
             )
             """.trimIndent(),
         ).params(
@@ -538,7 +518,6 @@ class JdbcBriefPersistenceAdapter(
                 "aggregateRevision" to event.aggregateRevision,
                 "occurredAt" to event.occurredAt.jdbcValue(),
                 "eventState" to event.state.name,
-                "fingerprint" to fingerprint,
                 "outcome" to outcome.name,
                 "receivedAt" to receivedAt.jdbcValue(),
             ),
@@ -547,31 +526,18 @@ class JdbcBriefPersistenceAdapter(
 
     private fun recordConflict(
         eventId: UUID,
-        fingerprint: String,
         detectedAt: Instant,
     ) {
         jdbc.sql(
             """
-            INSERT INTO source_event_conflict (event_id, conflicting_fingerprint, detected_at)
-            VALUES (:eventId, :fingerprint, :detectedAt)
+            INSERT INTO source_event_conflict (event_id, detected_at)
+            VALUES (:eventId, :detectedAt)
             ON CONFLICT (event_id) DO NOTHING
             """.trimIndent(),
         ).param("eventId", eventId)
-            .param("fingerprint", fingerprint)
             .param("detectedAt", detectedAt.jdbcValue())
             .update()
     }
-
-    override fun findStoredEditionState(editionId: UUID): StoredEditionState? = jdbc.sql(
-        """
-        SELECT workspace_id, season_id, week_start, zone_id, rule_version, state_fingerprint
-          FROM brief_edition
-         WHERE edition_id = :editionId
-        """.trimIndent(),
-    ).param("editionId", editionId)
-        .query(STORED_EDITION_STATE_MAPPER)
-        .optional()
-        .getOrNull()
 
     override fun findEditionCandidates(command: GenerateEditionCommand): List<AttentionItem> = jdbc.sql(
         """
@@ -624,26 +590,15 @@ class JdbcBriefPersistenceAdapter(
         .query(Long::class.java)
         .single()
 
-    private fun findLatestEditionByState(
-        command: GenerateEditionCommand,
-        stateFingerprint: String,
-    ): BriefEdition? = findEditionRow(
+    private fun findLatestEditionForRule(command: GenerateEditionCommand): BriefEdition? = findEditionRow(
         """
         WHERE workspace_id = :workspaceId
           AND season_id = :seasonId
           AND week_start = :weekStart
           AND zone_id = :zoneId
           AND rule_version = :ruleVersion
-          AND state_fingerprint = :stateFingerprint
-          AND generation = (
-              SELECT MAX(latest.generation)
-                FROM brief_edition latest
-               WHERE latest.workspace_id = :workspaceId
-                 AND latest.season_id = :seasonId
-                 AND latest.week_start = :weekStart
-                 AND latest.zone_id = :zoneId
-                 AND latest.rule_version = :ruleVersion
-          )
+        ORDER BY generation DESC
+        LIMIT 1
         """.trimIndent(),
         mapOf(
             "workspaceId" to command.workspaceId,
@@ -651,24 +606,18 @@ class JdbcBriefPersistenceAdapter(
             "weekStart" to command.weekStart,
             "zoneId" to command.zoneId.id,
             "ruleVersion" to BriefEdition.RULE_VERSION,
-            "stateFingerprint" to stateFingerprint,
         ),
     )
 
-    private fun insertEdition(
-        edition: BriefEdition,
-        stateFingerprint: String,
-    ) {
+    private fun insertEdition(edition: BriefEdition) {
         jdbc.sql(
             """
             INSERT INTO brief_edition (
                 edition_id, workspace_id, season_id, generation, week_start, zone_id,
-                window_start, window_end, rule_version, source_cursor, state_fingerprint,
-                generated_at
+                window_start, window_end, rule_version, source_cursor, generated_at
             ) VALUES (
                 :editionId, :workspaceId, :seasonId, :generation, :weekStart, :zoneId,
-                :windowStart, :windowEnd, :ruleVersion, :sourceCursor, :stateFingerprint,
-                :generatedAt
+                :windowStart, :windowEnd, :ruleVersion, :sourceCursor, :generatedAt
             )
             """.trimIndent(),
         ).params(
@@ -683,7 +632,6 @@ class JdbcBriefPersistenceAdapter(
                 "windowEnd" to edition.window.end.jdbcValue(),
                 "ruleVersion" to edition.ruleVersion,
                 "sourceCursor" to edition.sourceCursor,
-                "stateFingerprint" to stateFingerprint,
                 "generatedAt" to edition.generatedAt.jdbcValue(),
             ),
         ).update()
@@ -791,12 +739,10 @@ class JdbcBriefPersistenceAdapter(
         private val SOURCE_EVENT_RECEIPT_MAPPER = PostgresDataClassRowMapper(SourceEventReceipt::class.java)
         private val SOURCE_EVENT_MAPPER = PostgresDataClassRowMapper(SourceEvent::class.java)
         private val ATTENTION_ITEM_MAPPER = PostgresDataClassRowMapper(AttentionItem::class.java)
-        private val ATTENTION_ITEM_SUMMARY_MAPPER = DataClassRowMapper(CurrentAttentionItemSummary::class.java)
         private val ATTENTION_ITEM_TRANSITION_MAPPER = PostgresDataClassRowMapper(AttentionItemTransition::class.java)
         private val RESOLUTION_ITEM_MAPPER = PostgresDataClassRowMapper(ResolutionItem::class.java)
         private val EDITION_SUMMARY_MAPPER = PostgresDataClassRowMapper(EditionSummary::class.java)
         private val EDITION_ITEM_MAPPER = PostgresDataClassRowMapper(BriefEditionItem::class.java)
-        private val STORED_EDITION_STATE_MAPPER = DataClassRowMapper(StoredEditionState::class.java)
         private val UPSERT_ATTENTION = """
             INSERT INTO attention_item (
                 workspace_id, season_id, event_type, source_reference, severity,
@@ -817,6 +763,11 @@ class JdbcBriefPersistenceAdapter(
             SELECT workspace_id, season_id, event_type, source_reference, severity,
                    item_status AS status, observed_at, rule_version, last_revision, revision_gap
               FROM attention_item
+        """.trimIndent()
+        private val SOURCE_EVENT_SELECT = """
+            SELECT event_id, event_type, event_version, source_severity, workspace_id, season_id,
+                   source_reference, aggregate_revision, occurred_at, event_state AS state
+              FROM source_event_receipt
         """.trimIndent()
         private val SOURCE_EVENT_RECEIPT_SELECT = """
             SELECT receipt.event_id, receipt.ingestion_sequence, receipt.event_type,

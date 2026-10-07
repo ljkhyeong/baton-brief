@@ -6,13 +6,8 @@ import com.personal.baton.brief.domain.BriefEdition
 import com.personal.baton.brief.domain.BriefEditionItem
 import com.personal.baton.brief.domain.EditionItemSection
 import com.personal.baton.brief.domain.SourceEvent
-import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
 import com.personal.baton.brief.domain.WeeklyWindow
-import java.io.DataOutputStream
-import java.io.OutputStream
-import java.security.DigestOutputStream
-import java.security.MessageDigest
 import java.time.Clock
 import java.time.temporal.ChronoUnit
 import java.util.UUID
@@ -24,12 +19,11 @@ class BriefService(
     override fun ingest(event: SourceEvent): IngestResult {
         val normalizedEvent = event.copy(occurredAt = event.occurredAt.truncatedTo(ChronoUnit.MICROS))
         val receivedAt = now()
-        val fingerprint = fingerprint(normalizedEvent)
         if (!normalizedEvent.isSupported) {
-            return persistence.recordUnsupported(normalizedEvent, fingerprint, receivedAt, ::now)
+            return persistence.recordUnsupported(normalizedEvent, receivedAt, ::now)
         }
 
-        return persistence.processEvent(normalizedEvent, fingerprint, receivedAt, ::now) { current ->
+        return persistence.processEvent(normalizedEvent, receivedAt, ::now) { current ->
             AttentionProjector.project(normalizedEvent, current)
         }
     }
@@ -44,7 +38,7 @@ class BriefService(
     override fun rebuild(): RebuildResult = persistence.rebuild(AttentionProjector::project)
 
     override fun generateEdition(command: GenerateEditionCommand): EditionResult =
-        persistence.createEdition(command, ::now) { selectEditionContent(it, command.window) }
+        persistence.createEdition(command, ::now) { selectEditionItems(it, command.window) }
 
     override fun compareEditions(
         baseEditionId: UUID,
@@ -66,15 +60,14 @@ class BriefService(
         editionId: UUID,
     ): EditionFreshness? {
         val evaluatedAt = now()
-        val stored = persistence.findStoredEditionState(editionId)
+        val edition = persistence.findEdition(editionId)
             ?.takeIf { it.workspaceId == workspaceId && it.seasonId == seasonId }
             ?: return null
-        val ruleVersionChanged = stored.ruleVersion != BriefEdition.RULE_VERSION
-        // 생성과 같은 선정·지문 계산으로 지금 다시 만들 내용이 저장된 내용과 같은지 확인한다.
-        val command = GenerateEditionCommand(workspaceId, seasonId, stored.weekStart, stored.zoneId)
+        val ruleVersionChanged = edition.ruleVersion != BriefEdition.RULE_VERSION
+        // 생성과 같은 선정으로 지금 다시 만들 항목이 저장된 항목(필드·순서)과 같은지 확인한다.
+        val command = GenerateEditionCommand(workspaceId, seasonId, edition.window.weekStart, edition.window.zoneId)
         val upToDate = !ruleVersionChanged &&
-            selectEditionContent(persistence.findEditionCandidates(command), command.window).stateFingerprint ==
-            stored.stateFingerprint
+            selectEditionItems(persistence.findEditionCandidates(command), command.window) == edition.items
         return EditionFreshness(editionId, upToDate, ruleVersionChanged, evaluatedAt)
     }
 
@@ -114,78 +107,27 @@ class BriefService(
     private val BriefEditionItem.comparisonKey
         get() = reasonCode to sourceReference
 
-    private fun selectEditionContent(items: List<AttentionItem>, window: WeeklyWindow): EditionContent {
-        val selected = items
-            .asSequence()
-            .filter { it.status == SourceEventState.ACTIVE }
-            .map {
-                BriefEditionItem(
-                    sourceReference = it.sourceReference,
-                    reasonCode = it.eventType,
-                    severity = it.severity,
-                    status = it.status,
-                    observedAt = it.observedAt,
-                    ruleVersion = it.ruleVersion,
-                    aggregateRevision = it.lastRevision,
-                    revisionGap = it.revisionGap,
-                    section = if (it.observedAt < window.start) {
-                        EditionItemSection.CARRY_OVER
-                    } else {
-                        EditionItemSection.CURRENT_WEEK
-                    },
-                )
-            }.sortedWith(
-                compareBy<BriefEditionItem> { it.section }
-                    .thenByDescending { it.severity }
-                    .thenBy { it.reasonCode.name }
-                    .thenBy { it.sourceReference },
-            ).toList()
-        return EditionContent(
-            items = selected,
-            stateFingerprint = sha256(
-                selected.asSequence().flatMap { item ->
-                    sequenceOf(
-                        item.sourceReference,
-                        item.reasonCode.name,
-                        item.severity.name,
-                        item.status.name,
-                        item.observedAt,
-                        item.ruleVersion,
-                        item.aggregateRevision,
-                        item.revisionGap,
-                        item.section,
-                    )
+    private fun selectEditionItems(items: List<AttentionItem>, window: WeeklyWindow): List<BriefEditionItem> =
+        items.map {
+            BriefEditionItem(
+                sourceReference = it.sourceReference,
+                reasonCode = it.eventType,
+                severity = it.severity,
+                status = it.status,
+                observedAt = it.observedAt,
+                ruleVersion = it.ruleVersion,
+                aggregateRevision = it.lastRevision,
+                revisionGap = it.revisionGap,
+                section = if (it.observedAt < window.start) {
+                    EditionItemSection.CARRY_OVER
+                } else {
+                    EditionItemSection.CURRENT_WEEK
                 },
-            ),
+            )
+        }.sortedWith(
+            compareBy<BriefEditionItem> { it.section }
+                .thenByDescending { it.severity }
+                .thenBy { it.reasonCode.name }
+                .thenBy { it.sourceReference },
         )
-    }
-
-    private fun fingerprint(event: SourceEvent): String = sha256(
-        sequenceOf(
-            event.eventId,
-            event.eventType.name,
-            event.eventVersion,
-            event.workspaceId,
-            event.seasonId,
-            event.sourceReference,
-            event.aggregateRevision,
-            event.occurredAt,
-            event.state.name,
-            event.sourceSeverity?.name,
-        ),
-    )
-
-    private fun sha256(values: Sequence<Any?>): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        DataOutputStream(
-            DigestOutputStream(OutputStream.nullOutputStream(), digest),
-        ).use { output ->
-            values.forEach { value ->
-                val encoded = value.toString().encodeToByteArray()
-                output.writeInt(encoded.size)
-                output.write(encoded)
-            }
-        }
-        return digest.digest().toHexString()
-    }
 }

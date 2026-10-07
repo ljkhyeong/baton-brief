@@ -22,7 +22,7 @@ BRIEF가 담당한다.
 
 - 기존 `POST /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions` 명령
 - 주간 `[windowStart, windowEnd)`, `sourceCursor`, 규칙에 따른 항목 선정과 정렬
-- 불변 항목·`stateFingerprint`, 작업공간·시즌별 `generation`과 동시 생성 직렬화
+- 불변 항목, 작업공간·시즌별 `generation`과 동시 생성 직렬화
 - 같은 범위의 직전 상태 재사용과 `A → B → A` 상태 복귀 시 새 브리프 생성
 
 BRIEF에 대상 registry, 시즌 조회 client, `@Scheduled` 작업과 별도 생성 큐를 추가하지 않는다.
@@ -49,7 +49,7 @@ Content-Type: application/json
   값만으로 브리프 식별자가 영원히 같다고 가정하지 않고 실제 응답을 사용한다.
 
 별도 `Idempotency-Key`나 BATON 실행 식별자를 BRIEF 요청에 추가하지 않는다. BRIEF의 기존
-상태 지문과 생성 잠금이 반복·동시 호출의 저장 중복을 막는다.
+항목 비교와 생성 잠금이 반복·동시 호출의 저장 중복을 막는다.
 
 ## 브리프 생성 전 이벤트 전달 확인
 

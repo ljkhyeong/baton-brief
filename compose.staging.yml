@@ -48,7 +48,6 @@ services:
       BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED: "true"
       SERVER_ADDRESS: 0.0.0.0
       SERVER_FORWARD_HEADERS_STRATEGY: framework
-      SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 30s
       TZ: UTC
     secrets:
       - source: brief_database_password
@@ -60,6 +59,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Spring Boot 기본 graceful 종료 단계 대기(30s)보다 길게 둔다.
     stop_grace_period: 40s
     security_opt:
       - no-new-privileges:true

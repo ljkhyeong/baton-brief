@@ -21,7 +21,7 @@ DB 연결·마이그레이션·웹 서버 기동 전에 중단한다. 명령 실
 실행기 등록은 `ConditionContext.environment`에서 `brief.operations.command` 속성의 존재 여부로 결정한다.
 빈 등록 전부터 제공되는 설정 환경을 사용한다. `false`를 비활성 값으로
 해석하지 않으며, 잘못된 명령 이름은 기존 `ConfigurationProperties`의 열거형 바인딩에서 거부한다.
-수신 원문·fingerprint를 출력하지 않고 기존 수신 조회 결과와 재구축 건수만 반환한다.
+수신 원문을 출력하지 않고 기존 수신 조회 결과와 재구축 건수만 반환한다.
 운영 프로필에서는 성공 결과 JSON만 표준 출력으로 보내고 로그는 표준 오류로 분리한다.
 Spring Boot의 기본 로그 형식과 Logback의 `ConsoleAppender`를 사용한다. Docker 실행 시
 가상 터미널을 비활성화해 이 구분을 유지하며, 웹 서비스는 기존 기본 로그 설정을 사용한다.

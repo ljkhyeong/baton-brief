@@ -1,7 +1,6 @@
 package com.personal.baton.brief
 
-import com.personal.baton.brief.web.BriefEventSecurityConfiguration
-import com.personal.baton.brief.web.BriefServiceApiSecurityConfiguration
+import com.personal.baton.brief.web.BriefSecurityConfiguration
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.autoconfigure.AutoConfigurations
@@ -16,10 +15,7 @@ class BriefSecurityConfigurationTest {
                 SecurityAutoConfiguration::class.java,
                 ServletWebSecurityAutoConfiguration::class.java,
             ),
-        ).withUserConfiguration(
-            BriefEventSecurityConfiguration::class.java,
-            BriefServiceApiSecurityConfiguration::class.java,
-        )
+        ).withUserConfiguration(BriefSecurityConfiguration::class.java)
 
     @Test
     fun `이벤트 인증을 켠 경우에만 필수 토큰을 검증한다`() {

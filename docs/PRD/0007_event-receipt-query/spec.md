@@ -47,7 +47,7 @@ PRD-0002는 이벤트를 수신한 요청에서 처리 결과를 반환하지만
 | `state` | 최초 저장한 이벤트의 `ACTIVE` 또는 `RESOLVED` 상태 |
 | `processingOutcome` | 최초 기록에 저장된 처리 결과 |
 | `receivedAt` | BRIEF가 최초 수신 기록을 저장한 시각 |
-| `conflictDetectedAt` | 다른 지문의 충돌을 처음 탐지한 시각, 없으면 `null` |
+| `conflictDetectedAt` | 수신 필드가 다른 충돌을 처음 탐지한 시각, 없으면 `null` |
 
 `ingestionSequence`는 BRIEF가 수신 기록에 부여한 순번이다.
 이 값만으로 생산자의 이벤트 누락 여부를 판단할 수 없다.
@@ -64,15 +64,14 @@ PRD-0002는 이벤트를 수신한 요청에서 처리 결과를 반환하지만
 완전히 같은 이벤트의 재전달은 `POST /api/v1/events`에서 `DUPLICATE` 응답을 만들 수 있지만
 새 수신 기록을 만들거나 조회 응답의 `processingOutcome`을 `DUPLICATE`로 덮어쓰지 않는다.
 
-같은 이벤트 식별자의 다른 지문은 `POST /api/v1/events`에서 `CONFLICT` 응답을 만들지만
-최초 수신 기록과 `processingOutcome`을 바꾸지 않는다. 이벤트별 최초 충돌
+같은 이벤트 식별자에 수신 필드가 다른 이벤트는 `POST /api/v1/events`에서 `CONFLICT` 응답을
+만들지만 최초 수신 기록과 `processingOutcome`을 바꾸지 않는다. 이벤트별 최초 충돌
 탐지 시각만 선택적인 `conflictDetectedAt`으로 반환한다.
 
 ## 민감정보 제한
 
 응답에 다음 값을 포함하지 않는다.
 
-- `payloadFingerprint`와 `conflictingFingerprint`
 - 원문 요청 payload와 정규화 전 입력
 - SQL, PostgreSQL 진단, 예외 클래스·메시지와 스택 트레이스
 - 자격 증명, 제공자 주소, 원문 URL과 불필요한 PII
@@ -109,8 +108,8 @@ PRD-0002는 이벤트를 수신한 요청에서 처리 결과를 반환하지만
 - 최초 수신 기록을 `eventId`로 조회해 저장된 메타데이터, `ingestionSequence`,
   `processingOutcome`과 `receivedAt`을 반환한다.
 - 동일 이벤트 재전달 뒤에도 최초 `processingOutcome`이 유지된다.
-- 다른 지문의 충돌 뒤에도 최초 저장 필드는 유지되고 `conflictDetectedAt`만 나타난다.
+- 수신 필드가 다른 충돌 뒤에도 최초 저장 필드는 유지되고 `conflictDetectedAt`만 나타난다.
 - 투영 재구축 전후의 조회 응답이 같다.
 - 없는 이벤트는 `404 ProblemDetail`로 응답한다.
-- 응답에 두 fingerprint, 원문 payload, SQL과 예외 상세가 없다.
+- 응답에 원문 payload, SQL과 예외 상세가 없다.
 - 조회 전후에 수신 기록, 충돌 기록, 투영과 브리프 저장 상태가 바뀌지 않는다.

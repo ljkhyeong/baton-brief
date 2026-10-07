@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-11
-- 수정일: 2026-10-05
+- 수정일: 2026-10-06
 
 ## 맥락
 
@@ -49,16 +49,18 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   catalog에서 한 번만 관리한다.
 - BRIEF 전용 데이터베이스는 PostgreSQL 18.6을 사용한다.
 - 영속성 구현은 Spring JDBC의 `JdbcClient`와 Flyway 마이그레이션을 사용한다.
-- 스키마는 Flyway `V1__create_brief_schema.sql` 하나로 만들고 이후 변경은 다음 버전 파일로 추가한다.
+- 스키마는 Flyway `V1__create_brief_schema.sql` 하나로 만든다. 보존할 데이터나 운영 DB가 생긴 뒤의
+  변경은 다음 버전 파일로 추가한다. 그 전에는 V1을 직접 고치고 기존 로컬·스테이징 DB 볼륨을 다시 만든다.
+- 여러 테이블이 쓰는 이벤트 종류·상태·심각도 값 목록 제약은 PostgreSQL DOMAIN으로 한 번만 정의한다.
 - 수신 기록에는 `(workspace_id, season_id, ingestion_sequence DESC)` B-tree 인덱스를 둔다.
   작업공간·시즌별 수신 조회와 에디션의 생성 기준 조회가 다른 범위의 기록까지 읽는 비용을 줄인다.
   미지원 기록과 뒤늦게 충돌이 발견된 기록도 조회하므로 처리 결과로 인덱스 대상을 제한하지 않는다.
   100개 작업공간·10만 건의 합성 데이터에서 기존 조회 SQL의 실행 계획과 결과를 비교해 채택했다.
   실제 운영 성능 보장은 아니며 API·저장 데이터·선정 규칙을 바꾸지 않는다.
-- 단순 행 매핑은 Spring `DataClassRowMapper`를 사용하되 `Instant` 열 읽기만 확장한다.
-  PostgreSQL `TIMESTAMPTZ`는 JDBC 4.2의 `OffsetDateTime`으로 읽고 `toInstant()`로 변환해
-  구형 `Timestamp` 경유 시 과거 날짜가 달라지는 문제를 피한다. 생성자·필드 매핑은 Spring에
-  맡기며 날짜 입력 범위를 추가로 제한하지 않는다.
+- 단순 행 매핑은 `JdbcClient.query(Class)` 또는 Spring `DataClassRowMapper`에 맡긴다. `Instant` 열이
+  있는 행은 `DataClassRowMapper`를 확장한 매퍼로 PostgreSQL `TIMESTAMPTZ`를 JDBC 4.2의
+  `OffsetDateTime`으로 읽고 `toInstant()`로 변환해 구형 `Timestamp` 경유 시 과거 날짜가
+  달라지는 문제를 피한다. 생성자·필드 매핑은 Spring에 맡기며 날짜 입력 범위를 추가로 제한하지 않는다.
 - JPA와 ORM 엔티티는 사용하지 않는다. 도메인 모델과 데이터베이스 행 매핑을 분리한다.
 - 로컬 데이터베이스는 `postgres:18.6-alpine`을 사용하는 `compose.yml`로 제공한다. 애플리케이션은
   로컬 프로필 전용 별칭 대신 Spring Boot 표준 데이터 소스·Flyway 속성을 사용하고

@@ -18,7 +18,7 @@ description: BATON BRIEF의 Micrometer 지표·Prometheus 수집과 경보 규�
 
 ## 유지할 규칙
 
-- 지표 레이블은 값이 제한된 항목만 쓴다. 작업공간·시즌·이벤트 식별자, 원본 참조, 지문, URL,
+- 지표 레이블은 값이 제한된 항목만 쓴다. 작업공간·시즌·이벤트 식별자, 원본 참조, 본문, URL,
   token을 넣지 않는다. `brief.events.received`는 `outcome` 하나로 여섯 결과를 기동 시 `0`으로 등록하고
   웹 어댑터에서만 증가시킨다. HTTP·JVM·HikariCP 계측은 Spring Boot 자동 구성을 복제하지 않는다.
 - 지표는 `compose.observability.yml`을 쓸 때만 컨테이너 내부 관리 서버 `127.0.0.1:9091`에서 제공한다.

@@ -42,7 +42,7 @@ docker compose --env-file .env.staging -f compose.staging.yml run --rm --no-deps
 결과는 기존 조회 API와 같은 JSON이다. 과거 페이지는 반환된
 `nextBeforeIngestionSequence`를 `--brief.operations.before-ingestion-sequence`로 넘긴다.
 첫 페이지를 다시 조회하려면 커서를 생략한다. 조회 결과는 최초 수신 결과를 유지하며
-충돌 지문과 원문 payload를 포함하지 않는다.
+원문 payload를 포함하지 않는다.
 
 `RECEIPT`는 해당 이벤트의 수신 기록이 없으면 오류로 종료한다. `ANOMALIES`는 조건에 맞는
 기록이 없으면 빈 `receipts`와 `nextBeforeIngestionSequence=null`을 반환하고 정상 종료한다.

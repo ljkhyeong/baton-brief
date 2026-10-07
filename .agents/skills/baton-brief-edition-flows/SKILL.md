@@ -16,7 +16,8 @@ description: BATON BRIEF의 불변 에디션 생성·선정·시간 구간·스�
 - 조회: [이력](../../../docs/PRD/0003_edition-history/spec.md),
   [주간 최신](../../../docs/PRD/0009_weekly-latest-edition/spec.md),
   [비교](../../../docs/PRD/0005_edition-comparison/spec.md),
-  [ETag](../../../docs/PRD/0012_edition-etag/spec.md)
+  [ETag](../../../docs/PRD/0012_edition-etag/spec.md),
+  [최신 여부](../../../docs/PRD/0031_edition-freshness/spec.md)
 - 조회 경로·응답 필드를 바꾸면 [HTTP API 스킬](../baton-brief-api-flows/SKILL.md), 스냅샷 열·마이그레이션을
   바꾸면 [저장소 스킬](../baton-brief-persistence-flows/SKILL.md)을 함께 사용한다.
 
@@ -25,14 +26,15 @@ description: BATON BRIEF의 불변 에디션 생성·선정·시간 구간·스�
 - 생성 대상·시간대·시점은 BATON이 정하고 기존 BRIEF 명령을 호출한다. BRIEF에 스케줄러나
   대상 registry를 추가하지 않는다.
 - 주간은 IANA 시간대의 월요일 시작 `[windowStart, windowEnd)`다. DST 경계를 보존하고
-  생성 시각과 지문 입력은 PostgreSQL 마이크로초 정밀도를 맞춘다.
+  생성 시각과 항목 시각은 PostgreSQL 마이크로초 정밀도를 맞춘다.
 - 생성 시 현재 투영과 로컬 `sourceCursor`를 일관되게 고정하고 에디션을 원자적으로 저장한다.
-  같은 범위의 직전 상태만 재사용한다. `A → B → A`는 새 세대이며 커서 이동만으로 생성하지 않는다.
+  같은 범위·규칙 버전의 가장 최근 세대 항목 목록(필드·순서)이 지금 선정한 목록과 같을 때만 재사용한다.
+  `A → B → A`는 새 세대이며 커서 이동만으로 생성하지 않는다.
 - 선정 규칙 `2`는 `ACTIVE`이고 `observedAt < windowEnd`인 항목을 `CURRENT_WEEK`·`CARRY_OVER`로
-  구분한다. 현재 투영·항목 규칙은 `1`이다.
+  구분한다. 이 선정 조건은 저장소 쿼리 `findEditionCandidates`에만 둔다. 현재 투영·항목 규칙은 `1`이다.
 - 항목의 `section`·`aggregateRevision`·`revisionGap`은 `null` 없이 함께 고정하고 현재 투영에서
-  다시 추정하지 않는다. 분류와 근거는 응답·지문·비교에 포함한다.
-- 생성한 항목·지문은 투영 변경이나 재구축으로 다시 계산하지 않는다. 전역 최신과 정확한
+  다시 추정하지 않는다. 분류와 근거는 응답·항목 비교·에디션 비교에 포함한다.
+- 생성한 항목은 투영 변경이나 재구축으로 다시 계산하지 않는다. 전역 최신과 정확한
   작업공간·시즌·주차·시간대의 주간 최신은 각각 저장된 최대 세대를 선택한다.
 - 비교는 `(reasonCode, sourceReference)`를 키로 저장된 두 에디션을 읽는다. 분류·리비전 근거만
   달라도 `changed`이며 `removed`를 현재 `RESOLVED`로 해석하지 않는다.
@@ -43,7 +45,7 @@ description: BATON BRIEF의 불변 에디션 생성·선정·시간 구간·스�
 
 - 생성·선정 변경은 고정 시각의 주간·DST 경계, 결정적 정렬, 즉시 재시도와 `A → B → A`,
   동시 생성과 생성 후 불변성을 확인한다. 생성 잠금을 바꾸면 재구축과의 직렬화도 검증한다.
-- 스냅샷 필드 변경은 신규 생성·비교와 저장한 에디션의 지문 불변을 PostgreSQL에서 확인한다. 보존 데이터가
-  생긴 뒤에는 기존 항목의 업그레이드도 확인한다.
+- 스냅샷 필드 변경은 신규 생성·비교, 반복 생성 재사용과 최신 여부 판정을 PostgreSQL에서 확인한다.
+  보존 데이터가 생긴 뒤에는 기존 항목의 업그레이드도 확인한다.
 - 조회 변경은 해당 범위·정렬·페이지 경계를 확인한다. 주간 최신은 전역 최신과 다른 데이터로,
   비교는 추가·제거·변경과 기준·대상 순서로, ETag는 같은 선택 `304`·새 선택 `200`으로 확인한다.

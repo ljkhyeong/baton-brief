@@ -26,7 +26,7 @@ BATON PRD-0006은 현재 다섯 연속성 신호, `CRITICAL`·`WARNING` 심각�
 `eventVersion=2`에 `sourceSeverity`가 없으면 `400 Bad Request`다. 알 수 없는 열거형, 32비트
 정수 범위를 벗어난 버전과 봉투 형식 오류도 수신 기록을 만들지 않는다.
 
-`sourceSeverity`는 BATON의 원본 판정을 뜻하며 payload fingerprint, 최초 수신 기록과
+`sourceSeverity`는 BATON의 원본 판정을 뜻하며 중복·충돌 비교 필드, 최초 수신 기록과
 재구축 입력에 포함한다. 심각도 없이 받은 미지원 기록은 `null`로 저장한다.
 
 ## 투영 규칙 v1
@@ -48,8 +48,8 @@ BATON PRD-0006은 현재 다섯 연속성 신호, `CRITICAL`·`WARNING` 심각�
 ## 저장
 
 - `source_event_receipt.source_severity`는 nullable이며 `CRITICAL`·`WARNING`만 허용한다.
-- 수신 기록, 점검 항목과 브리프 항목의 이벤트 종류 제약은 v2 다섯 타입만 허용하고,
-  수신 기록의 `event_version`은 `2` 이상이다.
+- 수신 기록, 점검 항목과 브리프 항목의 이벤트 종류 열은 v2 다섯 타입만 허용하는
+  `source_event_type` DOMAIN을 쓰고, 수신 기록의 `event_version`은 `2` 이상이다.
 - `source_event_receipt_supported_contract`는 `UNSUPPORTED`가 아닌 기록에 `event_version = 2`와
   `source_severity IS NOT NULL`을 요구한다.
 - 현재 투영과 브리프의 `severity` 저장 값은 `HIGH`·`MEDIUM`만 사용한다.
@@ -58,7 +58,7 @@ BATON PRD-0006은 현재 다섯 연속성 신호, `CRITICAL`·`WARNING` 심각�
 ## 수신 기록과 재생
 
 PRD-0007 단건과 PRD-0011 이상 수신 기록 응답은 nullable `sourceSeverity`를 같은 안전한 최초
-수신 필드로 반환한다. fingerprint와 원문은 계속 노출하지 않는다.
+수신 필드로 반환한다. 원문은 계속 노출하지 않는다.
 
 재구축은 `UNSUPPORTED`를 제외한 수신 기록을 `ingestion_sequence` 순서로 읽으며
 저장한 `sourceSeverity`를 사용해 실시간 처리와 같은 현재 투영을 만든다.
@@ -92,12 +92,12 @@ PRD-0007 단건과 PRD-0011 이상 수신 기록 응답은 nullable `sourceSever
 
 ## 호환성과 오류 경계
 
-- 지원 v2와 미지원 이벤트의 저장 fingerprint를 고정값으로 검증한다.
+- 지원 v2와 미지원 이벤트의 같은 재전달이 저장된 수신 필드와 같다고 판정되는지 검증한다.
 - 지원하지 않는 버전은 `eventVersion`이 `3` 이상인 경우다.
 - 이후 버전을 지원하게 되어도 이미 `UNSUPPORTED`로 저장한 기록은 재투영하지 않는다.
   저장된 `processingOutcome`은 불변이며 재구축도 계속 제외한다.
-- 같은 `eventId`의 `UNSUPPORTED` 기록은 같은 지문이면 `UNSUPPORTED`, 다른 지문이면
-  `CONFLICT`를 반환한다.
+- 같은 `eventId`의 `UNSUPPORTED` 기록은 수신 필드가 모두 같으면 `UNSUPPORTED`, 하나라도
+  다르면 `CONFLICT`를 반환한다.
 - 이 BRIEF 소비자 변경의 책임은 BATON 생산자 코드, 인증, 전송 작업자와 종단 간 전달을
   포함하지 않는다. 생산자 쪽 완료 상태는 PRD-0018의 교차 저장소 근거로 따로 갱신한다.
 
@@ -107,7 +107,7 @@ PRD-0007 단건과 PRD-0011 이상 수신 기록 응답은 nullable `sourceSever
   `UNSUPPORTED`로 보존된다.
 - v2 다섯 타입의 `ACTIVE`·`RESOLVED`가 BATON 심각도 대응과 함께 적용된다.
 - v2의 동일 재전달, 충돌, 오래된 리비전과 리비전 공백이 기존 결과 계약을 따른다.
-- `sourceSeverity`가 fingerprint와 최초 수신 기록에 보존되고 다른 심각도의 같은
+- `sourceSeverity`가 최초 수신 기록에 보존되고 다른 심각도의 같은
   `eventId`가 충돌로 분류된다.
 - 재구축 뒤 현재 투영이 실시간 처리 결과와 같다.
 - 이벤트 v2 계약 예시가 JSON Schema와 일치하고 같은 예시가 실제 BRIEF 수신·재구축
