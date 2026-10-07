@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-11
-- 수정일: 2026-10-06
+- 수정일: 2026-10-07
 
 ## 맥락
 
@@ -45,7 +45,7 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   - Spring Boot BOM과 플러그인에 수정 버전이 반영되면 해당 제약과 catalog 버전을 제거한다.
     별도 의존성 관리 플러그인이나 제품 코드를 추가하지 않는다.
 - 빌드 스크립트는 Kotlin DSL을 사용한다. 빌드는 Gradle 다중 프로젝트로 구성하고 Gradle
-  래퍼는 9.2.1로 고정한다. Kotlin 플러그인과 Spring Boot/BOM 버전은 Gradle 표준 version
+  래퍼는 9.7.0으로 고정한다. Kotlin 플러그인과 Spring Boot/BOM 버전은 Gradle 표준 version
   catalog에서 한 번만 관리한다.
 - BRIEF 전용 데이터베이스는 PostgreSQL 18.6을 사용한다.
 - 영속성 구현은 Spring JDBC의 `JdbcClient`와 Flyway 마이그레이션을 사용한다.
@@ -83,8 +83,11 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
 CAL의 미병합 MVP 작업에서 당시 진행 중이던 Kotlin/JVM과 Spring Boot 4.1 계열 기준은
 참고하되 JDK 25나 Gradle 버전까지 복제하지 않는다. Kotlin 2.4.20은
 [공식 Gradle 호환표](https://kotlinlang.org/docs/gradle-configure-project.html)에서
-Gradle 7.6.3~9.7.0을 완전 지원한다. BRIEF는 기존에 검증한 Gradle 9.2.1을 유지하며
-자동 제안된 9.7.1은 CI 성공만으로 채택하지 않는다.
+Gradle 7.6.3~9.7.0을 완전 지원한다. 이전에 쓰던 9.2.1은 Gradle 보안 권고
+[GHSA-mqwm-5m85-gmcv](https://github.com/gradle/gradle/security/advisories/GHSA-mqwm-5m85-gmcv)·
+[GHSA-w78c-w6vf-rw82](https://github.com/gradle/gradle/security/advisories/GHSA-w78c-w6vf-rw82)
+(9.3.0에서 수정)의 영향을 받으므로, 완전 지원 범위 안의 최신인 9.7.0을 사용한다.
+상한을 넘는 자동 제안 버전은 CI 성공만으로 채택하지 않는다.
 
 Kotlin 2.4.20은 2026-09-07 출시된 [정식 버전](https://kotlinlang.org/docs/releases.html)이며,
 빌드 캐시의 역직렬화 취약점 [GHSA-r937-wjx7-w2jp](https://github.com/advisories/GHSA-r937-wjx7-w2jp)의
@@ -187,8 +190,8 @@ Java 25 뼈대에서의 과거 성공 결과를 Kotlin/JDK 21 산출물의 성�
   재검토한다.
 - 단일 Spring Boot 모듈: 초기 파일 수는 적지만 도메인·애플리케이션 경계를 빌드 수준에서
   보호하지 못해 채택하지 않았다.
-- Gradle 9.6.1·9.7.1: 현재 기능에 필요한 변경이 없어 검증한 9.2.1을 유지한다.
-  9.7.1은 Kotlin 2.4.20의 완전 지원 상한인 Gradle 9.7.0을 넘는다.
+- Gradle 9.7.1·9.8.0: Kotlin 2.4.20의 완전 지원 상한인 Gradle 9.7.0을 넘는다. 9.8.0은 로컬
+  전체 검증이 통과했지만 Kotlin 호환표가 상한을 올리거나 Kotlin을 올릴 때 다시 검토한다.
 - 메시지 브로커와 외부 연동 어댑터를 함께 선택: 이벤트 봉투, 전달과 운영 계약이
   아직 없으므로 기술 스택 결정에 포함하지 않았다.
 

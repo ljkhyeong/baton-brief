@@ -33,7 +33,7 @@ tasks.processTestResources {
     }
 }
 
-val architectureTest by tasks.registering(Test::class) {
+val architectureTest = tasks.register<Test>("architectureTest") {
     group = "verification"
     description = "DB 없이 모듈과 저장 포트의 의존 규칙을 검사합니다."
     testClassesDirs = sourceSets.test.get().output.classesDirs
