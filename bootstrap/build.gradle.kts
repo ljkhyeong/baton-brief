@@ -16,7 +16,7 @@ dependencies {
     testImplementation(libs.archunit)
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
-    testImplementation("com.networknt:json-schema-validator:3.0.6") {
+    testImplementation("com.networknt:json-schema-validator:3.0.8") {
         exclude(group = "tools.jackson.dataformat", module = "jackson-dataformat-yaml")
     }
     testImplementation("org.springframework:spring-jdbc")
