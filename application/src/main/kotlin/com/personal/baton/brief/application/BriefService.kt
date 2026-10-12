@@ -115,6 +115,7 @@ class BriefService(
                 severity = it.severity,
                 status = it.status,
                 observedAt = it.observedAt,
+                activeSince = checkNotNull(it.activeSince) { "활성 항목에는 activeSince가 필요합니다" },
                 ruleVersion = it.ruleVersion,
                 aggregateRevision = it.lastRevision,
                 revisionGap = it.revisionGap,

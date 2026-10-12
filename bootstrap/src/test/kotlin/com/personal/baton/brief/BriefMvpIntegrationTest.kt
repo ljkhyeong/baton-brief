@@ -950,6 +950,74 @@ class BriefMvpIntegrationTest(
     }
 
     @Test
+    fun `활성 시작 시각은 재활성화에서 다시 시작하고 생성한 브리프에는 고정된다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000009"
+        val seasonId = "20000000-0000-0000-0000-000000000009"
+        val reference = "role:aging"
+        val currentPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
+        val editionsPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        fun roleEvent(revision: Long, occurredAt: String, state: String = "ACTIVE", sourceSeverity: String = "CRITICAL") =
+            eventJson(
+                "80000000-0000-0000-0000-00000000000$revision", workspaceId, seasonId, reference, revision,
+                state = state, type = "ROLE_UNASSIGNED", occurredAt = occurredAt, sourceSeverity = sourceSeverity,
+            )
+
+        postEvent(roleEvent(1, "2026-08-03T01:00:00Z")).andExpect(status().isAccepted)
+        // 심각도만 바뀐 연속 활성 갱신은 지난주의 시작 시각을 유지한다.
+        postEvent(roleEvent(2, "2026-08-11T01:00:00Z", sourceSeverity = "WARNING"))
+            .andExpect(jsonPath("$.item.observedAt").value("2026-08-11T01:00:00Z"))
+            .andExpect(jsonPath("$.item.activeSince").value("2026-08-03T01:00:00Z"))
+        val firstEditionId = editionIdOf(
+            postEdition(editionsPath, editionRequest)
+                .andExpect(status().isCreated)
+                .andExpect(jsonPath("$.items[0].section").value("CURRENT_WEEK"))
+                .andExpect(jsonPath("$.items[0].activeSince").value("2026-08-03T01:00:00Z"))
+                .andReturn(),
+        )
+
+        postEvent(roleEvent(3, "2026-08-12T01:00:00Z", state = "RESOLVED")).andExpect(status().isAccepted)
+        mockMvc.perform(itemRequest(currentPath, "ROLE_UNASSIGNED", reference))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("RESOLVED"))
+            .andExpect(jsonPath("$.activeSince").value(nullValue()))
+        postEvent(roleEvent(4, "2026-08-13T01:00:00Z"))
+            .andExpect(jsonPath("$.item.activeSince").value("2026-08-13T01:00:00Z"))
+        val secondEditionId = editionIdOf(
+            postEdition(editionsPath, editionRequest)
+                .andExpect(status().isCreated)
+                .andExpect(jsonPath("$.items[0].activeSince").value("2026-08-13T01:00:00Z"))
+                .andReturn(),
+        )
+
+        // 생성한 브리프는 재활성화 뒤에도 생성 당시의 시작 시각을 유지한다.
+        mockMvc.perform(get("/api/v1/editions/$firstEditionId"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[0].activeSince").value("2026-08-03T01:00:00Z"))
+        mockMvc.perform(get("$editionsPath/$secondEditionId/changes").param("fromEditionId", firstEditionId))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.changed[0].before.activeSince").value("2026-08-03T01:00:00Z"))
+            .andExpect(jsonPath("$.changed[0].after.activeSince").value("2026-08-13T01:00:00Z"))
+
+        // 재구축이 같은 시작 시각을 재현하므로 다시 생성해도 기존 브리프를 재사용한다.
+        mockMvc.perform(post("/api/v1/projections/rebuild")).andExpect(status().isOk)
+        postEdition(editionsPath, editionRequest)
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editionId").value(secondEditionId))
+
+        // activeSince 추가로 표현이 바뀌었으므로 이전 형식의 ETag로는 304를 받지 않는다.
+        listOf(
+            get("/api/v1/editions/$secondEditionId") to "brief-edition-v2-$secondEditionId",
+            get("$editionsPath/$secondEditionId/changes").param("fromEditionId", firstEditionId) to
+                "brief-edition-comparison-v1-$firstEditionId-$secondEditionId",
+            itemRequest(currentPath, "ROLE_UNASSIGNED", reference) to "brief-attention-item-v1-1-4",
+        ).forEach { (request, previousEtag) ->
+            mockMvc.perform(request.header(HttpHeaders.IF_NONE_MATCH, "\"$previousEtag\""))
+                .andExpect(status().isOk)
+        }
+    }
+
+    @Test
     fun `에디션 생성은 같은 상태를 재사용하고 과거 상태의 새 세대를 이력에 남긴다`() {
         val workspaceId = "10000000-0000-0000-0000-000000000002"
         val seasonId = "20000000-0000-0000-0000-000000000002"
