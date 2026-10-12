@@ -51,6 +51,7 @@
 | [PRD-0027 현재 활성 항목 요약](PRD/0027_attention-item-summary/spec.md) | 채택됨 | 전체·업무 종류별 활성 심각도 개수와 리비전 공백 항목 수 |
 | [PRD-0028 점검 항목 필터](PRD/0028_attention-item-filters/spec.md) | 채택됨 | 현재 목록의 업무 종류·심각도·리비전 공백 필터와 기존 커서 유지 |
 | [PRD-0030 주간 해소 요약](PRD/0030_weekly-resolution-summary/spec.md) | 채택됨 | 연속 리비전으로 확인한 전체·업무 종류별 주간 해소 건수와 목록 |
+| [PRD-0033 연속 활성 시작 시각](PRD/0033_attention-item-active-since/spec.md) | 채택됨 | 현재 항목·브리프 항목의 활성 구간 시작 시각과 공백 뒤 재시작 |
 
 ## 브리프
 

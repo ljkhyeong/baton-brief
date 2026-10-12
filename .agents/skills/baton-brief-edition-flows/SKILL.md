@@ -12,7 +12,8 @@ description: BATON BRIEF의 불변 에디션 생성·선정·시간 구간·스�
 - 생성·멱등성: [MVP 계약](../../../docs/PRD/0002_mvp-contract/spec.md),
   [BATON 주도 생성](../../../docs/PRD/0024_baton-driven-edition-generation/spec.md)
 - 선정·저장 필드: [주간 분류](../../../docs/PRD/0029_edition-carry-over/spec.md),
-  [리비전 근거](../../../docs/PRD/0010_edition-revision-evidence/spec.md)
+  [리비전 근거](../../../docs/PRD/0010_edition-revision-evidence/spec.md),
+  [활성 시작 시각](../../../docs/PRD/0033_attention-item-active-since/spec.md)
 - 조회: [이력](../../../docs/PRD/0003_edition-history/spec.md),
   [주간 최신](../../../docs/PRD/0009_weekly-latest-edition/spec.md),
   [비교](../../../docs/PRD/0005_edition-comparison/spec.md),
@@ -32,8 +33,8 @@ description: BATON BRIEF의 불변 에디션 생성·선정·시간 구간·스�
   `A → B → A`는 새 세대이며 커서 이동만으로 생성하지 않는다.
 - 선정 규칙 `2`는 `ACTIVE`이고 `observedAt < windowEnd`인 항목을 `CURRENT_WEEK`·`CARRY_OVER`로
   구분한다. 이 선정 조건은 저장소 쿼리 `findEditionCandidates`에만 둔다. 현재 투영·항목 규칙은 `1`이다.
-- 항목의 `section`·`aggregateRevision`·`revisionGap`은 `null` 없이 함께 고정하고 현재 투영에서
-  다시 추정하지 않는다. 분류와 근거는 응답·항목 비교·에디션 비교에 포함한다.
+- 항목의 `section`·`aggregateRevision`·`revisionGap`·`activeSince`는 `null` 없이 함께 고정하고 현재
+  투영에서 다시 추정하지 않는다. 분류와 근거는 응답·항목 비교·에디션 비교에 포함한다.
 - 생성한 항목은 투영 변경이나 재구축으로 다시 계산하지 않는다. 전역 최신과 정확한
   작업공간·시즌·주차·시간대의 주간 최신은 각각 저장된 최대 세대를 선택한다.
 - 비교는 `(reasonCode, sourceReference)`를 키로 저장된 두 에디션을 읽는다. 분류·리비전 근거만

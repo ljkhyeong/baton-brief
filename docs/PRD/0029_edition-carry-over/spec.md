@@ -21,7 +21,8 @@
 | `CARRY_OVER` | 이전부터 미해소 | `observedAt < windowStart` |
 
 `observedAt`은 마지막으로 적용한 원본 이벤트의 시각이다. 이 값만으로 문제의 최초 발생
-시각이나 미해소 기간을 알 수 없다. 이전 문제의 심각도가 이번 주에 바뀌면 `CURRENT_WEEK`에만 포함한다.
+시각이나 미해소 기간을 알 수 없다. 현재 활성 구간의 시작 시각은 [PRD-0033](../0033_attention-item-active-since/spec.md)의
+`activeSince`로 함께 고정한다. 이전 문제의 심각도가 이번 주에 바뀌면 `CURRENT_WEEK`에만 포함한다.
 항목은 한 번만 포함하며 분류별 배열이나 집계 테이블을 복제하지 않는다.
 
 `CURRENT_WEEK`, `CARRY_OVER` 순서로 배치하고, 각 그룹 안에서 `HIGH`, `MEDIUM`,

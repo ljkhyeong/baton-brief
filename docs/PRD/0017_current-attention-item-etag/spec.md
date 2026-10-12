@@ -22,10 +22,11 @@
 
 ## ETag 기준
 
-- `ETag`는 API 응답 형식 버전(v1), 적용한 `ruleVersion`과 마지막 `aggregateRevision`으로 만든다.
+- `ETag`는 API 응답 형식 버전, 적용한 `ruleVersion`과 마지막 `aggregateRevision`으로 만든다.
+  응답 형식 버전은 [PRD-0033](../0033_attention-item-active-since/spec.md)의 `activeSince` 추가로 v1에서 v2가 됐다.
 - 현재 항목은 더 큰 집계 리비전의 지원 이벤트가 적용되거나 투영 규칙 버전이 바뀔 때만
-  내용이 바뀐다. 두 값이 같으면 상태·심각도·관측 시각·누적 리비전 공백을 포함한 현재
-  응답도 같다.
+  내용이 바뀐다. 두 값이 같으면 상태·심각도·관측 시각·활성 시작 시각·누적 리비전 공백을
+  포함한 현재 응답도 같다.
 - `STALE`, `DUPLICATE`, `CONFLICT`, `UNSUPPORTED`는 현재 항목을 바꾸지 않으므로 `ETag`도
   바꾸지 않는다.
 - 같은 규칙으로 재구축하면 현재 항목을 재현하므로 `ETag`도 유지한다.

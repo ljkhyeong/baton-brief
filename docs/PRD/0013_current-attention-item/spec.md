@@ -66,6 +66,7 @@ PRD-0014는 이 단건 계약을 바꾸지 않고 현재 `ACTIVE` 항목의 복�
 | `sourceReference` | 길이가 제한된 원본 참조값 |
 | `status` | 현재 `ACTIVE` 또는 `RESOLVED` 상태 |
 | `observedAt` | 마지막 적용 이벤트의 정규화된 원본 관측 시각 |
+| `activeSince` | [PRD-0033](../0033_attention-item-active-since/spec.md)의 현재 활성 구간 시작 시각. `RESOLVED`이면 `null` |
 | `aggregateRevision` | 마지막 적용 집계 리비전 |
 | `ruleVersion` | 현재 투영 규칙 버전 |
 | `revisionGap` | 지금까지 적용한 리비전에 공백이 있었는지 여부 |

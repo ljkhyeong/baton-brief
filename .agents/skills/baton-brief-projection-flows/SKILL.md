@@ -17,7 +17,8 @@ description: BATON BRIEF의 현재 관심 항목·리비전 판정·상태 전�
   [활성 요약](../../../docs/PRD/0027_attention-item-summary/spec.md),
   [심각도·공백 필터](../../../docs/PRD/0028_attention-item-filters/spec.md)
 - 전이·해소 근거: [상태 전이](../../../docs/PRD/0016_attention-item-transitions/spec.md),
-  [주간 해소](../../../docs/PRD/0030_weekly-resolution-summary/spec.md)
+  [주간 해소](../../../docs/PRD/0030_weekly-resolution-summary/spec.md),
+  [연속 활성 시작 시각](../../../docs/PRD/0033_attention-item-active-since/spec.md)
 - [보존·재구축](../../../docs/PRD/0008_retention-rebuild-boundary/spec.md)
 - 조회 경로·응답 필드를 바꾸면 [HTTP API 스킬](../baton-brief-api-flows/SKILL.md), SQL·잠금을 바꾸면
   [저장소 스킬](../baton-brief-persistence-flows/SKILL.md)을 함께 사용한다.
@@ -28,6 +29,8 @@ description: BATON BRIEF의 현재 관심 항목·리비전 판정·상태 전�
   원본 `aggregateRevision`을 사용하며 도착 순서나 로컬 `sourceCursor`로 대신하지 않는다.
 - 실시간 수신과 재구축은 같은 규칙을 사용한다. 원본 심각도 `CRITICAL`은 `HIGH`,
   `WARNING`은 `MEDIUM`으로 표시한다.
+- `activeSince`는 공백 없이 이어진 `ACTIVE` 갱신에서만 유지한다. `RESOLVED`는 `null`, 재활성화와
+  리비전 공백 뒤 `ACTIVE`는 이번 `occurredAt`으로 다시 시작하며 공백 사이를 추정하지 않는다.
 - 현재 단건은 `ACTIVE`·`RESOLVED`를 모두 반환한다. 목록은 `ACTIVE`가 기본이며
   `(eventType, sourceReference)` 오름차순 배타 키셋을 쓴다. 커서를 스냅샷으로 해석하지 않는다.
 - 전이 이력은 `APPLIED`·`APPLIED_WITH_GAP` 수신 기록을 원본 리비전 역순으로 읽는다.
