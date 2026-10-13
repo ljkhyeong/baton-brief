@@ -12,9 +12,10 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 
 2026-10-12 `codex/attention-active-since` 브랜치에 현재 항목·브리프 항목의 연속 활성 시작 시각
 `activeSince`([PRD-0033](docs/PRD/0033_attention-item-active-since/spec.md))를 추가하고 현재 항목·브리프·비교 ETag의
-응답 형식 버전을 올렸다. 로컬 커밋 상태이며 PR·원격 CI는 아직 없다. BATON `4be80f0d`의 BRIEF client는 Jackson 3
-기본값으로 알 수 없는 응답 필드를 무시하고 BRIEF에 `If-None-Match`를 보내지 않는 것을 코드로 확인했다(실행 검증 아님).
-화면에 표시하려면 BATON의 BRIEF DTO와 화면 갱신이 필요하다.
+응답 형식 버전을 올렸다. BATON 화면 표시는 BATON `codex/brief-active-since`(`codex/followup-improvements`의
+`e6ef79ac`에서 분기, `d09fe5b8`·`7329aa6e`·`db991c9c`)에 구현했다. 두 저장소 모두 로컬 커밋 상태이며 PR·원격 CI는 없다.
+BATON BRIEF client는 Jackson 3 기본값으로 알 수 없는 응답 필드를 무시하고 BRIEF에 `If-None-Match`를 보내지 않으므로,
+BRIEF를 먼저 배포해도 기존 BATON은 새 필드를 무시한다.
 
 2026-09-12 조회·운영 연동과 입력 검증 개선을 원격 `main`의 `791c8f4`에 병합했다
 ([PR #17](https://github.com/ljkhyeong/baton-brief/pull/17)). 해당 PR의
@@ -51,7 +52,8 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
-| BRIEF 연속 활성 시작 시각 `1a7269a`, 2026-10-12 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 46건·ArchUnit 4건·domain 9건 통과, `baton-brief.jar` 생성. 투영의 공백 조건을 지우면 새 도메인 테스트가 실패함을 확인하고 복원. `contractsZip` 성공(문서 5개·내부 링크 9개 확인) | JDK 21.0.10·Testcontainers PostgreSQL 18.6, 빈 DB. 단일 V1에 열을 추가해 업그레이드 대상은 없고 기존 볼륨은 재생성한다. 실행 JAR·이미지 기동, 스테이징 Compose, BATON 소비자 연동과 원격 CI는 미실행 |
+| BATON·BRIEF 실행 JAR 교차 검증, 2026-10-13 | BATON `7329aa6e`에서 `./gradlew --no-daemon :application:briefCrossServiceTest -PbriefBootJar=<BRIEF 1a7269a bootJar>` 2건 통과(1m 6s). 실제 두 JAR과 MySQL·PostgreSQL 18.6, 서비스 Caddy 비공개 HTTPS로 이벤트 전달·재시도·해소, 조회·생성·응답 유실 복구·서비스 token 교체와 현재 항목·주간 요약의 `activeSince` 전달 확인 | 로컬 CA·Testcontainers. 조회 대표 행은 BATON 테스트가 BRIEF DB에 직접 넣는다. 기존 시드가 10-06 제거한 지문 열을 써서 이전 실행부터 실패하던 것을 현재 V1에 맞췄고, 첫 실행의 역할 생성 `403`(BATON 계정 ID 헤더 누락)도 테스트에서 고쳤다. 공인 DNS·ACME·실제 배포 미실행 |
+| BRIEF 연속 활성 시작 시각 `1a7269a`, 2026-10-12 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 46건·ArchUnit 4건·domain 9건 통과, `baton-brief.jar` 생성. 투영의 공백 조건을 지우면 새 도메인 테스트가 실패함을 확인하고 복원. `contractsZip` 성공(문서 5개·내부 링크 9개 확인) | JDK 21.0.10·Testcontainers PostgreSQL 18.6, 빈 DB. 단일 V1에 열을 추가해 업그레이드 대상은 없고 기존 볼륨은 재생성한다. 실행 JAR 기동은 위 교차 검증에서 확인. 이미지 빌드·스테이징 Compose·원격 CI는 미실행 |
 | BRIEF Gradle wrapper 9.7.0, 2026-10-07 | wrapper JAR·배포 SHA-256을 Gradle 공식 값과 대조. `./gradlew test :bootstrap:bootJar contractsZip --warning-mode all` 성공(21개 작업 모두 실행). bootstrap 45건·ArchUnit 4건·domain 8건 통과, 지원 중단 경고 없음. `docker build`가 9.7.0을 받아 빌드하고 이미지 기동 확인 | JDK 21·Testcontainers PostgreSQL 18.6. Gradle 10에서 제거될 `by tasks.registering` 대신 `tasks.register<Test>` 사용. 9.8.0도 같은 전체 검증은 통과했지만 Kotlin 2.4.20 완전 지원 상한(9.7.0)을 넘어 채택하지 않음. 원격 CI는 PR 기준 |
 | BRIEF 표준 API 정리 `e848173`, 2026-10-06 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 45건·ArchUnit 4건·domain 8건 통과, `baton-brief.jar` 생성. `contractsZip` 성공(문서 5개·내부 링크 9개 확인). 실제 JAR에서 yml placeholder 없이 환경변수만으로 두 경계의 인증 켜기·token 누락 기동 실패 문구, 이벤트·서비스 무인증 `401`·정상 token 통과, 목록 밖 경로 무인증 `401`·서비스 token `403`, 로그 token 비노출·기본 사용자 미생성 확인. `docker build` 성공, 이미지 안 JAR 경로·`0444`·UID 10001과 기동 확인. PR #28 필수 CI 통과 | JDK 21·Testcontainers PostgreSQL 18.6, 빈 DB. JAR·이미지 확인은 DB 없이 Flyway를 끈 기동이라 수신·조회 동작은 통합 테스트 근거다. 수신 중복·충돌은 저장 필드 동등 비교, 브리프 재사용·최신 여부는 항목 목록 비교로 바뀌어 0000·9999년 재전달 `DUPLICATE`를 추가 검증했다. 스테이징 Compose 실행·배포는 미실행 |
 | BRIEF 이전 호환 제거·타입 바인딩, 2026-10-05 | `ea6b4e2`·`61ac26c` 각각 `./gradlew test :bootstrap:bootJar` 성공. bootstrap 44건·ArchUnit 4건·domain 7건 통과, 실행 JAR 생성. 이후 테스트만 추가해 형식 오류 통합 1건·운영 설정 4건·`WeeklyWindowTest` 3건을 선택 실행해 통과했고, 문자열 숫자 변환 금지·DTO 리비전 양수·운영 `limit`·기준 순번·주간 월요일 검사를 지우면 각각 실패함을 확인했다 | JDK 21·Testcontainers PostgreSQL 18.6. 단일 V1 스키마를 빈 DB에 적용한 결과로 검증했고 보존 데이터 업그레이드는 대상이 없다. 이벤트 v1 제거, 요청 UUID·`Instant`·`LocalDate` 타입 바인딩 전환. 원격 배포 미실행 |
@@ -68,7 +70,7 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 | BATON 병합 중 전체 브라우저 실행 | API 대역 환경에서 614건 통과·기존 조건에 따라 43건 제외 | 이후 열람자 제한 보완이 있어 최종 코드 전체 재실행 결과는 아님 |
 | BATON 열람자 제한 보완 후 | 관련 브라우저 시나리오 54건 통과 | 위 전체 실행과 별도 결과. 실제 DB를 사용하는 브라우저 통합은 미실행 |
 
-병합 후 실제 두 서비스 JAR의 교차 검증과 공인 스테이징 검증은 다시 실행하지 않았다.
+두 서비스 JAR의 교차 검증은 위 표의 2026-10-13 행이 최신이다. 공인 스테이징 검증은 실행하지 않았다.
 이후 전체 실행으로 대체된 제품 테스트 기록은 `git show 9e920c2:HANDOFF.md`, 그 이전 세부 명령은
 `git show 845b601:HANDOFF.md`에서 확인할 수 있다.
 
@@ -114,8 +116,10 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
    장애 주입은 실행 기록을 보존하고 별도 진행한다. 원격 전달 검증 전에는 계약 팩을 안정 버전으로 올리지 않는다.
 5. BATON이 [PRD-0032](docs/PRD/0032_scoped-edition-comparison/spec.md) 범위 지정 비교로 두 브리프의 사전 조회를 줄이고,
    [PRD-0031](docs/PRD/0031_edition-freshness/spec.md) 최신 여부를 추가 전달 안내와 함께 표시하도록 BATON PRD-0010과
-   BRIEF 클라이언트를 갱신한다. [PRD-0033](docs/PRD/0033_attention-item-active-since/spec.md) `activeSince`로
-   이월 항목의 미해소 기간을 표시하는 작업도 함께 검토한다. BATON 저장소 작업은 요청이 있을 때 진행한다.
+   BRIEF 클라이언트를 갱신한다. BATON 저장소 작업은 요청이 있을 때 진행한다.
+6. BRIEF `codex/attention-active-since`와 BATON `codex/brief-active-since`를 각각 PR로 올려 원격 CI를 확인한다.
+   BRIEF를 먼저 병합·배포한 뒤 BATON을 병합하고, 로그인한 화면에서 [PRD-0033](docs/PRD/0033_attention-item-active-since/spec.md)
+   미해결 시작일·경과일 표시를 확인한다. BATON 브랜치는 아직 `main`에 없는 `codex/followup-improvements` 위에 있다.
 
 ## 다음 세션의 환경 참고
 
