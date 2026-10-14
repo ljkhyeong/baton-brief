@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-27
-- 수정일: 2026-08-29
+- 수정일: 2026-10-14
 
 ## 배경
 
@@ -14,7 +14,7 @@ ADR-0004의 BRIEF 컨테이너는 외부 송신 차단을 유지하기 위해 HT
 
 ## 결정
 
-- `compose.staging.yml`의 선택적인 `https` profile에서 Caddy 2.11.4 Alpine 이미지를
+- `compose.staging.yml`의 선택적인 `https` profile에서 Caddy 2.11.7 Alpine 이미지를
   digest로 고정한다.
 - Caddy 자동 HTTPS를 사용하고 호스트는 `BRIEF_STAGING_HOST`로 주입한다. 공인 환경은
   ACME를 사용하고 로컬 `localhost` 검증은 Caddy 내부 CA를 사용한다.
