@@ -1,9 +1,7 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
-ARG JAVA_BUILD_IMAGE=eclipse-temurin:21.0.12_8-jdk-alpine-3.23@sha256:bcc6da0b0efc6fb0e445173784dddb45d5f70afa8a9128430a63f79ef0154601
-ARG JAVA_RUNTIME_IMAGE=eclipse-temurin:21.0.12_8-jre-alpine-3.23@sha256:319339a7fc9c7b59478cbed0340b6ba4944b45384a6eba3b0086856f4af08d8d
-
-FROM ${JAVA_BUILD_IMAGE} AS build
+# Dependabot은 ARG로 지정한 기반 이미지를 갱신하지 않으므로 FROM에 digest를 직접 고정한다.
+FROM eclipse-temurin:21.0.12_8-jdk-alpine-3.23@sha256:52ca1500049e2e2e7cee85fc4cd8689108792dc2bde18161b7f9236f609f0dea AS build
 WORKDIR /workspace
 
 COPY --chmod=0555 gradlew ./gradlew
@@ -24,7 +22,7 @@ COPY bootstrap/src/main ./bootstrap/src/main
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon :bootstrap:bootJar
 
-FROM ${JAVA_RUNTIME_IMAGE} AS runtime
+FROM eclipse-temurin:21.0.12_8-jre-alpine-3.23@sha256:1f165f3a75613b80cc803a2ccc4d865e5c8b845b97f692988d75c4a026609e61 AS runtime
 
 RUN command -v wget >/dev/null \
     && addgroup -S -g 10001 brief \
