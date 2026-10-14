@@ -13,7 +13,10 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 2026-10-12 `codex/attention-active-since` 브랜치에 현재 항목·브리프 항목의 연속 활성 시작 시각
 `activeSince`([PRD-0033](docs/PRD/0033_attention-item-active-since/spec.md))를 추가하고 현재 항목·브리프·비교 ETag의
 응답 형식 버전을 올렸다. BATON 화면 표시는 BATON `codex/brief-active-since`(`codex/followup-improvements`의
-`e6ef79ac`에서 분기, `d09fe5b8`·`7329aa6e`·`db991c9c`)에 구현했다. 두 저장소 모두 로컬 커밋 상태이며 PR·원격 CI는 없다.
+`e6ef79ac`에서 분기, `d09fe5b8`·`7329aa6e`·`db991c9c`)에 구현했다. 2026-10-14 그 위의 BATON
+`codex/brief-freshness-scoped-comparison`(`ec943a61`·`040639ee`)에서 비교를 [PRD-0032](docs/PRD/0032_scoped-edition-comparison/spec.md)
+범위 지정 비교 한 번으로 바꾸고, 저장 이후 변경 확인에 [PRD-0031](docs/PRD/0031_edition-freshness/spec.md) 최신 여부를
+추가 전달 안내와 함께 표시한다. 두 저장소 모두 로컬 커밋 상태이며 PR·원격 CI는 없다.
 BATON BRIEF client는 Jackson 3 기본값으로 알 수 없는 응답 필드를 무시하고 BRIEF에 `If-None-Match`를 보내지 않으므로,
 BRIEF를 먼저 배포해도 기존 BATON은 새 필드를 무시한다.
 
@@ -52,7 +55,7 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
-| BATON·BRIEF 실행 JAR 교차 검증, 2026-10-13 | BATON `7329aa6e`에서 `./gradlew --no-daemon :application:briefCrossServiceTest -PbriefBootJar=<BRIEF 1a7269a bootJar>` 2건 통과(1m 6s). 실제 두 JAR과 MySQL·PostgreSQL 18.6, 서비스 Caddy 비공개 HTTPS로 이벤트 전달·재시도·해소, 조회·생성·응답 유실 복구·서비스 token 교체와 현재 항목·주간 요약의 `activeSince` 전달 확인 | 로컬 CA·Testcontainers. 조회 대표 행은 BATON 테스트가 BRIEF DB에 직접 넣는다. 기존 시드가 10-06 제거한 지문 열을 써서 이전 실행부터 실패하던 것을 현재 V1에 맞췄고, 첫 실행의 역할 생성 `403`(BATON 계정 ID 헤더 누락)도 테스트에서 고쳤다. 공인 DNS·ACME·실제 배포 미실행 |
+| BATON·BRIEF 실행 JAR 교차 검증, 2026-10-14 | BATON `ec943a61`에서 `./gradlew --no-daemon :application:briefCrossServiceTest -PbriefBootJar=<BRIEF 1a7269a bootJar>` 2건 통과(1m 17s, 10-13 `7329aa6e`에서도 통과). 실제 두 JAR과 MySQL·PostgreSQL 18.6, 서비스 Caddy 비공개 HTTPS로 이벤트 전달·재시도·해소, 조회·생성·응답 유실 복구·서비스 token 교체, `activeSince` 전달, 범위 지정 비교·최신 여부의 범위 밖 `404`와 내용 일치 판정 확인 | 로컬 CA·Testcontainers. 조회 대표 행은 BATON 테스트가 BRIEF DB에 직접 넣는다. 기존 시드가 10-06 제거한 지문 열을 써서 이전 실행부터 실패하던 것을 현재 V1에 맞췄고, 첫 실행의 역할 생성 `403`(BATON 계정 ID 헤더 누락)도 테스트에서 고쳤다. 공인 DNS·ACME·실제 배포 미실행 |
 | BRIEF 연속 활성 시작 시각 `1a7269a`, 2026-10-12 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 46건·ArchUnit 4건·domain 9건 통과, `baton-brief.jar` 생성. 투영의 공백 조건을 지우면 새 도메인 테스트가 실패함을 확인하고 복원. `contractsZip` 성공(문서 5개·내부 링크 9개 확인) | JDK 21.0.10·Testcontainers PostgreSQL 18.6, 빈 DB. 단일 V1에 열을 추가해 업그레이드 대상은 없고 기존 볼륨은 재생성한다. 실행 JAR 기동은 위 교차 검증에서 확인. 이미지 빌드·스테이징 Compose·원격 CI는 미실행 |
 | BRIEF Gradle wrapper 9.7.0, 2026-10-07 | wrapper JAR·배포 SHA-256을 Gradle 공식 값과 대조. `./gradlew test :bootstrap:bootJar contractsZip --warning-mode all` 성공(21개 작업 모두 실행). bootstrap 45건·ArchUnit 4건·domain 8건 통과, 지원 중단 경고 없음. `docker build`가 9.7.0을 받아 빌드하고 이미지 기동 확인 | JDK 21·Testcontainers PostgreSQL 18.6. Gradle 10에서 제거될 `by tasks.registering` 대신 `tasks.register<Test>` 사용. 9.8.0도 같은 전체 검증은 통과했지만 Kotlin 2.4.20 완전 지원 상한(9.7.0)을 넘어 채택하지 않음. 원격 CI는 PR 기준 |
 | BRIEF 표준 API 정리 `e848173`, 2026-10-06 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 45건·ArchUnit 4건·domain 8건 통과, `baton-brief.jar` 생성. `contractsZip` 성공(문서 5개·내부 링크 9개 확인). 실제 JAR에서 yml placeholder 없이 환경변수만으로 두 경계의 인증 켜기·token 누락 기동 실패 문구, 이벤트·서비스 무인증 `401`·정상 token 통과, 목록 밖 경로 무인증 `401`·서비스 token `403`, 로그 token 비노출·기본 사용자 미생성 확인. `docker build` 성공, 이미지 안 JAR 경로·`0444`·UID 10001과 기동 확인. PR #28 필수 CI 통과 | JDK 21·Testcontainers PostgreSQL 18.6, 빈 DB. JAR·이미지 확인은 DB 없이 Flyway를 끈 기동이라 수신·조회 동작은 통합 테스트 근거다. 수신 중복·충돌은 저장 필드 동등 비교, 브리프 재사용·최신 여부는 항목 목록 비교로 바뀌어 0000·9999년 재전달 `DUPLICATE`를 추가 검증했다. 스테이징 Compose 실행·배포는 미실행 |
@@ -114,12 +117,10 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
    정상 Bearer 성공·잘못된 Bearer `401`·동일 이벤트 재전달 `200`, 비밀 로그 비노출과 실패 시 outbox 재시도를 확인한다.
 4. 로그인한 BATON 화면의 요약·필터·전이·해소 상세·조회·생성과 열람자 제한을 확인한다.
    장애 주입은 실행 기록을 보존하고 별도 진행한다. 원격 전달 검증 전에는 계약 팩을 안정 버전으로 올리지 않는다.
-5. BATON이 [PRD-0032](docs/PRD/0032_scoped-edition-comparison/spec.md) 범위 지정 비교로 두 브리프의 사전 조회를 줄이고,
-   [PRD-0031](docs/PRD/0031_edition-freshness/spec.md) 최신 여부를 추가 전달 안내와 함께 표시하도록 BATON PRD-0010과
-   BRIEF 클라이언트를 갱신한다. BATON 저장소 작업은 요청이 있을 때 진행한다.
-6. BRIEF `codex/attention-active-since`와 BATON `codex/brief-active-since`를 각각 PR로 올려 원격 CI를 확인한다.
-   BRIEF를 먼저 병합·배포한 뒤 BATON을 병합하고, 로그인한 화면에서 [PRD-0033](docs/PRD/0033_attention-item-active-since/spec.md)
-   미해결 시작일·경과일 표시를 확인한다. BATON 브랜치는 아직 `main`에 없는 `codex/followup-improvements` 위에 있다.
+5. BRIEF `codex/attention-active-since`와 BATON `codex/brief-active-since`·`codex/brief-freshness-scoped-comparison`
+   (앞 브랜치 위에 쌓음)을 PR로 올려 원격 CI를 확인한다. BRIEF를 먼저 병합·배포한 뒤 BATON을 병합하고, 로그인한 화면에서
+   [PRD-0033](docs/PRD/0033_attention-item-active-since/spec.md) 미해결 시작일·경과일, 저장 이후 내용 판정과 비교를 확인한다.
+   BATON 브랜치는 아직 `main`에 없는 `codex/followup-improvements` 위에 있다. BATON 저장소 작업은 요청이 있을 때 진행한다.
 
 ## 다음 세션의 환경 참고
 
