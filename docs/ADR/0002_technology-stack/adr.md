@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-11
-- 수정일: 2026-10-07
+- 수정일: 2026-10-16
 
 ## 맥락
 
@@ -26,7 +26,7 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
 
 ### 플랫폼과 저장 기술
 
-- Kotlin/JVM 2.4.20을 사용한다. 같은 버전의 Kotlin BOM을 모든 Kotlin 모듈에 Gradle
+- Kotlin/JVM 2.4.21을 사용한다. 같은 버전의 Kotlin BOM을 모든 Kotlin 모듈에 Gradle
   표준 `platform`으로 적용해 `kotlin-stdlib`과 `kotlin-reflect`를 정렬한다. BOM과 플러그인은
   version catalog의 같은 Kotlin 버전을 참조하며 개별 라이브러리 강제 버전이나 별도
   의존성 관리 플러그인을 추가하지 않는다.
@@ -65,8 +65,8 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
 - 로컬 데이터베이스는 `postgres:18.6-alpine`을 사용하는 `compose.yml`로 제공한다. 애플리케이션은
   로컬 프로필 전용 별칭 대신 Spring Boot 표준 데이터 소스·Flyway 속성을 사용하고
   Flyway를 기본 활성화한다.
-- ADR-0004의 스테이징 컨테이너는 digest로 고정한 Eclipse Temurin 21.0.12+8 JDK/JRE
-  Alpine 이미지와 PostgreSQL 18.6 Alpine 이미지를 사용한다. 이 공급자 선택은 해당
+- ADR-0004의 스테이징 컨테이너는 digest로 고정한 Eclipse Temurin 21 JDK/JRE
+  Alpine 3.24 이미지와 PostgreSQL 18.6 Alpine 이미지를 사용한다. 이 공급자 선택은 해당
   컨테이너의 재현성 경계이며 Java 21 도구 체인 결정을 대체하지 않는다.
 - 테스트는 필요한 모듈에만 두고 BOM이 관리하는 JUnit Jupiter, AssertJ와 PostgreSQL
   Testcontainers를 사용한다. 개별 라이브러리 버전은 별도로 고정하지 않는다.
@@ -81,7 +81,7 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   `HealthIndicator`와 DB 확인 SQL을 만들지 않는다.
 
 CAL의 미병합 MVP 작업에서 당시 진행 중이던 Kotlin/JVM과 Spring Boot 4.1 계열 기준은
-참고하되 JDK 25나 Gradle 버전까지 복제하지 않는다. Kotlin 2.4.20은
+참고하되 JDK 25나 Gradle 버전까지 복제하지 않는다. Kotlin 2.4.20·2.4.21은
 [공식 Gradle 호환표](https://kotlinlang.org/docs/gradle-configure-project.html)에서
 Gradle 7.6.3~9.7.0을 완전 지원한다. 이전에 쓰던 9.2.1은 Gradle 보안 권고
 [GHSA-mqwm-5m85-gmcv](https://github.com/gradle/gradle/security/advisories/GHSA-mqwm-5m85-gmcv)·
@@ -91,7 +91,8 @@ Gradle 7.6.3~9.7.0을 완전 지원한다. 이전에 쓰던 9.2.1은 Gradle 보�
 
 Kotlin 2.4.20은 2026-09-07 출시된 [정식 버전](https://kotlinlang.org/docs/releases.html)이며,
 빌드 캐시의 역직렬화 취약점 [GHSA-r937-wjx7-w2jp](https://github.com/advisories/GHSA-r937-wjx7-w2jp)의
-수정 버전 범위에 포함된다. 컴파일러와 런타임을 함께 갱신하되 Java 21·Spring Boot 4.1.1과
+수정 버전 범위에 포함된다. 2.4.21은 2026-10-08 출시된 같은 계열의 버그 수정 릴리스이며
+Gradle 호환 범위가 같다. 컴파일러와 런타임을 함께 갱신하되 Java 21·Spring Boot 4.1.1과
 제품 계약은 유지한다. Spring Boot BOM만 사용하면 플러그인이 추가하는 `kotlin-stdlib`과
 BOM의 `kotlin-reflect` 버전이 달라지므로 Kotlin BOM으로 정렬한다.
 
@@ -190,8 +191,9 @@ Java 25 뼈대에서의 과거 성공 결과를 Kotlin/JDK 21 산출물의 성�
   재검토한다.
 - 단일 Spring Boot 모듈: 초기 파일 수는 적지만 도메인·애플리케이션 경계를 빌드 수준에서
   보호하지 못해 채택하지 않았다.
-- Gradle 9.7.1·9.8.0: Kotlin 2.4.20의 완전 지원 상한인 Gradle 9.7.0을 넘는다. 9.8.0은 로컬
-  전체 검증이 통과했지만 Kotlin 호환표가 상한을 올리거나 Kotlin을 올릴 때 다시 검토한다.
+- Gradle 9.7.1·9.8.0·9.8.1: Kotlin 2.4.20·2.4.21의 완전 지원 상한인 Gradle 9.7.0을 넘는다.
+  9.8.0은 로컬 전체 검증, 9.8.1은 PR CI가 통과했지만 Kotlin 호환표가 상한을 올리거나 Kotlin을 올릴 때
+  다시 검토한다. 그때까지 Dependabot은 9.7.0보다 높은 wrapper를 제안하지 않는다.
 - 메시지 브로커와 외부 연동 어댑터를 함께 선택: 이벤트 봉투, 전달과 운영 계약이
   아직 없으므로 기술 스택 결정에 포함하지 않았다.
 

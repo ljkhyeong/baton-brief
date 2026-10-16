@@ -28,6 +28,10 @@ updates:
       - dependency-name: "tools.jackson:jackson-bom"
         update-types:
           - "version-update:semver-minor"
+      # Kotlin 2.4.21의 Gradle 완전 지원 상한은 9.7.0이다(ADR-0002). Kotlin을 올릴 때 호환표와 함께 다시 확인한다.
+      - dependency-name: "gradle-wrapper"
+        versions:
+          - "> 9.7.0"
 
   - package-ecosystem: "docker"
     directory: "/"

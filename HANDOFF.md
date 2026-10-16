@@ -32,8 +32,10 @@ BRIEF를 먼저 배포해도 기존 BATON은 새 필드를 무시한다.
 병합 뒤 의존성 제출에서 Dependabot 경고 7건이 모두 닫혔다.
 2026-10-06 표준 API 정리([PR #28](https://github.com/ljkhyeong/baton-brief/pull/28))를 원격 `main`의 `27a5b08`에 병합했고
 필수 CI는 통과했다. Gradle wrapper는 보안 권고가 있는 9.2.1에서 Kotlin 2.4.20 완전 지원 상한인 9.7.0으로 올렸다.
-Dependabot이 제안한 9.8.0([PR #20](https://github.com/ljkhyeong/baton-brief/pull/20))은 상한을 넘어 채택하지 않았다
-([ADR-0002](docs/ADR/0002_technology-stack/adr.md)).
+Dependabot이 제안한 9.8.0([PR #20](https://github.com/ljkhyeong/baton-brief/pull/20))·9.8.1([PR #38](https://github.com/ljkhyeong/baton-brief/pull/38))은
+Kotlin 2.4.21에서도 같은 상한을 넘어 채택하지 않았다([ADR-0002](docs/ADR/0002_technology-stack/adr.md)).
+2026-10-16 Dependabot 이미지·Actions 갱신 통합([PR #35](https://github.com/ljkhyeong/baton-brief/pull/35))을 원격 `main`의
+`592af3b`에 병합했고 필수 CI는 통과했다. 병합 뒤 열린 Dependabot 경고는 0건이다.
 BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
 이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
@@ -57,10 +59,10 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
+| BRIEF Kotlin 2.4.21·스테이징 기반 이미지, 2026-10-16 | `./gradlew test :bootstrap:bootJar --warning-mode all` 성공. 모든 모듈 재컴파일, bootstrap 46건·ArchUnit 4건·domain 9건 통과, 경고·지원 중단 메시지 없음. 실행·테스트 경로와 JAR의 `kotlin-stdlib`·`kotlin-reflect` 2.4.21 확인. `verify.yml`의 Compose 구문·promtool 규칙 6개와 시험·amtool·이미지 빌드(컨테이너 안 `:bootstrap:bootJar`)·서비스 Caddy capability·UID·Caddy 설정·스테이징 HTTPS 실행 경계 단계를 같은 스크립트로 로컬 실행해 모두 통과. 실행 이미지의 Temurin `21.0.12.1+1`·Alpine 3.24.2·OpenSSL 3.5.8, 서비스 Caddy v2.11.7 확인. #33 upload-artifact 7.0.2 SHA는 공식 태그와 대조 | macOS Docker·로컬 CA·JDK 21. Dependabot #36(Temurin `21-…-alpine-3.24`)·#37(Kotlin)과 [PR #35](https://github.com/ljkhyeong/baton-brief/pull/35)의 #30(Prometheus 3.15.0·Caddy 2.11.7)·#33을 채택. Dependabot은 `ARG` 기반 이미지를 갱신하지 않아 두 Dockerfile을 `FROM` 직접 고정으로 바꿨다. 미채택: json-schema-validator 3.0.8(#32, 테스트에 Jackson 3.2.1 적용), jackson-bom 3.2.3(#31, ADR-0002의 3.1 계열), Gradle 9.8.1(#38, Kotlin 완전 지원 상한 9.7.0 초과). 세 경우 모두 무시 규칙을 넣었다. 원격 CI는 각 PR 기준, 배포는 미실행 |
 | BATON·BRIEF 실행 JAR 교차 검증, 2026-10-14 | BATON `ec943a61`에서 `./gradlew --no-daemon :application:briefCrossServiceTest -PbriefBootJar=<BRIEF 1a7269a bootJar>` 2건 통과(1m 17s, 10-13 `7329aa6e`에서도 통과). 실제 두 JAR과 MySQL·PostgreSQL 18.6, 서비스 Caddy 비공개 HTTPS로 이벤트 전달·재시도·해소, 조회·생성·응답 유실 복구·서비스 token 교체, `activeSince` 전달, 범위 지정 비교·최신 여부의 범위 밖 `404`와 내용 일치 판정 확인 | 로컬 CA·Testcontainers. 조회 대표 행은 BATON 테스트가 BRIEF DB에 직접 넣는다. 기존 시드가 10-06 제거한 지문 열을 써서 이전 실행부터 실패하던 것을 현재 V1에 맞췄고, 첫 실행의 역할 생성 `403`(BATON 계정 ID 헤더 누락)도 테스트에서 고쳤다. 공인 DNS·ACME·실제 배포 미실행 |
 | BRIEF 연속 활성 시작 시각 `1a7269a`, 2026-10-12 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 46건·ArchUnit 4건·domain 9건 통과, `baton-brief.jar` 생성. 투영의 공백 조건을 지우면 새 도메인 테스트가 실패함을 확인하고 복원. `contractsZip` 성공(문서 5개·내부 링크 9개 확인) | JDK 21.0.10·Testcontainers PostgreSQL 18.6, 빈 DB. 단일 V1에 열을 추가해 업그레이드 대상은 없고 기존 볼륨은 재생성한다. 실행 JAR 기동은 위 교차 검증에서 확인. 이미지 빌드·스테이징 Compose·원격 CI는 미실행 |
 | BRIEF Gradle wrapper 9.7.0, 2026-10-07 | wrapper JAR·배포 SHA-256을 Gradle 공식 값과 대조. `./gradlew test :bootstrap:bootJar contractsZip --warning-mode all` 성공(21개 작업 모두 실행). bootstrap 45건·ArchUnit 4건·domain 8건 통과, 지원 중단 경고 없음. `docker build`가 9.7.0을 받아 빌드하고 이미지 기동 확인 | JDK 21·Testcontainers PostgreSQL 18.6. Gradle 10에서 제거될 `by tasks.registering` 대신 `tasks.register<Test>` 사용. 9.8.0도 같은 전체 검증은 통과했지만 Kotlin 2.4.20 완전 지원 상한(9.7.0)을 넘어 채택하지 않음. 원격 CI는 PR 기준 |
-| BRIEF 스테이징 기반 이미지·Dependabot 갱신, 2026-10-14 | Dependabot #30(Prometheus 3.15.0·공개 Caddy 2.11.7)·#33(upload-artifact 7.0.2, 공식 태그 SHA 대조)을 병합하고 서비스 Caddy를 같은 2.11.7 digest로, Temurin 21.0.12+8 JDK/JRE를 같은 태그의 2026-09-17 재빌드 digest로 맞췄다. `verify.yml`의 Compose 구문·promtool 규칙 6개와 시험·amtool·이미지 빌드(컨테이너 안 `:bootstrap:bootJar`)·서비스 Caddy capability·UID·Caddy 설정·스테이징 HTTPS 실행 경계 단계를 같은 스크립트로 로컬 실행해 모두 통과. 실행 이미지의 Alpine 3.23.6·OpenSSL 3.5.8, 서비스 Caddy v2.11.7 확인 | macOS Docker·로컬 CA. Dependabot은 `ARG`로 지정한 기반 이미지를 갱신하지 않아 두 Dockerfile을 `FROM` 직접 고정으로 바꿨다. json-schema-validator 3.0.8(#32)은 테스트에 Jackson 3.2.1을 적용하고 jackson-bom 3.2.3(#31)은 ADR-0002의 3.1 계열 기준을 벗어나 채택하지 않고 무시 규칙에 넣었다. 제품 코드·Gradle 입력이 같아 `./gradlew test`는 재실행하지 않음. 원격 CI는 [PR #35](https://github.com/ljkhyeong/baton-brief/pull/35) 기준, 배포는 미실행 |
 | BRIEF 표준 API 정리 `e848173`, 2026-10-06 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 45건·ArchUnit 4건·domain 8건 통과, `baton-brief.jar` 생성. `contractsZip` 성공(문서 5개·내부 링크 9개 확인). 실제 JAR에서 yml placeholder 없이 환경변수만으로 두 경계의 인증 켜기·token 누락 기동 실패 문구, 이벤트·서비스 무인증 `401`·정상 token 통과, 목록 밖 경로 무인증 `401`·서비스 token `403`, 로그 token 비노출·기본 사용자 미생성 확인. `docker build` 성공, 이미지 안 JAR 경로·`0444`·UID 10001과 기동 확인. PR #28 필수 CI 통과 | JDK 21·Testcontainers PostgreSQL 18.6, 빈 DB. JAR·이미지 확인은 DB 없이 Flyway를 끈 기동이라 수신·조회 동작은 통합 테스트 근거다. 수신 중복·충돌은 저장 필드 동등 비교, 브리프 재사용·최신 여부는 항목 목록 비교로 바뀌어 0000·9999년 재전달 `DUPLICATE`를 추가 검증했다. 스테이징 Compose 실행·배포는 미실행 |
 | BRIEF 이전 호환 제거·타입 바인딩, 2026-10-05 | `ea6b4e2`·`61ac26c` 각각 `./gradlew test :bootstrap:bootJar` 성공. bootstrap 44건·ArchUnit 4건·domain 7건 통과, 실행 JAR 생성. 이후 테스트만 추가해 형식 오류 통합 1건·운영 설정 4건·`WeeklyWindowTest` 3건을 선택 실행해 통과했고, 문자열 숫자 변환 금지·DTO 리비전 양수·운영 `limit`·기준 순번·주간 월요일 검사를 지우면 각각 실패함을 확인했다 | JDK 21·Testcontainers PostgreSQL 18.6. 단일 V1 스키마를 빈 DB에 적용한 결과로 검증했고 보존 데이터 업그레이드는 대상이 없다. 이벤트 v1 제거, 요청 UUID·`Instant`·`LocalDate` 타입 바인딩 전환. 원격 배포 미실행 |
 | BRIEF `98005ac` 독립 실행 환경변수, 2026-09-12 | `:bootstrap:test`의 인증 설정·서비스 인증·이벤트 계약 8건 통과, `:bootstrap:bootJar`는 입력 불변으로 기존 JAR 재사용(13초). 실제 JAR에서 서비스 토큰 누락 기동 실패, 인증 분리·수신 202·중복 200·요약 조회·브리프 생성, DB 중단 시 readiness 503·liveness 200과 앱 재시작 없는 복구 확인 | JDK 21.0.10·PostgreSQL 18.6. 임시 환경의 DB·HTTP 주소는 loopback과 시험 포트 사용. 최초 DB 재시작 때 Docker 자동 포트 재할당으로 복구 확인 실패해 원인 재현 후 고정 포트로 해당 범위만 재검증. 로그 `/tmp/brief-runtime-env-build-20260912.log`·`/tmp/brief-runtime-env-check-20260912.log`·`/tmp/brief-runtime-env-port-check-20260912.log`·`/tmp/brief-runtime-env-recovery-check-20260912.log`. 임시 프로세스·DB·볼륨 정리, 로그 비밀 비노출·문서 링크·전체 diff 확인. 이미지 빌드·k3s·실제 웹훅 발송·공인 HTTPS·원격 CI 미실행 |
@@ -104,10 +106,6 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 - 공개 Caddy의 인증서 볼륨 소유권을 포함한 비루트 전환, 다중 인스턴스 구성
 - 이미지 registry·릴리스 정책·라이선스
 - Gradle dependency verification checksum의 최초 검토와 플랫폼 간 유지 절차
-- Dependabot 경고 7건(Tomcat 3·Jackson 3·Commons Lang 1)의 원격 해소는 병합 뒤 `main`의 의존성 제출 결과로
-  확인한다. 2026-10-05 기준 Tomcat 경고가 남은 원인은 웹 어댑터에만 건 제약이 `:bootstrap:testCompileClasspath`에
-  닿지 않아 11.0.24가 그래프에 남은 것이었다. 루트 빌드로 옮긴 뒤 모든 해결 가능 구성과 `buildEnvironment`에서
-  Tomcat 11.0.25·Jackson 3.1.7·Commons Lang 3.20.0을 확인했다. 기존 `main` 전용 Actions 캐시 쓰기 정책을 유지한다.
 
 ## 다음 작업
 
