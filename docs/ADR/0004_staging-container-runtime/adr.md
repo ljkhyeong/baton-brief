@@ -2,7 +2,7 @@
 
 - 상태: 채택됨
 - 결정일: 2026-08-27
-- 수정일: 2026-10-14
+- 수정일: 2026-10-16
 
 ## 배경
 
@@ -23,11 +23,12 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 구성을 제공하지만 운영과 유
   이미지에 결과를 복사한다.
 - BuildKit이 해석하는 Dockerfile frontend도 `docker/dockerfile:1.7`의 다중 플랫폼 digest로
   고정한다.
-- 빌드와 실행 이미지는 Eclipse Temurin 21.0.12+8 Alpine 이미지를 digest로 고정한다.
-  이는 ADR-0002의 Java 21 기준을 스테이징 컨테이너에서 재현하기 위한 선택이며 다른
-  배포 환경의 JDK 공급자를 강제하지 않는다.
+- 빌드와 실행 이미지는 Eclipse Temurin 21 Alpine 3.24 이미지(`21-jdk-alpine-3.24`·
+  `21-jre-alpine-3.24`)를 digest로 고정한다. 이는 ADR-0002의 Java 21 기준을 스테이징
+  컨테이너에서 재현하기 위한 선택이며 다른 배포 환경의 JDK 공급자를 강제하지 않는다.
 - 기반 이미지는 Dockerfile `FROM`에 태그와 digest를 직접 적는다. Dependabot은 `ARG`로 지정한
-  이미지를 갱신하지 않으므로 같은 태그의 재빌드 digest와 패치 버전도 갱신 PR로 받기 위해서다.
+  이미지를 갱신하지 않기 때문이다. Temurin은 Dependabot이 패치 태그(`21.0.12_8-…`)를 주 버전
+  태그로 바꿔 제안하므로 주 버전 태그를 쓰고, JDK 패치와 재빌드는 같은 태그의 digest 갱신 PR로 받는다.
 - 실행 컨테이너는 UID/GID `10001`, 읽기 전용 루트 파일시스템, `/tmp` tmpfs와 모든 Linux
   capability 제거를 사용한다.
 - `compose.staging.yml`의 기본 profile은 BRIEF와 PostgreSQL 18.6을 함께 실행한다. PostgreSQL은 내부
@@ -62,6 +63,7 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 구성을 제공하지만 운영과 유
 ### 비용과 한계
 
 - Dependabot이 제안한 이미지 digest와 JDK 패치 갱신을 이미지 빌드·실행 확인 뒤 반영해야 한다.
+  태그에 패치 번호가 없으므로 실제 JDK 버전은 이미지의 `JAVA_VERSION`으로 확인한다.
 - 단일 PostgreSQL 볼륨만 제공하며 백업, 복구, 고가용성과 용량 정책은 포함하지 않는다.
 - 기본 Compose 구성은 호스트에서 BRIEF API에 직접 접근할 수 없다. 공개 이벤트 전달에는
   ADR-0005의 Caddy profile과 공인 DNS·인증서 환경이 필요하다.
