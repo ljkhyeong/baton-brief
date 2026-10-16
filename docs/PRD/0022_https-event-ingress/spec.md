@@ -25,7 +25,7 @@ PRD-0020은 BATON 전용 Bearer를, PRD-0021은 내부 HTTP 애플리케이션�
 
 ## TLS와 호스트
 
-- `compose.staging.yml`의 `https` profile은 digest로 고정한 Caddy 2.11.4 Alpine 이미지를
+- `compose.staging.yml`의 `https` profile은 digest로 고정한 Caddy 2.11.7 Alpine 이미지를
   사용한다.
 - `BRIEF_STAGING_HOST`는 스테이징 DNS에 등록된 호스트 이름으로 설정한다. 실제 호스트를
   넣지 않으면 기본 `brief.invalid`가 사용되어 공인 인증서 발급에 성공하지 않는다.

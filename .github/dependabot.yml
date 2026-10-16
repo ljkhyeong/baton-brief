@@ -20,10 +20,14 @@ updates:
           - "minor"
           - "patch"
     ignore:
-      # 3.0.7은 제품과 다른 Jackson 3.2.1 BOM을 테스트에 적용한다.
+      # 3.0.7부터 제품과 다른 Jackson 3.2 BOM을 테스트에 적용한다. 제품 Jackson이 3.2 계열이 되면 제거한다.
       - dependency-name: "com.networknt:json-schema-validator"
         versions:
-          - "3.0.7"
+          - ">= 3.0.7"
+      # ADR-0002의 Jackson 보안 고정은 Spring Boot BOM과 같은 3.1 계열 안에서 패치만 올린다.
+      - dependency-name: "tools.jackson:jackson-bom"
+        update-types:
+          - "version-update:semver-minor"
 
   - package-ecosystem: "docker"
     directory: "/"
