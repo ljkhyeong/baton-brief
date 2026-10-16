@@ -60,6 +60,7 @@ PRD-0002와 PRD-0003은 브리프의 단건·이력 조회를 제공하지만, B
 표시 필드를 그대로 재사용한다. 즉 `reasonCode`, `severity`, `sourceReference`, `status`,
 `observedAt`, `ruleVersion`, `aggregateRevision`과 `revisionGap`을 포함한다.
 PRD-0029의 `section`도 같은 고정 표현에 포함하며 분류만 달라도 `changed`로 반환한다.
+[PRD-0033](../0033_attention-item-active-since/spec.md)의 `activeSince`도 같은 고정 표현에 포함한다.
 변경되지 않은 항목은 응답에 반복하지 않는다.
 
 ## 비교 규칙

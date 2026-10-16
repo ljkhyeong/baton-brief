@@ -58,10 +58,13 @@ CREATE TABLE attention_item (
     severity brief_severity NOT NULL,
     item_status source_event_state NOT NULL,
     observed_at TIMESTAMPTZ NOT NULL,
+    active_since TIMESTAMPTZ,
     rule_version INTEGER NOT NULL,
     last_revision BIGINT NOT NULL,
     revision_gap BOOLEAN NOT NULL,
     PRIMARY KEY (workspace_id, season_id, event_type, source_reference),
+    -- 활성 항목만 현재 활성 구간의 시작 시각을 가진다.
+    CONSTRAINT attention_item_active_since_matches_status CHECK ((item_status = 'ACTIVE') = (active_since IS NOT NULL)),
     CONSTRAINT attention_item_rule_version_positive CHECK (rule_version > 0),
     CONSTRAINT attention_item_revision_positive CHECK (last_revision > 0)
 );
@@ -100,6 +103,7 @@ CREATE TABLE brief_edition_item (
     severity brief_severity NOT NULL,
     item_status source_event_state NOT NULL,
     observed_at TIMESTAMPTZ NOT NULL,
+    active_since TIMESTAMPTZ NOT NULL,
     rule_version INTEGER NOT NULL,
     aggregate_revision BIGINT NOT NULL,
     revision_gap BOOLEAN NOT NULL,

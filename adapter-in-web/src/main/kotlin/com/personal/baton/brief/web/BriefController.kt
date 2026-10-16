@@ -101,7 +101,7 @@ class BriefController(
             sourceReference,
         ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "점검 항목을 찾을 수 없습니다")
         return ResponseEntity.ok()
-            .eTag("brief-attention-item-v1-${item.ruleVersion}-${item.lastRevision}")
+            .eTag("brief-attention-item-v2-${item.ruleVersion}-${item.lastRevision}")
             .body(AttentionItemResponse.from(item))
     }
 
@@ -271,7 +271,7 @@ private fun EditionComparisonResult.toResponse(
     targetEditionId: UUID,
 ): ResponseEntity<EditionComparison> = when (this) {
     is EditionComparisonResult.Found -> ResponseEntity.ok()
-        .eTag("brief-edition-comparison-v1-$fromEditionId-$targetEditionId")
+        .eTag("brief-edition-comparison-v2-$fromEditionId-$targetEditionId")
         .body(comparison)
     EditionComparisonResult.NotFound -> editionNotFound()
     EditionComparisonResult.ScopeMismatch -> throw ResponseStatusException(
@@ -286,5 +286,5 @@ private fun editionNotFound(): Nothing =
 private fun BriefEdition.toResponse(
     builder: ResponseEntity.BodyBuilder = ResponseEntity.ok(),
 ): ResponseEntity<BriefEditionResponse> = builder
-    .eTag("brief-edition-v2-$editionId")
+    .eTag("brief-edition-v3-$editionId")
     .body(BriefEditionResponse.from(this))
