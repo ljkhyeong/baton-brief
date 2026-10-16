@@ -156,8 +156,9 @@ HTTP 상태와 응답 본문은 다음과 같다.
 - 요청 검증 실패: `400 Bad Request` (`eventVersion`의 `1` 이하와 32비트 정수 범위 위반 포함)
 
 본문은 `eventId`, `status`와 적용된 경우의 `item`을 반환한다. `item`은 `reasonCode`,
-`severity`, `sourceReference`, `status`, `observedAt`, `aggregateRevision`, `ruleVersion`과
-`revisionGap`을 포함한다.
+`severity`, `sourceReference`, `status`, `observedAt`, `activeSince`, `aggregateRevision`,
+`ruleVersion`과 `revisionGap`을 포함한다. PRD-0033의 `activeSince`는 현재 활성 구간의
+시작 시각이며 `RESOLVED`이면 `null`이다.
 
 지원하지 않는 이벤트의 완전히 같은 재생은 `DUPLICATE`로 바꾸지 않고 저장된 `UNSUPPORTED` 결과를
 그대로 반환한다. 같은 `eventId`로 수신 필드가 다른 이벤트가 오면 최초 수신 기록의 지원
@@ -268,8 +269,8 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
   먼저), `reasonCode`, `sourceReference` 오름차순으로 안정 정렬한다. `section`도 항목 비교에
   포함하며 새 브리프의 `ruleVersion=2`와 항목의 투영 `ruleVersion=1`을 구분한다.
 - 생성이 완료되면 선택한 항목과 표시 필드, PRD-0010의 집계 리비전·리비전 공백 근거,
-  구간, 시간대, 규칙 버전과 원본 커서를 고정한다. 이후 투영 변경이나 재구축이 기존
-  브리프를 수정하지 않는다.
+  PRD-0033의 활성 시작 시각, 구간, 시간대, 규칙 버전과 원본 커서를 고정한다. 이후 투영
+  변경이나 재구축이 기존 브리프를 수정하지 않는다.
 - 선택 상태가 달라지거나 정정이 필요하면 기존 브리프를 덮어쓰지 않고 해당
   작업공간·시즌의 다음 생성 번호로 새 브리프를 저장한다. 상태가 `A → B → A`로 되돌아와 과거와
   같은 항목 목록이 다시 나타나더라도 직전 브리프와 다르므로 과거 `A` 브리프를 재사용하지
@@ -287,7 +288,7 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
 요청은 기존 브리프와 `200 OK`를 반환한다. 브리프 본문은 최소한 `editionId`,
 `workspaceId`, `seasonId`, `generation`, `weekStart`, `zoneId`, `windowStart`, `windowEnd`,
 `sourceCursor`, `generatedAt`, `ruleVersion`과 고정된 `items`를 포함한다. 항목에는
-`reasonCode`, `severity`, `sourceReference`, `status`, `observedAt`, `ruleVersion`,
+`reasonCode`, `severity`, `sourceReference`, `status`, `observedAt`, `activeSince`, `ruleVersion`,
 `aggregateRevision`, `revisionGap`과 `section`을 두며 모두 `null`이 아니다. 조회 대상이 없으면
 `404 Not Found`를 반환한다.
 

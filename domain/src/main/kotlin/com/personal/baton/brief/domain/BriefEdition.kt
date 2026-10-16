@@ -39,6 +39,7 @@ data class BriefEditionItem(
     val severity: Severity,
     val status: SourceEventState,
     val observedAt: Instant,
+    val activeSince: Instant,
     val ruleVersion: Int,
     val aggregateRevision: Long,
     val revisionGap: Boolean,

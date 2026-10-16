@@ -553,7 +553,7 @@ class JdbcBriefPersistenceAdapter(
         .query(ATTENTION_ITEM_MAPPER)
         .list()
 
-    private fun AttentionItem.jdbcParameters(): Map<String, Any> = mapOf(
+    private fun AttentionItem.jdbcParameters(): Map<String, Any?> = mapOf(
         "workspaceId" to workspaceId,
         "seasonId" to seasonId,
         "eventType" to eventType.name,
@@ -561,6 +561,7 @@ class JdbcBriefPersistenceAdapter(
         "severity" to severity.name,
         "itemStatus" to status.name,
         "observedAt" to observedAt.jdbcValue(),
+        "activeSince" to activeSince?.jdbcValue(),
         "ruleVersion" to ruleVersion,
         "lastRevision" to lastRevision,
         "revisionGap" to revisionGap,
@@ -642,10 +643,10 @@ class JdbcBriefPersistenceAdapter(
             """
             INSERT INTO brief_edition_item (
                 edition_id, position, source_reference, reason_code, severity,
-                item_status, observed_at, rule_version, aggregate_revision, revision_gap, section
+                item_status, observed_at, active_since, rule_version, aggregate_revision, revision_gap, section
             ) VALUES (
                 :editionId, :position, :sourceReference, :reasonCode, :severity,
-                :itemStatus, :observedAt, :ruleVersion, :aggregateRevision, :revisionGap, :section
+                :itemStatus, :observedAt, :activeSince, :ruleVersion, :aggregateRevision, :revisionGap, :section
             )
             """.trimIndent(),
             edition.items.mapIndexed { position, item ->
@@ -657,6 +658,7 @@ class JdbcBriefPersistenceAdapter(
                     "severity" to item.severity.name,
                     "itemStatus" to item.status.name,
                     "observedAt" to item.observedAt.jdbcValue(),
+                    "activeSince" to item.activeSince.jdbcValue(),
                     "ruleVersion" to item.ruleVersion,
                     "aggregateRevision" to item.aggregateRevision,
                     "revisionGap" to item.revisionGap,
@@ -704,8 +706,8 @@ class JdbcBriefPersistenceAdapter(
 
     private fun findEditionItems(editionId: UUID): List<BriefEditionItem> = jdbc.sql(
         """
-        SELECT source_reference, reason_code, severity, item_status AS status, observed_at, rule_version,
-               aggregate_revision, revision_gap, section
+        SELECT source_reference, reason_code, severity, item_status AS status, observed_at, active_since,
+               rule_version, aggregate_revision, revision_gap, section
           FROM brief_edition_item
          WHERE edition_id = :editionId
          ORDER BY position
@@ -746,22 +748,23 @@ class JdbcBriefPersistenceAdapter(
         private val UPSERT_ATTENTION = """
             INSERT INTO attention_item (
                 workspace_id, season_id, event_type, source_reference, severity,
-                item_status, observed_at, rule_version, last_revision, revision_gap
+                item_status, observed_at, active_since, rule_version, last_revision, revision_gap
             ) VALUES (
                 :workspaceId, :seasonId, :eventType, :sourceReference, :severity,
-                :itemStatus, :observedAt, :ruleVersion, :lastRevision, :revisionGap
+                :itemStatus, :observedAt, :activeSince, :ruleVersion, :lastRevision, :revisionGap
             )
             ON CONFLICT (workspace_id, season_id, event_type, source_reference) DO UPDATE SET
                 severity = EXCLUDED.severity,
                 item_status = EXCLUDED.item_status,
                 observed_at = EXCLUDED.observed_at,
+                active_since = EXCLUDED.active_since,
                 rule_version = EXCLUDED.rule_version,
                 last_revision = EXCLUDED.last_revision,
                 revision_gap = EXCLUDED.revision_gap
         """.trimIndent()
         private val ATTENTION_ITEM_SELECT = """
             SELECT workspace_id, season_id, event_type, source_reference, severity,
-                   item_status AS status, observed_at, rule_version, last_revision, revision_gap
+                   item_status AS status, observed_at, active_since, rule_version, last_revision, revision_gap
               FROM attention_item
         """.trimIndent()
         private val SOURCE_EVENT_SELECT = """
