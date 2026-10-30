@@ -65,7 +65,7 @@ PRD-0005의 비교 키 `(reasonCode, sourceReference)`와 정렬은 그대로 �
   근거의 반복 생성은 그 브리프를 멱등하게 반환한다.
 - 근거만 달라진 같은 키의 항목을 비교하면 `changed.before`·`changed.after`로 반환한다.
 - 재구축이나 후속 수신 뒤에도 기존 브리프의 항목과 근거가 바뀌지 않는다.
-- 투영과 브리프 `ruleVersion`은 계속 `1`이다.
+- 투영 `ruleVersion`은 `1`을 유지하고 브리프 `ruleVersion`은 [PRD-0029](../0029_edition-carry-over/spec.md)를 따른다.
 
 ## 제외 범위
 

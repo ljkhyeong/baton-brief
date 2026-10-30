@@ -36,10 +36,13 @@ HTTP만 제공하고 PRD-0022의 명시적인 profile로 호스트의 이벤트 
 - `BRIEF_STAGING_DATABASE_PASSWORD_FILE`
 - `BRIEF_STAGING_EVENT_RECEIVER_BEARER_TOKEN_FILE`
 - `BRIEF_STAGING_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN_FILE`
+- `BRIEF_STAGING_SERVICE_API_BEARER_TOKEN_FILE`
+- `BRIEF_STAGING_SERVICE_API_PREVIOUS_BEARER_TOKEN_FILE`
 - 데이터베이스 이름·사용자와 이미지 이름
 - `https` profile에서 사용할 공개 호스트 이름과 HTTP/HTTPS 포트 매핑
+- `compose.service-api.yml`을 함께 쓸 때만 필요한 서비스 Caddy TLS 파일과 공유 네트워크 이름
 
-실제 비밀 파일은 저장소 밖에 두고 Git에 추가하지 않는다. Compose는 세 파일을
+실제 비밀 파일은 저장소 밖에 두고 Git에 추가하지 않는다. 기본 Compose는 다섯 파일을
 `/run/secrets`에 마운트하며 Spring Boot `configtree:`가 데이터베이스 비밀번호와 현재·
 직전 Bearer 속성을 읽는다. 평상시 직전 token 파일은 비워 두고, PRD-0020의 수동 교체
 구간에만 기존 값을 넣는다.
@@ -65,8 +68,8 @@ docker compose --env-file .env.staging -f compose.staging.yml --profile https co
 docker compose --env-file .env.staging -f compose.staging.yml --profile https up --build -d --wait
 ```
 
-기본 Compose 구성의 BRIEF는 호스트 포트를 게시하지 않는다. 호스트 접근은 PRD-0022의 Caddy
-profile이나 PRD-0025의 비공개 서비스 Caddy를 통해서만 제공한다.
+기본 Compose 구성의 BRIEF는 호스트 포트를 게시하지 않는다. 외부 이벤트 수신은 PRD-0022의
+Caddy profile, BATON 조회·생성은 호스트 포트가 없는 PRD-0025의 비공개 서비스 Caddy로만 제공한다.
 
 ## 수용 기준
 

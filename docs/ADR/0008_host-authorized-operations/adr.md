@@ -39,6 +39,8 @@ Micrometer의 Prometheus registry와 Spring Boot 자동 구성을 사용한다. 
 추가 이용료 없이 운영하도록 선택적 Compose에 자체 호스팅 Prometheus를 둔다.
 BRIEF의 네트워크 공간을 공유해 loopback 지표를 수집하며 외부 송신·호스트 포트를 추가하지 않는다.
 수집기는 비루트·읽기 전용이고 지표는 전용 볼륨에 보관한다. BRIEF 재생성 시 함께 갱신한다.
+네트워크 공간을 공유하므로 Docker가 BRIEF를 스스로 재시작하면 수집이 끊기고 Prometheus 재시작으로 복구한다.
+네트워크 공간을 소유하는 별도 컨테이너는 이 구성에 비해 복잡해 채택하지 않았다.
 
 수집은 30초 간격, 보관은 7일 또는 1GB 기준이다. 수집 실패·대상 누락, 지속적인 HTTP 서버
 오류, 충돌·미지원 수신과 변경 번호 공백 탐지의 증가, DB 연결 대기를 경보 규칙으로 판정한다.
@@ -50,6 +52,7 @@ Prometheus는 경보에 `service=brief`를 붙이고 파일에 등록한 비공�
 기본 대상 목록은 비어 있어 실제 연결 전에는 발송하지 않는다. 채널 웹훅은 Alertmanager에만
 파일로 제공하며 앱 코드·외부 발송 어댑터·공개 관리 경로를 추가하지 않는다.
 현재 RELAY의 loopback Alertmanager는 BRIEF가 직접 접근할 수 없으므로 공용 연결 경로를 마련한 뒤 적용한다.
+연결 경로는 `--internal` 공유 네트워크로 두며 BRIEF를 외부 송신 네트워크에 연결하지 않는다.
 설정은 [외부 연동 절차](../../operations/external-integrations.md)를 따른다. 서버 설치는 이번 범위에 포함하지 않는다.
 Prometheus는 자신의 loopback에서 기본 경보 전송 오류·유실 카운터만 추가 수집한다.
 Alertmanager까지의 전달 실패를 진단하며 수신처 URL은 경보 레이블에 포함하지 않는다.

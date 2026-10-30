@@ -6,8 +6,8 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 계약·구조 결정은 [문서 색인](docs/README.md), 계약 버전은 [VERSION](contracts/VERSION)을 따른다.
 스키마는 Flyway `V1__create_brief_schema.sql` 하나이고 이벤트는 v2만 투영한다. 보존할 데이터와 운영 소비자가
 없어 이벤트 v1·이전 데이터 호환은 두지 않는다. 2026-10-06 운영 전 정리로 V1 내용(지문 열 삭제·열거형 DOMAIN)을
-다시 고쳤고, 2026-10-12 연속 활성 시작 시각 열(`active_since`)을 V1에 추가했다. 이전 V1~V10 이력이나 그 전 V1로
-만든 로컬·스테이징 DB는 Flyway 체크섬 검증에서 기동이 거부되므로 볼륨을 지우고 다시 만든다.
+다시 고쳤고, 2026-10-12 연속 활성 시작 시각 열(`active_since`), 2026-10-30 전이 이력 인덱스를 V1에 추가했다.
+이전 V1~V10 이력이나 그 전 V1로 만든 로컬·스테이징 DB는 Flyway 체크섬 검증에서 기동이 거부되므로 볼륨을 지우고 다시 만든다.
 계약 팩은 원격 호환 검증 전인 RC 상태다.
 
 2026-10-12 `codex/attention-active-since` 브랜치에 현재 항목·브리프 항목의 연속 활성 시작 시각
@@ -17,8 +17,8 @@ BRIEF의 로컬 MVP와 스테이징 실행 구성을 구현했다. 기능은 [RE
 `codex/brief-freshness-scoped-comparison`(`ec943a61`·`040639ee`)에서 비교를 [PRD-0032](docs/PRD/0032_scoped-edition-comparison/spec.md)
 범위 지정 비교 한 번으로 바꾸고, 저장 이후 변경 확인에 [PRD-0031](docs/PRD/0031_edition-freshness/spec.md) 최신 여부를
 추가 전달 안내와 함께 표시한다. BRIEF 변경은 2026-10-16 [PR #34](https://github.com/ljkhyeong/baton-brief/pull/34)로
-원격 `main`의 `dee0c30`에 병합했고 필수 CI는 통과했다. BATON 두 브랜치는 다른 세션이 연 통합 PR
-[ljkhyeong/baton#32](https://github.com/ljkhyeong/baton/pull/32)에 포함되어 있다.
+원격 `main`의 `dee0c30`에 병합했고 필수 CI는 통과했다. BATON 두 브랜치는 통합 PR
+[ljkhyeong/baton#32](https://github.com/ljkhyeong/baton/pull/32)로 같은 날 BATON `main`의 `06fd9817`에 병합됐다.
 BATON BRIEF client는 Jackson 3 기본값으로 알 수 없는 응답 필드를 무시하고 BRIEF에 `If-None-Match`를 보내지 않으므로,
 BRIEF를 먼저 배포해도 기존 BATON은 새 필드를 무시한다.
 
@@ -30,19 +30,18 @@ BRIEF를 먼저 배포해도 기존 BATON은 새 필드를 무시한다.
 2026-10-05 Jackson 보안 패치([PR #24](https://github.com/ljkhyeong/baton-brief/pull/24))와 Claude Code 스킬 공유·코드 정리
 ([PR #23](https://github.com/ljkhyeong/baton-brief/pull/23))를 원격 `main`의 `6f1c88b`에 병합했고 두 PR의 필수 CI는 통과했다.
 병합 뒤 의존성 제출에서 Dependabot 경고 7건이 모두 닫혔다.
-2026-10-06 표준 API 정리([PR #28](https://github.com/ljkhyeong/baton-brief/pull/28))를 원격 `main`의 `27a5b08`에 병합했고
+2026-10-07 표준 API 정리([PR #28](https://github.com/ljkhyeong/baton-brief/pull/28))를 원격 `main`의 `27a5b08`에 병합했고
 필수 CI는 통과했다. Gradle wrapper는 보안 권고가 있는 9.2.1에서 Kotlin 2.4.20 완전 지원 상한인 9.7.0으로 올렸다.
 Dependabot이 제안한 9.8.0([PR #20](https://github.com/ljkhyeong/baton-brief/pull/20))·9.8.1([PR #38](https://github.com/ljkhyeong/baton-brief/pull/38))은
 Kotlin 2.4.21에서도 같은 상한을 넘어 채택하지 않았다([ADR-0002](docs/ADR/0002_technology-stack/adr.md)).
-2026-10-16 Dependabot 이미지·Actions 갱신 통합([PR #35](https://github.com/ljkhyeong/baton-brief/pull/35))을 원격 `main`의
-`592af3b`에 병합했고 필수 CI는 통과했다. 병합 뒤 열린 Dependabot 경고는 0건이다.
+2026-10-16 Dependabot 이미지·Actions 갱신 통합([PR #35](https://github.com/ljkhyeong/baton-brief/pull/35))을 `592af3b`에,
+Kotlin 2.4.21·Temurin 갱신([PR #39](https://github.com/ljkhyeong/baton-brief/pull/39))을 `327c9c1`에 병합했고 필수 CI는 모두 통과했다.
 BATON 연결 변경은 계정 권한 조회와 열람자 생성 제한을 포함해 `1916d8c8`에 병합했다.
-이 값은 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
+이 값은 첫 연동 병합 기준이며, 다른 작업에서 바뀔 수 있는 현재 BATON HEAD를 뜻하지 않는다.
 
 공개 이벤트 수신 주소는 `brief.b4ton.com`이다. 사용자는 Cloudflare DNS·Ubuntu 홈서버·공인 IP·인증서와
-공유기 80·443 포트포워딩을 준비했다. k3s는 아직 구축하지 않았다. 이번 요청은 외부 연동 검토이며
-API·웹훅 코드, 빌드와 임시 환경변수까지 준비한다. 이미지 빌드·홈서버·공유기·k3s·DNS·TLS 설정은
-사용자가 직접 수행한다. 실제 DNS 변경·인증서 적용·원격 배포는 실행하지 않았다.
+공유기 80·443 포트포워딩을 준비했다. k3s는 아직 구축하지 않았다. 이미지 빌드·홈서버·공유기·k3s·DNS·TLS
+설정은 사용자가 직접 수행한다. 실제 DNS 변경·인증서 적용·원격 배포는 실행하지 않았다.
 BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리했다. Git에서 제외한
 `.env.runtime.local`은 권한 `0600`의 로컬 검증용 임시 값이며 운영 비밀로 사용하지 않는다.
 추가 이용료 없는 Prometheus와 PostgreSQL 백업·격리 복원 확인을 제공한다. 운영 알림은 Slack·Discord를
@@ -59,26 +58,26 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 
 | 대상·기준 | 실행·결과 | 적용 범위와 한계 |
 | --- | --- | --- |
-| BRIEF Kotlin 2.4.21·스테이징 기반 이미지, 2026-10-16 | `./gradlew test :bootstrap:bootJar --warning-mode all` 성공. 모든 모듈 재컴파일, bootstrap 46건·ArchUnit 4건·domain 9건 통과, 경고·지원 중단 메시지 없음. 실행·테스트 경로와 JAR의 `kotlin-stdlib`·`kotlin-reflect` 2.4.21 확인. `verify.yml`의 Compose 구문·promtool 규칙 6개와 시험·amtool·이미지 빌드(컨테이너 안 `:bootstrap:bootJar`)·서비스 Caddy capability·UID·Caddy 설정·스테이징 HTTPS 실행 경계 단계를 같은 스크립트로 로컬 실행해 모두 통과. 실행 이미지의 Temurin `21.0.12.1+1`·Alpine 3.24.2·OpenSSL 3.5.8, 서비스 Caddy v2.11.7 확인. #33 upload-artifact 7.0.2 SHA는 공식 태그와 대조 | macOS Docker·로컬 CA·JDK 21. Dependabot #36(Temurin `21-…-alpine-3.24`)·#37(Kotlin)과 [PR #35](https://github.com/ljkhyeong/baton-brief/pull/35)의 #30(Prometheus 3.15.0·Caddy 2.11.7)·#33을 채택. Dependabot은 `ARG` 기반 이미지를 갱신하지 않아 두 Dockerfile을 `FROM` 직접 고정으로 바꿨다. 미채택: json-schema-validator 3.0.8(#32, 테스트에 Jackson 3.2.1 적용), jackson-bom 3.2.3(#31, ADR-0002의 3.1 계열), Gradle 9.8.1(#38, Kotlin 완전 지원 상한 9.7.0 초과). 세 경우 모두 무시 규칙을 넣었다. 원격 CI는 각 PR 기준, 배포는 미실행 |
-| BATON·BRIEF 실행 JAR 교차 검증, 2026-10-14 | BATON `ec943a61`에서 `./gradlew --no-daemon :application:briefCrossServiceTest -PbriefBootJar=<BRIEF 1a7269a bootJar>` 2건 통과(1m 17s, 10-13 `7329aa6e`에서도 통과). 실제 두 JAR과 MySQL·PostgreSQL 18.6, 서비스 Caddy 비공개 HTTPS로 이벤트 전달·재시도·해소, 조회·생성·응답 유실 복구·서비스 token 교체, `activeSince` 전달, 범위 지정 비교·최신 여부의 범위 밖 `404`와 내용 일치 판정 확인 | 로컬 CA·Testcontainers. 조회 대표 행은 BATON 테스트가 BRIEF DB에 직접 넣는다. 기존 시드가 10-06 제거한 지문 열을 써서 이전 실행부터 실패하던 것을 현재 V1에 맞췄고, 첫 실행의 역할 생성 `403`(BATON 계정 ID 헤더 누락)도 테스트에서 고쳤다. 공인 DNS·ACME·실제 배포 미실행 |
+| BRIEF 전수 검토 `15b28ae`, 2026-10-30 | `./gradlew test :bootstrap:bootJar contractsZip --warning-mode all` 성공. bootstrap 66건·ArchUnit 4건·domain 10건 통과, 경고·지원 중단 메시지 없음. 계약 ZIP 문서 5개·내부 링크 9개 정상. 추가한 테스트는 잠금·재생 순서·커서·범위·최초 충돌·기준 순번·전이 필터·정렬·미지원 충돌을 망가뜨린 변이 10건을 모두 잡았다. `verify.yml`의 Compose·promtool·amtool·이미지 빌드·Caddy·스테이징 HTTPS 실행 경계 단계를 같은 스크립트로 로컬 실행해 모두 통과(서비스 허용 경로 전체, 차단 경로, 대소문자 `404`, 본문 `413`, 8443만 개방, 로그 비노출, 백업 manifest, 실제 지표 수집 포함). 실행 이미지 Temurin `21.0.13+9`·Alpine 3.24.3·OpenSSL 3.5.9, Spring Boot 4.1.2·Tomcat 11.0.27·Jackson 3.1.8·Kotlin 2.4.21, Caddy 2.11.7, Prometheus 3.15.1 확인. 전이 이력 인덱스는 합성 수신 약 20만 건에서 결과 일치와 버퍼 4,339→24개 확인 | macOS Docker·로컬 CA·JDK 21·Testcontainers PostgreSQL 18.6, 빈 DB. V1을 고쳐 기존 로컬·스테이징 볼륨은 다시 만든다. 스테이징 환경 파일에 서비스 API token 파일이 필수가 됐다. 미채택: json-schema-validator 3.0.8(#32, 테스트에 Jackson 3.2.1 적용), jackson-bom 3.2(#31, ADR-0002의 3.1 계열), Gradle 9.8.1(#38, Kotlin 완전 지원 상한 초과). 숫자 `occurredAt`은 PRD-0002의 Jackson 표준 해석을 유지했다. 원격 CI는 PR 기준, 배포는 미실행 |
+| BATON·BRIEF 실행 JAR 교차 검증, 2026-10-30 | BATON `main` `06fd9817`에서 `./gradlew --no-daemon :application:briefCrossServiceTest -PbriefBootJar=<BRIEF 15b28ae bootJar>` 2건 통과(2m 25s). 실제 두 JAR과 MySQL·PostgreSQL 18.6, 서비스 Caddy 비공개 HTTPS로 이벤트 전달·재시도·해소, 조회·생성·응답 유실 복구·서비스 token 교체, `activeSince` 전달, 범위 지정 비교·최신 여부의 범위 밖 `404`와 내용 일치 판정 확인 | 로컬 CA·Testcontainers. 조회 대표 행은 BATON 테스트가 BRIEF DB에 직접 넣는다. 공인 DNS·ACME·실제 배포 미실행 |
 | BRIEF 연속 활성 시작 시각 `1a7269a`, 2026-10-12 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 46건·ArchUnit 4건·domain 9건 통과, `baton-brief.jar` 생성. 투영의 공백 조건을 지우면 새 도메인 테스트가 실패함을 확인하고 복원. `contractsZip` 성공(문서 5개·내부 링크 9개 확인) | JDK 21.0.10·Testcontainers PostgreSQL 18.6, 빈 DB. 단일 V1에 열을 추가해 업그레이드 대상은 없고 기존 볼륨은 재생성한다. 실행 JAR 기동은 위 교차 검증에서 확인. 이미지 빌드·스테이징 Compose·원격 CI는 미실행 |
 | BRIEF Gradle wrapper 9.7.0, 2026-10-07 | wrapper JAR·배포 SHA-256을 Gradle 공식 값과 대조. `./gradlew test :bootstrap:bootJar contractsZip --warning-mode all` 성공(21개 작업 모두 실행). bootstrap 45건·ArchUnit 4건·domain 8건 통과, 지원 중단 경고 없음. `docker build`가 9.7.0을 받아 빌드하고 이미지 기동 확인 | JDK 21·Testcontainers PostgreSQL 18.6. Gradle 10에서 제거될 `by tasks.registering` 대신 `tasks.register<Test>` 사용. 9.8.0도 같은 전체 검증은 통과했지만 Kotlin 2.4.20 완전 지원 상한(9.7.0)을 넘어 채택하지 않음. 원격 CI는 PR 기준 |
 | BRIEF 표준 API 정리 `e848173`, 2026-10-06 | `./gradlew test :bootstrap:bootJar` 성공. bootstrap 45건·ArchUnit 4건·domain 8건 통과, `baton-brief.jar` 생성. `contractsZip` 성공(문서 5개·내부 링크 9개 확인). 실제 JAR에서 yml placeholder 없이 환경변수만으로 두 경계의 인증 켜기·token 누락 기동 실패 문구, 이벤트·서비스 무인증 `401`·정상 token 통과, 목록 밖 경로 무인증 `401`·서비스 token `403`, 로그 token 비노출·기본 사용자 미생성 확인. `docker build` 성공, 이미지 안 JAR 경로·`0444`·UID 10001과 기동 확인. PR #28 필수 CI 통과 | JDK 21·Testcontainers PostgreSQL 18.6, 빈 DB. JAR·이미지 확인은 DB 없이 Flyway를 끈 기동이라 수신·조회 동작은 통합 테스트 근거다. 수신 중복·충돌은 저장 필드 동등 비교, 브리프 재사용·최신 여부는 항목 목록 비교로 바뀌어 0000·9999년 재전달 `DUPLICATE`를 추가 검증했다. 스테이징 Compose 실행·배포는 미실행 |
 | BRIEF 이전 호환 제거·타입 바인딩, 2026-10-05 | `ea6b4e2`·`61ac26c` 각각 `./gradlew test :bootstrap:bootJar` 성공. bootstrap 44건·ArchUnit 4건·domain 7건 통과, 실행 JAR 생성. 이후 테스트만 추가해 형식 오류 통합 1건·운영 설정 4건·`WeeklyWindowTest` 3건을 선택 실행해 통과했고, 문자열 숫자 변환 금지·DTO 리비전 양수·운영 `limit`·기준 순번·주간 월요일 검사를 지우면 각각 실패함을 확인했다 | JDK 21·Testcontainers PostgreSQL 18.6. 단일 V1 스키마를 빈 DB에 적용한 결과로 검증했고 보존 데이터 업그레이드는 대상이 없다. 이벤트 v1 제거, 요청 UUID·`Instant`·`LocalDate` 타입 바인딩 전환. 원격 배포 미실행 |
-| BRIEF `98005ac` 독립 실행 환경변수, 2026-09-12 | `:bootstrap:test`의 인증 설정·서비스 인증·이벤트 계약 8건 통과, `:bootstrap:bootJar`는 입력 불변으로 기존 JAR 재사용(13초). 실제 JAR에서 서비스 토큰 누락 기동 실패, 인증 분리·수신 202·중복 200·요약 조회·브리프 생성, DB 중단 시 readiness 503·liveness 200과 앱 재시작 없는 복구 확인 | JDK 21.0.10·PostgreSQL 18.6. 임시 환경의 DB·HTTP 주소는 loopback과 시험 포트 사용. 최초 DB 재시작 때 Docker 자동 포트 재할당으로 복구 확인 실패해 원인 재현 후 고정 포트로 해당 범위만 재검증. 로그 `/tmp/brief-runtime-env-build-20260912.log`·`/tmp/brief-runtime-env-check-20260912.log`·`/tmp/brief-runtime-env-port-check-20260912.log`·`/tmp/brief-runtime-env-recovery-check-20260912.log`. 임시 프로세스·DB·볼륨 정리, 로그 비밀 비노출·문서 링크·전체 diff 확인. 이미지 빌드·k3s·실제 웹훅 발송·공인 HTTPS·원격 CI 미실행 |
-| BRIEF `7c02472` CI 실패 보고서·`53a6aa1` 컨테이너 진단, 2026-09-12 | actionlint 1.7.12 통과. 워크플로의 보관 경로로 기존 도메인·통합·ArchUnit 보고서 25개(83,263바이트)를 선택하며 HTML의 CSS/JS 포함·Gradle 바이너리 결과 제외 확인. 로그 `/tmp/brief-ci-test-reports-actionlint-20260912.log`·`/tmp/brief-ci-test-reports-paths-20260912.log` | 공식 upload-artifact v7.0.1 커밋 고정·Gradle 실패 조건·3일 보관 설정 확인. 실제 원격 업로드·전체 CI·배포는 미실행. 기존 cleanup 6개 실패 조합·Bash 검사의 `53a6aa1` 근거(`/tmp/brief-ci-cleanup-before-20260912.log`·`/tmp/brief-ci-cleanup-after-20260912.log`) 유지. 검사 도구 `/tmp/brief-ci-diagnostics-tools-20260912/actionlint`. 전체 diff·문서 링크 확인. 제품 입력 불변으로 Gradle·JAR 검증 재실행 제외 |
-| BRIEF `3bcaaf7` 운영 명령 누락 처리, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefOperationsConfigurationTest' :bootstrap:bootJar` 성공(3초), 설정 테스트 3건·ArchUnit 4건 통과. 실제 JAR에서 명령 누락이 출력 없이 성공 종료하는 문제 재현 후, 활성·기본 운영 프로필 모두 실패 종료·표준 출력 없음·DB/웹 미기동 확인. 각 프로필의 REBUILD는 정상 JSON 출력·수신 기록 보존·Flyway 미실행 확인 | JDK 21.0.10·PostgreSQL 18.6의 임시 DB, 정리 완료. 프로필 판정 방식은 실제 JAR의 기본 프로필 변환에서 누락을 놓쳐 제거하고, 운영 YAML의 빈 명령과 기존 필수 열거형 바인딩 사용. 기존 false/FALSE 거부·일반 설정의 명령 생략·웹/Flyway 초기 검사도 테스트에 포함. 로그 `/tmp/brief-missing-command-verified-build-20260912.log`·`/tmp/brief-missing-command-runtime-20260912.log`. 전체 diff·구조·문서 링크 확인. 운영 설정만 바꿔 전체 제품 테스트·계약 ZIP·원격 CI·배포는 미실행 |
-| BRIEF `522ff3c` PostgreSQL 준비 검사, 2026-09-12 | 개발용·스테이징과 HTTPS·서비스 API·지표 Compose 조합 5개 구문 확인. PostgreSQL 18.6의 초기화를 지연해 기존 검사가 TCP 접속 불가 상태를 `healthy`로 표시하는 문제 재현. 수정 후 초기화 중 `starting`, 완료 후 `healthy`·TCP SQL 성공, 기존 DB 재시작 확인 | 네트워크·호스트 포트 없는 임시 컨테이너, 검사 간격만 1초로 단축. 초기 검증용 파일 마운트 권한과 Compose 달러 이스케이프 처리 오류를 수정한 뒤 통과·정리. 로그 `/tmp/brief-postgres-readiness-before-20260912.log`·`/tmp/brief-postgres-readiness-after-20260912.log`. 전체 diff·문서 링크 확인. 앱·빌드·스키마 불변으로 `fbea014`의 테스트·JAR 근거 재사용. 전체 서비스 재기동·원격 CI·배포 미실행 |
+| BRIEF `98005ac` 독립 실행 환경변수, 2026-09-12 | `:bootstrap:test`의 인증 설정·서비스 인증·이벤트 계약 8건 통과, `:bootstrap:bootJar`는 입력 불변으로 기존 JAR 재사용(13초). 실제 JAR에서 서비스 토큰 누락 기동 실패, 인증 분리·수신 202·중복 200·요약 조회·브리프 생성, DB 중단 시 readiness 503·liveness 200과 앱 재시작 없는 복구 확인 | JDK 21.0.10·PostgreSQL 18.6. 임시 환경의 DB·HTTP 주소는 loopback과 시험 포트 사용. 최초 DB 재시작 때 Docker 자동 포트 재할당으로 복구 확인 실패해 원인 재현 후 고정 포트로 해당 범위만 재검증. 임시 프로세스·DB·볼륨 정리, 로그 비밀 비노출·문서 링크·전체 diff 확인. 이미지 빌드·k3s·실제 웹훅 발송·공인 HTTPS·원격 CI 미실행 |
+| BRIEF `7c02472` CI 실패 보고서·`53a6aa1` 컨테이너 진단, 2026-09-12 | actionlint 1.7.12 통과. 워크플로의 보관 경로로 기존 도메인·통합·ArchUnit 보고서 25개(83,263바이트)를 선택하며 HTML의 CSS/JS 포함·Gradle 바이너리 결과 제외 확인. | 공식 upload-artifact v7.0.1 커밋 고정·Gradle 실패 조건·3일 보관 설정 확인. 실제 원격 업로드·전체 CI·배포는 미실행. 기존 cleanup 6개 실패 조합·Bash 검사의 `53a6aa1` 근거 유지. 전체 diff·문서 링크 확인. 제품 입력 불변으로 Gradle·JAR 검증 재실행 제외 |
+| BRIEF `3bcaaf7` 운영 명령 누락 처리, 2026-09-12 | `./gradlew :bootstrap:test --tests '*BriefOperationsConfigurationTest' :bootstrap:bootJar` 성공(3초), 설정 테스트 3건·ArchUnit 4건 통과. 실제 JAR에서 명령 누락이 출력 없이 성공 종료하는 문제 재현 후, 활성·기본 운영 프로필 모두 실패 종료·표준 출력 없음·DB/웹 미기동 확인. 각 프로필의 REBUILD는 정상 JSON 출력·수신 기록 보존·Flyway 미실행 확인 | JDK 21.0.10·PostgreSQL 18.6의 임시 DB, 정리 완료. 프로필 판정 방식은 실제 JAR의 기본 프로필 변환에서 누락을 놓쳐 제거하고, 운영 YAML의 빈 명령과 기존 필수 열거형 바인딩 사용. 기존 false/FALSE 거부·일반 설정의 명령 생략·웹/Flyway 초기 검사도 테스트에 포함. 전체 diff·구조·문서 링크 확인. 운영 설정만 바꿔 전체 제품 테스트·계약 ZIP·원격 CI·배포는 미실행 |
+| BRIEF `522ff3c` PostgreSQL 준비 검사, 2026-09-12 | 개발용·스테이징과 HTTPS·서비스 API·지표 Compose 조합 5개 구문 확인. PostgreSQL 18.6의 초기화를 지연해 기존 검사가 TCP 접속 불가 상태를 `healthy`로 표시하는 문제 재현. 수정 후 초기화 중 `starting`, 완료 후 `healthy`·TCP SQL 성공, 기존 DB 재시작 확인 | 네트워크·호스트 포트 없는 임시 컨테이너, 검사 간격만 1초로 단축. 초기 검증용 파일 마운트 권한과 Compose 달러 이스케이프 처리 오류를 수정한 뒤 통과·정리. 전체 diff·문서 링크 확인. 앱·빌드·스키마 불변으로 `fbea014`의 테스트·JAR 근거 재사용. 전체 서비스 재기동·원격 CI·배포 미실행 |
 | BRIEF `9d6e9f2` 운영 안내·경보 문구, 2026-09-12 | `:bootstrap:test`에서 `BriefOperationsConfigurationTest` 1건과 `contractsZip` 성공. Prometheus 경보 시나리오 8개 통과. 계약 ZIP의 문서 5개·내부 링크 8개 확인 | 오류·경보 문자열만 변경. 검증 조건·경보 규칙·API·실행 예시는 유지. 문서 로컬 링크 177개 확인. 전체 테스트·JAR 생성·배포는 문구 수정 범위에서 제외 |
-| BRIEF `2d2521d` 운영·전달 경보, 2026-09-12 | Prometheus 3.14.0 `promtool check config`·`test rules`로 규칙 6개·시나리오 18개 통과. 실제 Alertmanager 중단으로 전송 오류 증가·전달 실패 경보를 확인하고 재시작 후 HTTPS 전달·Slack 수신 대역의 경보/해제 확인. 기본 대상 `[]`에서 업무 경보가 발생해도 전송 오류·유실 지표와 전달 실패 경보가 없음을 별도 확인. 로그 `/tmp/brief-notification-rules-20260912.log`·`/tmp/brief-notification-runtime-20260912.log`·`/tmp/brief-notification-disabled-20260912.log` | Alertmanager 0.32.1·Python 3.14.7, 비루트·읽기 전용·외부 네트워크/호스트 포트 없는 임시 환경. 시험에만 간격 단축·임시 CA 사용 후 정리. 실패 없음. 유실 카운터 증가·5분 후 해제·재시작 초기화는 규칙 시나리오로 검증. 앱·빌드 입력 불변으로 `6ed7922`의 Gradle·JAR 근거 재사용. 기존 DB 대기 실측은 `7d54ba6`·`42b744f` JAR의 `/tmp/brief-db-wait-runtime-20260912-retry.log` 근거 유지. 실제 Slack·Discord 수신·원격 배포·CI는 미실행 |
-| BRIEF `ae06f1c` 운영 출력 분리, 2026-09-12 | `./gradlew test :bootstrap:bootJar` 성공(15초). bootstrap 39건 통과, 도메인 6건 기존 결과 재사용. JDK 21.0.10·PostgreSQL 18.6. 실제 JAR로 단건·이상 기록 2페이지·재구축과 미존재·필수 입력 누락을 실행해 JSON/로그 분리·종료 코드 확인. 로그 `/tmp/brief-ops-output-build-20260912.log`·`/tmp/brief-ops-output-runtime-20260912.log` | 운영 프로필에만 적용. 포트 점유 상태에서도 정상 실행하고 검증용 미적용 마이그레이션을 실행하지 않음을 확인. 웹 기본 로그, 수신·충돌·브리프·Flyway 이력 보존과 임시 앱·DB 정리 확인. 실행 JAR는 이 커밋 기준. 실패·제외 없음. 기존 주간 해소 필터·비교 조건부 조회 포함 전체 테스트 통과. 원격 배포·운영 Compose 실행은 미실행. 계약 ZIP 입력 변경 없음 |
-| BRIEF `3c7636c` 동시 수신 예시·`adae4e0` 단독 채널, 2026-09-12 | Alertmanager 0.32.1로 동시 수신 예시 구문·BRIEF/RELAY 경로 2건, actionlint 1.7.12 통과. 기존 수신 대역을 재사용해 새 예시에서 Slack·Discord 경보·해제 4건과 제목·본문·내부 URL 비노출 확인 | 비루트·읽기 전용·외부 네트워크와 호스트 포트 없는 임시 환경, 발송 간격만 시험용으로 단축. 실패 없음·임시 컨테이너 정리. 로그 `/tmp/brief-dual-webhook-config-20260912.log`·`/tmp/brief-dual-webhook-runtime-20260912.log`·`/tmp/brief-dual-webhook-actionlint-20260912.log`. 기존 단독 채널과 Prometheus/HTTPS 전달 근거는 `adae4e0`·`0d9b064` 유지. 문서 링크·전체 diff 확인. 제품·빌드·환경변수 입력 불변으로 `98005ac`의 JAR·API 검증 재사용. 실제 채널 발송·서버 설정·이미지 빌드·원격 CI는 미실행 |
-| BRIEF `5e2f5ae` 백업 자동 검증, 스크립트 `93345fc`, 2026-09-12 | actionlint 1.7.12와 CI에 추가한 Bash 블록 실행 성공. 기존 `ae06f1c` JAR·JDK 21.0.10·PostgreSQL 18.6으로 V9 스키마와 계약 이벤트를 준비해 백업 생성·격리 복원·손상 파일 실패 확인. 원본 DB·`0700`/`0600` 권한 보존과 임시 앱·DB·볼륨 정리 확인. 로그 `/tmp/brief-backup-ci-20260912-retry.log` | 최초 로컬 시도는 내부 네트워크의 호스트 접속 불가로 준비 중 실패해 검증 환경에만 loopback 접속 경로를 추가했다. CI 추가 블록만 실행했으며 전체 Actions·원격 실행은 미실행. 기존 `93345fc`의 20,001행·외래 키 오류·공백 경로·격리 조건 검증은 유지. 앱·스키마·스크립트 변경이 없어 Gradle·JAR·계약 ZIP 재검증 제외. Linux 타이머 설치·대용량·외부 보관·서버 장애 복구는 미실행 |
+| BRIEF `2d2521d` 운영·전달 경보, 2026-09-12 | Prometheus 3.14.0 `promtool check config`·`test rules`로 규칙 6개·시나리오 18개 통과. 실제 Alertmanager 중단으로 전송 오류 증가·전달 실패 경보를 확인하고 재시작 후 HTTPS 전달·Slack 수신 대역의 경보/해제 확인. 기본 대상 `[]`에서 업무 경보가 발생해도 전송 오류·유실 지표와 전달 실패 경보가 없음을 별도 확인. | Alertmanager 0.32.1·Python 3.14.7, 비루트·읽기 전용·외부 네트워크/호스트 포트 없는 임시 환경. 시험에만 간격 단축·임시 CA 사용 후 정리. 실패 없음. 유실 카운터 증가·5분 후 해제·재시작 초기화는 규칙 시나리오로 검증. 앱·빌드 입력 불변으로 `6ed7922`의 Gradle·JAR 근거 재사용. 기존 DB 대기 실측은 `7d54ba6`·`42b744f` JAR 근거 유지. 실제 Slack·Discord 수신·원격 배포·CI는 미실행 |
+| BRIEF `ae06f1c` 운영 출력 분리, 2026-09-12 | `./gradlew test :bootstrap:bootJar` 성공(15초). bootstrap 39건 통과, 도메인 6건 기존 결과 재사용. JDK 21.0.10·PostgreSQL 18.6. 실제 JAR로 단건·이상 기록 2페이지·재구축과 미존재·필수 입력 누락을 실행해 JSON/로그 분리·종료 코드 확인. | 운영 프로필에만 적용. 포트 점유 상태에서도 정상 실행하고 검증용 미적용 마이그레이션을 실행하지 않음을 확인. 웹 기본 로그, 수신·충돌·브리프·Flyway 이력 보존과 임시 앱·DB 정리 확인. 실행 JAR는 이 커밋 기준. 실패·제외 없음. 기존 주간 해소 필터·비교 조건부 조회 포함 전체 테스트 통과. 원격 배포·운영 Compose 실행은 미실행. 계약 ZIP 입력 변경 없음 |
+| BRIEF `3c7636c` 동시 수신 예시·`adae4e0` 단독 채널, 2026-09-12 | Alertmanager 0.32.1로 동시 수신 예시 구문·BRIEF/RELAY 경로 2건, actionlint 1.7.12 통과. 기존 수신 대역을 재사용해 새 예시에서 Slack·Discord 경보·해제 4건과 제목·본문·내부 URL 비노출 확인 | 비루트·읽기 전용·외부 네트워크와 호스트 포트 없는 임시 환경, 발송 간격만 시험용으로 단축. 실패 없음·임시 컨테이너 정리. 기존 단독 채널과 Prometheus/HTTPS 전달 근거는 `adae4e0`·`0d9b064` 유지. 문서 링크·전체 diff 확인. 제품·빌드·환경변수 입력 불변으로 `98005ac`의 JAR·API 검증 재사용. 실제 채널 발송·서버 설정·이미지 빌드·원격 CI는 미실행 |
+| BRIEF `5e2f5ae` 백업 자동 검증, 스크립트 `93345fc`, 2026-09-12 | actionlint 1.7.12와 CI에 추가한 Bash 블록 실행 성공. 기존 `ae06f1c` JAR·JDK 21.0.10·PostgreSQL 18.6으로 V9 스키마와 계약 이벤트를 준비해 백업 생성·격리 복원·손상 파일 실패 확인. 원본 DB·`0700`/`0600` 권한 보존과 임시 앱·DB·볼륨 정리 확인. | 최초 로컬 시도는 내부 네트워크의 호스트 접속 불가로 준비 중 실패해 검증 환경에만 loopback 접속 경로를 추가했다. CI 추가 블록만 실행했으며 전체 Actions·원격 실행은 미실행. 기존 `93345fc`의 20,001행·외래 키 오류·공백 경로·격리 조건 검증은 유지. 앱·스키마·스크립트 변경이 없어 Gradle·JAR·계약 ZIP 재검증 제외. Linux 타이머 설치·대용량·외부 보관·서버 장애 복구는 미실행 |
 | BATON `1916d8c8` | `build checkApiContract`, 후속 계약 문서 수정의 `generateApiContract checkApiContract`, 최종 프런트 빌드 성공 | 병합한 코드·API 계약·프런트 빌드. 원격 배포 근거는 아님 |
 | BATON 병합 중 전체 브라우저 실행 | API 대역 환경에서 614건 통과·기존 조건에 따라 43건 제외 | 이후 열람자 제한 보완이 있어 최종 코드 전체 재실행 결과는 아님 |
 | BATON 열람자 제한 보완 후 | 관련 브라우저 시나리오 54건 통과 | 위 전체 실행과 별도 결과. 실제 DB를 사용하는 브라우저 통합은 미실행 |
 
-두 서비스 JAR의 교차 검증은 위 표의 2026-10-13 행이 최신이다. 공인 스테이징 검증은 실행하지 않았다.
+두 서비스 JAR의 교차 검증은 위 표의 2026-10-30 행이 최신이다. 공인 스테이징 검증은 실행하지 않았다.
 이후 전체 실행으로 대체된 제품 테스트 기록은 `git show 9e920c2:HANDOFF.md`, 그 이전 세부 명령은
 `git show 845b601:HANDOFF.md`에서 확인할 수 있다.
 
@@ -105,6 +104,7 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
 - 실제 서버의 Prometheus·정기 백업 설치와 수집·전달 장애의 외부 알림 연결
 - 공개 Caddy의 인증서 볼륨 소유권을 포함한 비루트 전환, 다중 인스턴스 구성
 - 이미지 registry·릴리스 정책·라이선스
+- BRIEF가 스스로 재시작되면 Prometheus 수집이 끊겨 수동 재시작이 필요한 구조(2026-10-30 재현)와 systemd 샌드박스 적용
 - Gradle dependency verification checksum의 최초 검토와 플랫폼 간 유지 절차
 
 ## 다음 작업
@@ -118,8 +118,9 @@ BRIEF에 주입할 값은 [.env.runtime.example](.env.runtime.example)에 정리
    정상 Bearer 성공·잘못된 Bearer `401`·동일 이벤트 재전달 `200`, 비밀 로그 비노출과 실패 시 outbox 재시도를 확인한다.
 4. 로그인한 BATON 화면의 요약·필터·전이·해소 상세·조회·생성과 열람자 제한을 확인한다.
    장애 주입은 실행 기록을 보존하고 별도 진행한다. 원격 전달 검증 전에는 계약 팩을 안정 버전으로 올리지 않는다.
-5. BRIEF를 배포한 뒤 BATON 통합 PR [ljkhyeong/baton#32](https://github.com/ljkhyeong/baton/pull/32)를 병합하고, 로그인한 화면에서
+5. BRIEF를 배포한 뒤 BATON `main`(`06fd9817` 이후)을 배포하고, 로그인한 화면에서
    [PRD-0033](docs/PRD/0033_attention-item-active-since/spec.md) 미해결 시작일·경과일, 저장 이후 내용 판정과 비교를 확인한다.
+   BATON의 범위 지정 비교·최신 여부 호출에는 [PR #25](https://github.com/ljkhyeong/baton-brief/pull/25) 이후 BRIEF가 필요하다.
    BATON 저장소 작업은 요청이 있을 때 진행한다.
 
 ## 다음 세션의 환경 참고

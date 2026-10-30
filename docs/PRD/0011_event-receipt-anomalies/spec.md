@@ -77,7 +77,7 @@ BRIEF가 PRD-0008에 따라 보존하는 최초 수신 기록과 이벤트별 �
 | `occurredAt` | 원본이 사실을 관측한 정규화된 시각 |
 | `state` | 최초 저장한 `ACTIVE` 또는 `RESOLVED` 상태 |
 | `processingOutcome` | 최초 기록에 저장된 처리 결과 |
-| `receivedAt` | 최초 수신 기록을 저장한 시각 |
+| `receivedAt` | BRIEF가 최초 요청을 받은 시각 |
 | `conflictDetectedAt` | 수신 필드가 다른 충돌을 처음 탐지한 시각, 없으면 `null` |
 
 원문 payload, 정규화 전 입력, SQL·예외 상세, 자격 증명, 원문 URL과

@@ -19,8 +19,9 @@ description: BATON BRIEF의 HTTP 경로·요청/응답 DTO·Problem Details·커
 
 ## 유지할 규칙
 
-- 경로는 `BriefController`의 `/api/v1` 아래에 두고 `BriefUseCases`에 위임한다. 요청·응답은
-  `BriefDtos.kt`의 전송 DTO로 표현하고 도메인 객체·DB 행·원문 payload를 노출하지 않는다.
+- 경로는 `BriefController`의 `/api/v1` 아래에 두고 `BriefUseCases`에 위임한다. 요청과 필드를
+  바꿔 내보내는 응답은 `BriefDtos.kt`의 전송 DTO로 표현한다. 응답 형태가 같은 application 모델과
+  브리프 항목은 그대로 반환하며 DB 행·원문 payload는 노출하지 않는다.
 - 입력 형식은 DTO의 Bean Validation, Spring 표준 `ProblemDetail`과 Jackson 엄격 설정에 맡긴다.
   전용 오류 DTO·`ResponseEntityExceptionHandler` 하위 클래스·별도 본문 검사기를 만들지 않는다.
 - BATON이 호출하는 조회·생성 경로를 추가·변경·삭제하면 세 허용 목록을 함께 맞춘다.

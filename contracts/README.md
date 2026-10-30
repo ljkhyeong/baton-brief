@@ -15,6 +15,8 @@
 
 스키마는 개별 필드 형식과 v2 열거형을 정의한다. 같은 `sourceReference`의 리비전 증가,
 `ACTIVE`·`RESOLVED` 상태 변경, 멱등성·충돌·HTTP 응답과 재구축 규칙은 PRD-0019가 기준이다.
+`occurredAt`은 UTC로 바꾼 연도가 0000~9999여야 한다. 오프셋 때문에 이 범위를 벗어나면 Schema를
+통과해도 BRIEF가 `400`으로 거부한다.
 
 Draft 2020-12의 `format`은 기본적으로 주석이므로 계약 검증기는 `format-assertion`을
 활성화해야 한다. UUID와 `date-time`을 실제 제약으로 검사하지 않는 기본 설정만으로 계약

@@ -43,8 +43,8 @@ BRIEF_BACKUP_DIRECTORY=/absolute/approved/backup-directory \
 기존 백업은 삭제하지 않는다. 다른 환경 파일은 `BRIEF_STAGING_ENV_FILE`, 별도 Compose
 프로젝트는 `COMPOSE_PROJECT_NAME`으로 지정한다.
 
-덤프와 함께 백업 시작·완료 시각, DB 서버·도구 버전, 애플리케이션 commit 또는 이미지
-digest, 적용한 Flyway 버전을 기록하되 비밀 값은 기록하지 않는다.
+스크립트는 덤프 옆 `manifest.txt`에 백업 시작·완료 시각, `pg_dump` 버전, 적용한 Flyway 버전과
+실행 이미지를 남긴다. 비밀 값은 기록하지 않는다. 복원 때 이 파일로 백업 시점과 맞는 실행 이미지를 찾는다.
 
 `pg_dump`는 실행 중인 DB의 일관된 스냅샷을 만든다. 백업 시작 이후 변경이 모두 포함됐다고
 해석하지 않는다. 파일 생성 성공이나 `pg_restore --list`로 목차를 읽는 것만으로 복원 성공을
@@ -70,6 +70,8 @@ sudo journalctl -u baton-brief-backup.service -n 20 --no-pager
 
 첫 백업의 격리 복원을 아래 절차로 확인한 뒤 `sudo systemctl enable --now baton-brief-backup.timer`로
 예약을 켠다. 실행 상태는 `systemctl list-timers baton-brief-backup.timer`와 위 journal 명령으로 확인한다.
+실패하면 10분 간격으로 세 번까지 실행하고 2시간을 넘으면 중단한다. 실패를 외부로 알리지는 않으므로
+운영 채널이 정해지면 service에 `OnFailure=`로 알림 유닛을 연결한다.
 타이머를 끄려면 `sudo systemctl disable --now baton-brief-backup.timer`를 사용한다.
 
 유료 API나 관리형 DB를 사용하지 않는다. 백업 파일은 서버 디스크를 계속 사용하며 자동 삭제는
@@ -154,7 +156,7 @@ DB를 지우지 않는다. `--single-transaction`은 오류 시 종료하고 복
 일치해야 한다.
 
 ```bash
-brief_restore_jar=/absolute/backup-matched/bootstrap.jar
+brief_restore_jar=/absolute/backup-matched/baton-brief.jar
 brief_restore_secrets=/absolute/restore-only/secrets
 brief_restore_db_port=15432
 brief_restore_db=brief_restore

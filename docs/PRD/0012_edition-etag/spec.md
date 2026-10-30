@@ -26,6 +26,7 @@ ETag로 호출자가 이미 받은 브리프나 비교 결과인지 확인하고
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest` | 현재 주간 범위 최신으로 선택된 브리프의 조건부 조회 |
 | `GET` | `/api/v1/editions/{editionId}` | 특정 브리프의 조건부 조회 |
 | `GET` | `/api/v1/editions/{targetEditionId}/changes?fromEditionId={baseEditionId}` | 두 브리프 비교 결과의 조건부 조회 |
+| `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/{targetEditionId}/changes?fromEditionId={baseEditionId}` | 같은 시즌으로 범위를 제한한 비교 결과의 조건부 조회 |
 
 브리프 생성의 기존 `201 Created`·`200 OK`와 `Location`, 조회의 기존 `200 OK`·`404 Not
 Found` 의미는 유지한다.

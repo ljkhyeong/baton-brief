@@ -95,8 +95,8 @@ BATON 화면은 조회 중 선택한 조건을 유지하며, 선택한 브리프
 ### 실행 구성과 접근 제한
 
 - `/actuator/health`는 Spring Boot가 애플리케이션과 DB 상태를 종합한 결과를 반환한다.
-- 로컬 실행의 이벤트 수신 인증은 기본 비활성이며, 스테이징은 BATON 전용 Bearer를 파일로
-  주입한다.
+- 로컬 실행의 인증은 기본 비활성이며, 스테이징은 이벤트 수신과 서비스 API의 Bearer를 파일로
+  주입해 항상 활성화한다.
 - Caddy는 외부에서 정확한 `POST /api/v1/events`만 전달하고 다른 경로는 `404`로 종료한다.
 - BRIEF는 내부 `data`·`proxy` 네트워크에만 참여하고 외부 송신용 `egress`에는 Caddy만
   연결된다.
@@ -144,7 +144,7 @@ AI 요약으로 업무 상태를 판정하지 않는다.
 [ADR-0002](docs/ADR/0002_technology-stack/adr.md)를 기술 기준으로 사용한다.
 
 - Kotlin/JVM·Kotlin BOM 2.4.21, Java 21 도구 체인과 JDK 21 실행 환경
-- Spring Boot/BOM 4.1.1, Gradle wrapper 9.7.0과 Kotlin DSL
+- Spring Boot/BOM 4.1.2, Gradle wrapper 9.7.0과 Kotlin DSL
 - PostgreSQL 18.6, Spring JDBC `JdbcClient`, Flyway, JPA 미사용
 - `domain`, `application`, `adapter-in-web`, `adapter-out-persistence`, `bootstrap`의 다섯
   Gradle 모듈
@@ -228,8 +228,8 @@ docker compose --env-file .env.staging \
 준비하는 순서는 [도메인 배포 안내](docs/operations/brief-b4ton-com-deployment.md)를 따른다.
 현재 구축 상태는 `HANDOFF.md`에서 확인한다.
 
-`.env.staging.example`을 추적되지 않는 `.env.staging`으로 복사하고 데이터베이스·Bearer
-파일의 실제 절대 경로를 지정한다.
+`.env.staging.example`을 추적되지 않는 `.env.staging`으로 복사하고 저장소 밖에 둔 데이터베이스·Bearer
+파일의 실제 절대 경로를 지정한다. 이벤트 수신과 서비스 API의 현재 token은 서로 다른 값으로 만든다.
 
 데이터베이스 비밀번호와 이벤트 수신·서비스 API의 현재·직전 Bearer 파일은 컨테이너
 UID/GID `10001`이 읽을 수 있어야 한다. 평상시 비워 두는 직전 token 파일에도 같은 조건을

@@ -30,7 +30,11 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 구성을 제공하지만 운영과 유
   이미지를 갱신하지 않기 때문이다. Temurin은 Dependabot이 패치 태그(`21.0.12_8-…`)를 주 버전
   태그로 바꿔 제안하므로 주 버전 태그를 쓰고, JDK 패치와 재빌드는 같은 태그의 digest 갱신 PR로 받는다.
 - 실행 컨테이너는 UID/GID `10001`, 읽기 전용 루트 파일시스템, `/tmp` tmpfs와 모든 Linux
-  capability 제거를 사용한다.
+  capability 제거를 사용한다. PostgreSQL도 읽기 전용 루트에 데이터 볼륨과 tmpfs만 쓰고, 공식
+  이미지의 초기화에 필요한 `CHOWN`·`DAC_OVERRIDE`·`FOWNER`·`SETGID`·`SETUID`만 남긴다.
+- BRIEF 컨테이너 메모리는 768MB로 제한한다. 제한이 없으면 JVM 힙 상한(75%)이 호스트 전체 메모리를
+  기준으로 잡혀 같은 서버의 BATON까지 영향을 받는다. 기동 직후 사용량은 약 256MiB였으며 실제 부하에
+  맞춰 조정한다.
 - `compose.staging.yml`의 기본 profile은 BRIEF와 PostgreSQL 18.6을 함께 실행한다. PostgreSQL은 내부
   데이터 네트워크에서만 실행하고 호스트 포트를 공개하지 않는다.
 - 개발용·스테이징 PostgreSQL 상태 검사는 `pg_isready -h 127.0.0.1`로 TCP 연결을 확인한다.
@@ -41,10 +45,11 @@ BRIEF는 실행 JAR과 로컬 PostgreSQL 구성을 제공하지만 운영과 유
   profile만 담당하고, 서비스 조회·생성은 ADR-0007의 호스트 포트 없는 서비스 Caddy를
   사용한다. HTTPS 앞단과 인증서는 배포 환경이 소유하고 애플리케이션 이미지에 TLS 종단을
   넣지 않는다.
-- 데이터베이스 비밀번호와 현재·직전 이벤트 수신 Bearer는 저장소 밖 파일을 Compose
+- 데이터베이스 비밀번호와 이벤트 수신·서비스 API의 현재·직전 Bearer는 저장소 밖 파일을 Compose
   secrets로 마운트하고 Spring Boot `configtree:`로 읽는다. 별도 비밀 로더나 환경변수
   복사 스크립트를 만들지 않는다.
-- 스테이징 구성에서는 이벤트 수신 Bearer 인증을 항상 활성화한다.
+- 스테이징 구성에서는 이벤트 수신과 서비스 API Bearer 인증을 항상 활성화한다. 서비스 Caddy를
+  띄우지 않아도 `proxy` 네트워크의 다른 컨테이너가 인증 없이 앱 API를 호출할 수 없게 하기 위해서다.
 - 컨테이너 상태 확인은 기존 `/actuator/health`를 사용한다. 커스텀 상태 확인 경로나
   상세 응답을 추가하지 않는다.
 
