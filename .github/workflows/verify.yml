@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Java 21 설정
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
@@ -53,6 +55,12 @@ jobs:
           docker compose --env-file .env.staging.example -f compose.staging.yml --profile https config --quiet
           docker compose --env-file .env.staging.example -f compose.staging.yml -f compose.service-api.yml config --quiet
           docker compose --env-file .env.staging.example -f compose.staging.yml -f compose.observability.yml config --quiet
+          docker compose --env-file .env.staging.example -f compose.staging.yml -f compose.service-api.yml \
+            -f compose.observability.yml --profile https config --quiet
+          docker compose -f compose.ci-tools.yml config --quiet
+          # Testcontainers와 개발용·스테이징 PostgreSQL이 같은 버전인지 확인한다.
+          test "$(grep -hoE 'postgres:[0-9.]+-alpine' compose.yml compose.staging.yml \
+            bootstrap/src/test/kotlin/com/personal/baton/brief/BriefPostgresConfiguration.kt | sort -u | wc -l)" -eq 1
 
       - name: 지표 설정과 경보 규칙 검증
         run: |
@@ -61,9 +69,10 @@ jobs:
             --volume "$PWD/ops/prometheus:/etc/prometheus:ro" --workdir /etc/prometheus "$prometheus_image")
           "${promtool[@]}" check config /etc/prometheus/prometheus.yml
           "${promtool[@]}" test rules alerts.test.yml
+          alertmanager_image="$(docker compose -f compose.ci-tools.yml config --format json | jq -r '.services.alertmanager.image')"
           amtool=(docker run --rm --network none --entrypoint /bin/amtool
             --volume "$PWD/ops/alertmanager:/etc/alertmanager:ro"
-            'prom/alertmanager:v0.32.1@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286')
+            "$alertmanager_image")
           for channel in slack discord slack-discord; do
             config="/etc/alertmanager/brief-$channel.example.yml"
             "${amtool[@]}" check-config "$config"
@@ -119,6 +128,7 @@ jobs:
             --env-file .env.staging.example
             -f compose.staging.yml
             -f compose.service-api.yml
+            -f compose.observability.yml
             --profile https
           )
           service_network="baton-brief-ci-service"
@@ -147,7 +157,7 @@ jobs:
           service_token="ci-service-token-0000000000000000000000"
           echo "::add-mask::$event_token"
           echo "::add-mask::$service_token"
-          curl_image="curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6"
+          curl_image="$(docker compose -f compose.ci-tools.yml config --format json | jq -r '.services.curl.image')"
           printf '%s' "ci-database-password" > "$staging_dir/database-password"
           printf '%s' "$event_token" > "$staging_dir/event-bearer-token"
           : > "$staging_dir/event-previous-bearer-token"
@@ -272,6 +282,7 @@ jobs:
           backup_files=("$staging_dir/backups"/*/database.dump)
           test "${#backup_files[@]}" = "1"
           test -s "${backup_files[0]}"
+          grep --fixed-strings --line-regexp --quiet 'flyway_version=1' "$(dirname "${backup_files[0]}")/manifest.txt"
           BRIEF_BACKUP_FILE="${backup_files[0]}" bash ops/verify-postgresql-backup.sh
 
           backup_bytes="$(wc -c < "${backup_files[0]}")"
@@ -283,6 +294,18 @@ jobs:
           fi
 
           test "$(http_status public_curl https://localhost:38443/actuator/health)" = "404"
+          # 허용 경로는 대소문자까지 일치해야 앱으로 전달한다.
+          test "$(public_curl --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer $event_token" \
+            --data-binary '@contracts/examples/role-unassigned.active-r1-critical.json' \
+            --output /dev/null --write-out '%{http_code} %{size_download}' \
+            https://localhost:38443/API/V1/EVENTS)" = "404 0"
+          # 본문 크기 제한은 앱에 닿기 전에 413으로 끝낸다.
+          head -c 70000 /dev/zero | tr '\0' 'a' > "$staging_dir/oversized.json"
+          test "$(http_status public_curl --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer $event_token" \
+            --data-binary "@$staging_dir/oversized.json" \
+            https://localhost:38443/api/v1/events)" = "413"
 
           service_response="$(
             service_api_curl --fail \
@@ -314,11 +337,65 @@ jobs:
             "https://localhost:38443$resolutions_path")" = "404"
           test "$(http_status service_api_curl --header="Authorization: Bearer $service_token" \
             'https://brief-service:8443/actuator/health')" = "404"
-          # 새 브리프 경로도 서비스 Caddy를 지나 앱 인증까지 도달해야 한다.
-          editions_path="${summary_path%/attention-items/summary}/editions/50000000-0000-0000-0000-000000000001"
-          test "$(http_status service_api_curl "https://brief-service:8443$editions_path/freshness")" = "401"
-          test "$(http_status service_api_curl \
-            "https://brief-service:8443$editions_path/changes?fromEditionId=50000000-0000-0000-0000-000000000001")" = "401"
+          # 허용 목록의 모든 경로는 서비스 Caddy를 지나 앱 인증까지 도달해야 한다.
+          scope_path="${summary_path%/attention-items/summary}"
+          edition_id="50000000-0000-0000-0000-000000000001"
+          item_query="eventType=ROLE_UNASSIGNED&sourceReference=handoff:1"
+          week_query="weekStart=2026-08-24&zoneId=Asia/Seoul"
+          for path in \
+            "$scope_path/attention-items" \
+            "$scope_path/attention-items/current?$item_query" \
+            "$scope_path/attention-items/transitions?$item_query" \
+            "$scope_path/editions" \
+            "$scope_path/editions/latest" \
+            "$scope_path/editions/weekly/latest?$week_query" \
+            "$scope_path/editions/$edition_id/changes?fromEditionId=$edition_id" \
+            "$scope_path/editions/$edition_id/freshness" \
+            "/api/v1/editions/$edition_id" \
+            "/api/v1/editions/$edition_id/changes?fromEditionId=$edition_id"; do
+            test "$(http_status service_api_curl "https://brief-service:8443$path")" = "401"
+          done
+          test "$(http_status service_api_curl --request POST "https://brief-service:8443$scope_path/editions")" = "401"
+
+          # 목록 밖 경로와 메서드는 서비스 token이 있어도 Caddy가 404로 끝낸다.
+          for request in \
+            "POST /api/v1/projections/rebuild" \
+            "POST /api/v1/events" \
+            "GET /api/v1/events/$edition_id/receipt" \
+            "GET $scope_path/event-receipts/anomalies" \
+            "DELETE $scope_path/editions"; do
+            test "$(http_status service_api_curl --header="Authorization: Bearer $service_token" \
+              --request "${request%% *}" "https://brief-service:8443${request#* }")" = "404"
+          done
+          test "$(http_status service_api_curl --header="Authorization: Bearer $service_token" \
+            --header 'Content-Type: application/json' --data-raw "$(cat "$staging_dir/oversized.json")" \
+            "https://brief-service:8443$scope_path/editions")" = "413"
+
+          # 서비스 Caddy는 8443만 열어 평문 리디렉션으로 Bearer를 받지 않는다.
+          if docker exec "$service_api_id" netstat -ltn | grep --quiet ':80 '; then
+            echo "서비스 Caddy가 80 포트를 열었습니다." >&2
+            exit 1
+          fi
+
+          # 원본 참조는 서비스 Caddy 접근 로그에 남기지 않는다.
+          log_sentinel="brief-log-sentinel-reference"
+          service_api_curl --output /dev/null --header="Authorization: Bearer $service_token" \
+            "https://brief-service:8443$scope_path/attention-items/current?eventType=ROLE_UNASSIGNED&sourceReference=$log_sentinel"
+
+          # 경보 규칙이 쓰는 지표가 실제로 수집되는지 확인한다.
+          for metric in brief_events_received_total hikaricp_connections_pending http_server_requests_seconds_count; do
+            scraped=""
+            for _attempt in $(seq 1 40); do
+              if docker exec "$brief_id" wget -q -T 10 -O - \
+                "http://127.0.0.1:9090/api/v1/query?query=$metric%7Bjob%3D%22brief%22%7D" \
+                | jq --exit-status '.data.result | length > 0' > /dev/null; then
+                scraped="true"
+                break
+              fi
+              sleep 2
+            done
+            test "$scraped" = "true"
+          done
 
           # 로그 수집 실패는 즉시 중단하고 grep의 조기 종료와 분리한다.
           brief_logs="$(docker logs "$brief_id" 2>&1)"
@@ -336,3 +413,4 @@ jobs:
           assert_token_absent "$service_token" "$brief_logs" "BRIEF 로그에 서비스 API Bearer token이 노출됐습니다."
           assert_token_absent "$service_token" "$https_logs" "공개 Caddy 로그에 서비스 API Bearer token이 노출됐습니다."
           assert_token_absent "$service_token" "$service_api_logs" "서비스 Caddy 로그에 Bearer token이 노출됐습니다."
+          assert_token_absent "$log_sentinel" "$service_api_logs" "서비스 Caddy 로그에 원본 참조가 노출됐습니다."
