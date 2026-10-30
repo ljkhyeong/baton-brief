@@ -372,7 +372,8 @@ jobs:
             "https://brief-service:8443$scope_path/editions")" = "413"
 
           # 서비스 Caddy는 8443만 열어 평문 리디렉션으로 Bearer를 받지 않는다.
-          if docker exec "$service_api_id" netstat -ltn | grep --quiet ':80 '; then
+          service_api_ports="$(docker exec "$service_api_id" netstat -ltn)"
+          if grep --quiet ':80 ' <<< "$service_api_ports"; then
             echo "서비스 Caddy가 80 포트를 열었습니다." >&2
             exit 1
           fi
