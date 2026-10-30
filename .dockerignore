@@ -2,10 +2,10 @@
 .gradle
 .idea
 **/build
-.env
-.env.*
+**/.env
+**/.env.*
 !.env.staging.example
-*.key
-*.pem
-*.p12
-*.pfx
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx

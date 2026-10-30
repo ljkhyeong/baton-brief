@@ -1,8 +1,13 @@
 {
 	admin off
+	# 8443 HTTPS만 연다. 평문 80 리디렉션은 Bearer를 평문으로 받을 수 있다.
+	auto_https disable_redirects
 }
 
 (brief_proxy) {
+	request_body {
+		max_size 64KB
+	}
 	header Cache-Control "no-store"
 	request_header -Forwarded
 	request_header -X-Forwarded-*
@@ -17,6 +22,10 @@ https://{$BRIEF_SERVICE_HOST:brief-service}:8443 {
 		format filter {
 			request>headers>Authorization delete
 			request>headers>Proxy-Authorization delete
+			request>uri query {
+				delete sourceReference
+				delete afterSourceReference
+			}
 		}
 	}
 

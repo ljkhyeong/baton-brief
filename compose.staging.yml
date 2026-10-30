@@ -25,6 +25,20 @@ services:
       timeout: 3s
       retries: 12
       start_period: 10s
+    # 기본 10초 안에 체크포인트가 끝나지 않으면 강제 종료 뒤 복구를 시작한다.
+    stop_grace_period: 60s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+      - /var/run/postgresql:rw,noexec,nosuid,nodev,size=1m
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     security_opt:
       - no-new-privileges:true
     networks:
@@ -46,6 +60,7 @@ services:
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${BRIEF_STAGING_DB_NAME:-baton_brief}"
       SPRING_DATASOURCE_USERNAME: "${BRIEF_STAGING_DB_USERNAME:-brief}"
       BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED: "true"
+      BRIEF_SERVICE_API_AUTHENTICATION_REQUIRED: "true"
       SERVER_ADDRESS: 0.0.0.0
       SERVER_FORWARD_HEADERS_STRATEGY: framework
       TZ: UTC
@@ -56,11 +71,17 @@ services:
         target: brief.event-receiver.bearer-token
       - source: brief_event_receiver_previous_bearer_token
         target: brief.event-receiver.previous-bearer-token
+      - source: brief_service_api_bearer_token
+        target: brief.service-api.bearer-token
+      - source: brief_service_api_previous_bearer_token
+        target: brief.service-api.previous-bearer-token
     depends_on:
       postgres:
         condition: service_healthy
     # Spring Boot 기본 graceful 종료 단계 대기(30s)보다 길게 둔다.
     stop_grace_period: 40s
+    # 제한이 없으면 JVM 힙 상한(75%)이 호스트 전체 메모리를 기준으로 잡힌다.
+    mem_limit: 768m
     security_opt:
       - no-new-privileges:true
     networks:
@@ -118,3 +139,7 @@ secrets:
     file: "${BRIEF_STAGING_EVENT_RECEIVER_BEARER_TOKEN_FILE:?BRIEF_STAGING_EVENT_RECEIVER_BEARER_TOKEN_FILE is required}"
   brief_event_receiver_previous_bearer_token:
     file: "${BRIEF_STAGING_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN_FILE:?BRIEF_STAGING_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN_FILE is required}"
+  brief_service_api_bearer_token:
+    file: "${BRIEF_STAGING_SERVICE_API_BEARER_TOKEN_FILE:?BRIEF_STAGING_SERVICE_API_BEARER_TOKEN_FILE is required}"
+  brief_service_api_previous_bearer_token:
+    file: "${BRIEF_STAGING_SERVICE_API_PREVIOUS_BEARER_TOKEN_FILE:?BRIEF_STAGING_SERVICE_API_PREVIOUS_BEARER_TOKEN_FILE is required}"
