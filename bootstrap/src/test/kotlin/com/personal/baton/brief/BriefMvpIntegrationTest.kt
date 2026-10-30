@@ -7,7 +7,6 @@ import com.personal.baton.brief.application.BriefService
 import com.personal.baton.brief.application.GenerateEditionCommand
 import com.personal.baton.brief.application.IngestResult
 import com.personal.baton.brief.application.IngestStatus
-import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.domain.AttentionProjector
 import com.personal.baton.brief.domain.EditionItemSection
 import com.personal.baton.brief.domain.ProjectionDecision
@@ -16,6 +15,7 @@ import com.personal.baton.brief.domain.SourceEventSeverity
 import com.personal.baton.brief.domain.SourceEventState
 import com.personal.baton.brief.domain.SourceEventType
 import io.micrometer.core.instrument.MeterRegistry
+import java.net.URI
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -643,14 +643,28 @@ class BriefMvpIntegrationTest(
         val seasonId = "20000000-0000-0000-0000-000000000001"
         val currentAttentionPath =
             "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
+        postEvent(eventJson("30000000-0000-0000-0000-000000000001", workspaceId, seasonId, "handoff:1", 1))
+            .andExpect(status().isAccepted)
+        mockMvc.perform(itemRequest(currentAttentionPath, "ROLE_PREPARATION_INCOMPLETE", "handoff:1"))
+            .andExpect(status().isOk)
 
-        mockMvc.perform(
+        // 네 식별자 중 하나만 달라도 같은 항목이 아니다.
+        listOf(
             itemRequest(
                 "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/attention-items/current",
                 "ROLE_PREPARATION_INCOMPLETE",
                 "handoff:1",
             ),
-        ).andExpect(status().isNotFound)
+            itemRequest(
+                "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/attention-items/current",
+                "ROLE_PREPARATION_INCOMPLETE",
+                "handoff:1",
+            ),
+            itemRequest(currentAttentionPath, "HANDOFF_INCOMPLETE", "handoff:1"),
+            itemRequest(currentAttentionPath, "ROLE_PREPARATION_INCOMPLETE", "handoff:2"),
+        ).forEach { request ->
+            mockMvc.perform(request).andExpect(status().isNotFound)
+        }
 
         mockMvc.perform(
             itemRequest(currentAttentionPath, "ROLE_PREPARATION_INCOMPLETE", " "),
@@ -669,9 +683,11 @@ class BriefMvpIntegrationTest(
         val receivedAt = Instant.parse("2026-08-12T09:00:01Z")
         val conflictRequestAt = Instant.parse("2026-08-12T09:00:02Z")
         val conflictDetectedAt = Instant.parse("2026-08-12T09:00:03Z")
+        val laterRequestAt = Instant.parse("2026-08-12T09:00:04Z")
+        val laterConflictAt = Instant.parse("2026-08-12T09:00:05Z")
         val sequentialClock = Mockito.mock(Clock::class.java)
         Mockito.`when`(sequentialClock.instant())
-            .thenReturn(receivedAt, conflictRequestAt, conflictDetectedAt)
+            .thenReturn(receivedAt, conflictRequestAt, conflictDetectedAt, laterRequestAt, laterConflictAt)
         val conflictEventId = UUID.fromString("30000000-0000-0000-0000-000000000098")
         val conflictEvent = SourceEvent(
             eventId = conflictEventId,
@@ -689,9 +705,17 @@ class BriefMvpIntegrationTest(
         assertThat(service.ingest(conflictEvent).status).isEqualTo(IngestStatus.APPLIED)
         assertThat(service.ingest(conflictEvent.copy(state = SourceEventState.RESOLVED)).status)
             .isEqualTo(IngestStatus.CONFLICT)
+        assertThat(service.ingest(conflictEvent.copy(aggregateRevision = 2)).status)
+            .isEqualTo(IngestStatus.CONFLICT)
         val receipt = checkNotNull(persistence.findEventReceipt(conflictEventId))
         assertThat(receipt.receivedAt).isEqualTo(receivedAt)
         assertThat(receipt.conflictDetectedAt).isEqualTo(conflictDetectedAt)
+        // 충돌은 증거만 남기고 현재 항목을 바꾸지 않는다.
+        val item = persistence.findAttentionItem(
+            conflictEvent.workspaceId, conflictEvent.seasonId, conflictEvent.eventType, conflictEvent.sourceReference,
+        )
+        assertThat(item?.status).isEqualTo(SourceEventState.ACTIVE)
+        assertThat(item?.lastRevision).isEqualTo(1)
     }
 
     @Test
@@ -875,6 +899,7 @@ class BriefMvpIntegrationTest(
         val editionCount = countRowsInTable(jdbc, "brief_edition")
         listOf(
             "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/editions/$firstEditionId/freshness",
+            "/api/v1/workspaces/10000000-0000-0000-0000-000000000099/seasons/$seasonId/editions/$firstEditionId/freshness",
             "$editionsPath/50000000-0000-0000-0000-000000000099/freshness",
         ).forEach { path ->
             mockMvc.perform(get(path))
@@ -1467,6 +1492,18 @@ class BriefMvpIntegrationTest(
             .andExpect(status().isNotFound)
         mockMvc.perform(get("$otherGenerationPath/$targetEditionId/changes").param("fromEditionId", baseEditionId))
             .andExpect(status().isNotFound)
+        // 기준이 범위 안이어도 대상이 범위 밖이면 같은 404로 존재를 감춘다.
+        mockMvc.perform(get("$generationPath/$otherEditionId/changes").param("fromEditionId", baseEditionId))
+            .andExpect(status().isNotFound)
+
+        val otherSeasonEditionId = editionIdOf(
+            postEdition(
+                "/api/v1/workspaces/$workspaceId/seasons/20000000-0000-0000-0000-000000000099/editions",
+                editionRequest,
+            ).andExpect(status().isCreated).andReturn(),
+        )
+        mockMvc.perform(get(changesPath).param("fromEditionId", otherSeasonEditionId))
+            .andExpect(status().isBadRequest)
 
         mockMvc.perform(
             get(changesPath)
@@ -1547,6 +1584,7 @@ class BriefMvpIntegrationTest(
         listOf(
             "aggregateRevision" to "1.0",
             "aggregateRevision" to "9223372036854775808",
+            "occurredAt" to "31556889864403199",
             "unexpected" to "true",
         ).forEach { (field, rawValue) ->
             postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1).putRawValue(field, RawValue(rawValue)))
@@ -1560,6 +1598,9 @@ class BriefMvpIntegrationTest(
             "sourceReference" to "valid\u0000suffix",
             "occurredAt" to "2026-08-12T09:00:00",
             "occurredAt" to "+10000-01-01T00:00:00Z",
+            "occurredAt" to "+1000000000-12-31T23:59:59Z",
+            "occurredAt" to "-0001-12-31T23:59:59Z",
+            "occurredAt" to "0000-01-01T00:00:00+09:00",
         ).forEach { (field, value) ->
             postEvent(eventJson(eventId, workspaceId, seasonId, "invalid", 1).put(field, value))
                 .andExpect(status().isBadRequest)
@@ -1865,81 +1906,523 @@ class BriefMvpIntegrationTest(
         postEvent(
             eventJson("30000000-0000-0000-0000-000000000020", workspaceId, seasonId, "handoff:concurrent", 1),
         ).andExpect(status().isAccepted)
+        val event = supportedEvent("30000000-0000-0000-0000-000000000021", workspaceId, seasonId, "handoff:during-rebuild")
 
-        val rebuildStarted = CountDownLatch(1)
-        val releaseRebuild = CountDownLatch(1)
-        val receivedAt = Instant.parse("2026-08-12T09:00:01Z")
-        val supportedEvent = SourceEvent(
-            eventId = UUID.fromString("30000000-0000-0000-0000-000000000021"),
-            eventType = SourceEventType.ROLE_PREPARATION_INCOMPLETE,
-            eventVersion = 2,
-            workspaceId = UUID.fromString(workspaceId),
-            seasonId = UUID.fromString(seasonId),
-            sourceReference = "handoff:during-rebuild",
-            aggregateRevision = 1,
-            occurredAt = receivedAt,
-            state = SourceEventState.ACTIVE,
-            sourceSeverity = SourceEventSeverity.CRITICAL,
-        )
-
-        val executor = Executors.newFixedThreadPool(2)
-        try {
-            val rebuild = executor.submit<RebuildResult> {
+        val (_, ingest) = assertWaitsForLock(
+            lockMode = "ShareLock",
+            holder = { pause ->
                 persistence.rebuild { receivedEvent, current ->
-                    rebuildStarted.countDown()
-                    check(releaseRebuild.await(10, TimeUnit.SECONDS))
+                    pause()
                     AttentionProjector.project(receivedEvent, current)
                 }
-            }
-            assertThat(rebuildStarted.await(10, TimeUnit.SECONDS)).isTrue()
-            val ingest = executor.submit<IngestResult> {
-                persistence.processEvent(
-                    event = supportedEvent,
-                    receivedAt = receivedAt,
-                    conflictDetectedAt = { receivedAt },
-                ) { current ->
-                    AttentionProjector.project(supportedEvent, current)
-                }
-            }
+            },
+            waiter = { ingestDirectly(event) },
+        )
 
-            await()
-                .pollDelay(0, TimeUnit.MILLISECONDS)
-                .pollInterval(10, TimeUnit.MILLISECONDS)
-                .atMost(10, TimeUnit.SECONDS)
-                .until {
-                    jdbc.sql(
-                        """
-                        SELECT EXISTS (
-                            SELECT 1
-                              FROM pg_locks
-                             WHERE database = (
-                                       SELECT oid
-                                         FROM pg_database
-                                        WHERE datname = current_database()
-                                   )
-                               AND locktype = 'advisory'
-                               AND mode = 'ShareLock'
-                               AND NOT granted
-                        )
-                        """.trimIndent(),
-                    ).query(Boolean::class.java).single()
-                }
-            releaseRebuild.countDown()
-
-            rebuild.get(10, TimeUnit.SECONDS)
-            assertThat(ingest.get(10, TimeUnit.SECONDS).status).isEqualTo(IngestStatus.APPLIED)
-        } finally {
-            releaseRebuild.countDown()
-            executor.shutdownNow()
-            executor.awaitTermination(10, TimeUnit.SECONDS)
-        }
+        assertThat(ingest.status).isEqualTo(IngestStatus.APPLIED)
         assertThat(
             jdbc.sql(
                 "SELECT COUNT(*) FROM attention_item WHERE source_reference = :sourceReference",
-            ).param("sourceReference", supportedEvent.sourceReference)
+            ).param("sourceReference", event.sourceReference)
                 .query(Long::class.java)
                 .single(),
         ).isEqualTo(1)
+    }
+
+    @Test
+    fun `같은 항목의 동시 수신은 잠금으로 직렬화되어 리비전 순서를 지킨다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000004"
+        val seasonId = "20000000-0000-0000-0000-000000000004"
+        val first = supportedEvent("30000000-0000-0000-0000-000000000022", workspaceId, seasonId, "handoff:serialized", 1)
+        val second = supportedEvent("30000000-0000-0000-0000-000000000023", workspaceId, seasonId, "handoff:serialized", 2)
+
+        val (firstResult, secondResult) = assertWaitsForLock(
+            lockMode = "ExclusiveLock",
+            holder = { pause -> ingestDirectly(first, beforeProject = pause) },
+            waiter = { ingestDirectly(second) },
+        )
+
+        assertThat(firstResult.status).isEqualTo(IngestStatus.APPLIED)
+        // 잠금이 없으면 두 번째 수신이 저장 전 상태를 읽어 공백으로 판정한다.
+        assertThat(secondResult.status).isEqualTo(IngestStatus.APPLIED)
+        assertThat(
+            persistence.findAttentionItem(first.workspaceId, first.seasonId, first.eventType, first.sourceReference)
+                ?.lastRevision,
+        ).isEqualTo(2)
+    }
+
+    @Test
+    fun `에디션 생성은 진행 중인 수신을 기다려 항목과 기준 순번을 같은 시점으로 고정한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000004"
+        val seasonId = "20000000-0000-0000-0000-000000000004"
+        val event = supportedEvent("30000000-0000-0000-0000-000000000024", workspaceId, seasonId, "handoff:before-edition")
+
+        val (_, edition) = assertWaitsForLock(
+            lockMode = "ExclusiveLock",
+            holder = { pause -> ingestDirectly(event, beforeProject = pause) },
+            waiter = {
+                postEdition(
+                    "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions",
+                    """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}""",
+                ).andReturn()
+            },
+        )
+
+        assertThat(edition.response.status).isEqualTo(201)
+        assertThat(JsonPath.read<Int>(edition.response.contentAsString, "$.sourceCursor")).isEqualTo(1)
+        assertThat(JsonPath.read<List<String>>(edition.response.contentAsString, "$.items[*].sourceReference"))
+            .containsExactly(event.sourceReference)
+    }
+
+    @Test
+    fun `에디션 생성은 진행 중인 재구축이 끝난 뒤 실행된다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000004"
+        val seasonId = "20000000-0000-0000-0000-000000000004"
+        postEvent(
+            eventJson("30000000-0000-0000-0000-000000000020", workspaceId, seasonId, "handoff:concurrent", 1),
+        ).andExpect(status().isAccepted)
+
+        val (_, edition) = assertWaitsForLock(
+            lockMode = "ExclusiveLock",
+            holder = { pause ->
+                persistence.rebuild { receivedEvent, current ->
+                    pause()
+                    AttentionProjector.project(receivedEvent, current)
+                }
+            },
+            waiter = {
+                postEdition(
+                    "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions",
+                    """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}""",
+                ).andReturn()
+            },
+        )
+
+        assertThat(edition.response.status).isEqualTo(201)
+        assertThat(JsonPath.read<List<String>>(edition.response.contentAsString, "$.items[*].sourceReference"))
+            .containsExactly("handoff:concurrent")
+    }
+
+    @Test
+    fun `에디션과 최신 조회는 다른 작업공간과 시즌의 항목을 섞지 않는다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000021"
+        val otherWorkspaceId = "10000000-0000-0000-0000-000000000022"
+        val seasonId = "20000000-0000-0000-0000-000000000021"
+        val otherSeasonId = "20000000-0000-0000-0000-000000000022"
+        val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        val scopes = listOf(
+            Triple(workspaceId, seasonId, "handoff:own"),
+            Triple(otherWorkspaceId, seasonId, "handoff:other-workspace"),
+            Triple(workspaceId, otherSeasonId, "handoff:other-season"),
+        )
+        scopes.forEach { (workspace, season, sourceReference) ->
+            postEvent(eventJson(UUID.randomUUID().toString(), workspace, season, sourceReference, 1))
+                .andExpect(status().isAccepted)
+        }
+
+        scopes.forEachIndexed { index, (workspace, season, sourceReference) ->
+            val editionsPath = "/api/v1/workspaces/$workspace/seasons/$season/editions"
+            postEdition(editionsPath, editionRequest)
+                .andExpect(status().isCreated)
+                .andExpect(jsonPath("$.generation").value(1))
+                .andExpect(jsonPath("$.sourceCursor").value(index + 1))
+                .andExpect(jsonPath("$.items[*].sourceReference", contains(sourceReference)))
+            mockMvc.perform(get("$editionsPath/latest"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.items[*].sourceReference", contains(sourceReference)))
+        }
+
+        // 수신이 없는 범위는 빈 브리프와 기준 순번 0으로 고정한다.
+        postEdition("/api/v1/workspaces/$otherWorkspaceId/seasons/$otherSeasonId/editions", editionRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(jsonPath("$.sourceCursor").value(0))
+    }
+
+    @Test
+    fun `브리프 재사용은 선정과 무관한 수신을 무시하고 주간이 다르면 새 세대를 만든다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000023"
+        val seasonId = "20000000-0000-0000-0000-000000000023"
+        val editionsPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, "handoff:carry-over", 1,
+                occurredAt = "2026-08-05T09:00:00Z",
+            ),
+        ).andExpect(status().isAccepted)
+        val firstEdition = postEdition(editionsPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.sourceCursor").value(1))
+            .andExpect(jsonPath("$.items[0].section").value("CARRY_OVER"))
+            .andReturn()
+
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, "handoff:carry-over", 1,
+                occurredAt = "2026-08-05T09:00:00Z",
+            ),
+        ).andExpect(jsonPath("$.status").value("STALE"))
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, "handoff:unsupported", 1,
+                eventVersion = 3, sourceSeverity = null,
+            ),
+        ).andExpect(status().isUnprocessableContent)
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), "10000000-0000-0000-0000-000000000099", seasonId, "handoff:other-scope", 1,
+            ),
+        ).andExpect(status().isAccepted)
+
+        postEdition(editionsPath, editionRequest)
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.editionId").value(editionIdOf(firstEdition)))
+            .andExpect(jsonPath("$.sourceCursor").value(1))
+
+        // 항목이 같아도 다른 주간은 재사용하지 않고, 기준 순번은 이 범위의 마지막 지원 수신을 가리킨다.
+        postEdition(editionsPath, """{"weekStart":"2026-08-17","zoneId":"Asia/Seoul"}""")
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.generation").value(2))
+            .andExpect(jsonPath("$.sourceCursor").value(2))
+    }
+
+    @Test
+    fun `브리프 항목은 같은 구역 심각도 사유 안에서 원본 참조 순서로 고정한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000024"
+        val seasonId = "20000000-0000-0000-0000-000000000024"
+        val editionsPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        val editionRequest = """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}"""
+        listOf("handoff:z", "handoff:m", "handoff:a").forEach { sourceReference ->
+            postEvent(eventJson(UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 1))
+                .andExpect(status().isAccepted)
+        }
+
+        postEdition(editionsPath, editionRequest)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.items[*].sourceReference", contains("handoff:a", "handoff:m", "handoff:z")))
+        postEdition(editionsPath, editionRequest).andExpect(status().isOk)
+    }
+
+    @Test
+    fun `전이 이력은 적용한 변경만 항목 식별자 범위 안에서 반환한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000025"
+        val seasonId = "20000000-0000-0000-0000-000000000025"
+        val sourceReference = "handoff:transitions"
+        val eventId = "30000000-0000-0000-0000-000000000025"
+        postEvent(eventJson(eventId, workspaceId, seasonId, sourceReference, 1)).andExpect(status().isAccepted)
+        postEvent(eventJson(UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 2, state = "RESOLVED"))
+            .andExpect(status().isAccepted)
+
+        // 현재 상태를 바꾸지 않은 수신은 전이가 아니다.
+        postEvent(eventJson(eventId, workspaceId, seasonId, sourceReference, 1))
+            .andExpect(jsonPath("$.status").value("DUPLICATE"))
+        postEvent(eventJson(eventId, workspaceId, seasonId, sourceReference, 3)).andExpect(status().isConflict)
+        postEvent(eventJson(UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 1))
+            .andExpect(jsonPath("$.status").value("STALE"))
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 3,
+                eventVersion = 3, sourceSeverity = null,
+            ),
+        ).andExpect(status().isUnprocessableContent)
+
+        // 식별자가 하나만 다른 항목은 섞이지 않는다.
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 9,
+                type = "HANDOFF_INCOMPLETE", sourceSeverity = "WARNING",
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, "20000000-0000-0000-0000-000000000099", sourceReference, 9,
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(eventJson(UUID.randomUUID().toString(), workspaceId, seasonId, "handoff:other", 9))
+            .andExpect(status().isAccepted)
+
+        mockMvc.perform(
+            itemRequest(
+                "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/transitions",
+                "ROLE_PREPARATION_INCOMPLETE",
+                sourceReference,
+            ),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.transitions[*].aggregateRevision", contains(2, 1)))
+            .andExpect(jsonPath("$.transitions[*].state", contains("RESOLVED", "ACTIVE")))
+            .andExpect(jsonPath("$.nextBeforeAggregateRevision").value(nullValue()))
+    }
+
+    @Test
+    fun `재구축은 도착 순서를 재생해 역전된 리비전의 공백 증거를 보존한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000026"
+        val seasonId = "20000000-0000-0000-0000-000000000026"
+        val sourceReference = "handoff:reordered"
+        val currentPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 1,
+                occurredAt = "2026-08-12T09:00:00Z",
+            ),
+        ).andExpect(jsonPath("$.status").value("APPLIED"))
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 3,
+                occurredAt = "2026-08-12T09:02:00Z",
+            ),
+        ).andExpect(jsonPath("$.status").value("APPLIED_WITH_GAP"))
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 2,
+                occurredAt = "2026-08-12T09:01:00Z",
+            ),
+        ).andExpect(jsonPath("$.status").value("STALE"))
+
+        val current = mockMvc.perform(itemRequest(currentPath, "ROLE_PREPARATION_INCOMPLETE", sourceReference))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.aggregateRevision").value(3))
+            .andExpect(jsonPath("$.activeSince").value("2026-08-12T09:02:00Z"))
+            .andExpect(jsonPath("$.revisionGap").value(true))
+            .andReturn()
+
+        mockMvc.perform(post("/api/v1/projections/rebuild")).andExpect(status().isOk)
+
+        val rebuilt = mockMvc.perform(itemRequest(currentPath, "ROLE_PREPARATION_INCOMPLETE", sourceReference))
+            .andExpect(status().isOk)
+            .andReturn()
+        assertThat(rebuilt.response.contentAsString).isEqualTo(current.response.contentAsString)
+    }
+
+    @Test
+    fun `조건부 조회는 표현을 바꾸지 않는 수신과 재구축 뒤에도 304를 유지한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000027"
+        val seasonId = "20000000-0000-0000-0000-000000000027"
+        val sourceReference = "handoff:etag"
+        val eventId = "30000000-0000-0000-0000-000000000027"
+        val currentPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items/current"
+        val editionsPath = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/editions"
+        postEvent(eventJson(eventId, workspaceId, seasonId, sourceReference, 1)).andExpect(status().isAccepted)
+        postEdition(editionsPath, """{"weekStart":"2026-08-10","zoneId":"Asia/Seoul"}""")
+            .andExpect(status().isCreated)
+        val itemEtag = etagOf(
+            mockMvc.perform(itemRequest(currentPath, "ROLE_PREPARATION_INCOMPLETE", sourceReference)).andReturn(),
+        )
+        val editionEtag = etagOf(mockMvc.perform(get("$editionsPath/latest")).andReturn())
+
+        postEvent(eventJson(eventId, workspaceId, seasonId, sourceReference, 1))
+            .andExpect(jsonPath("$.status").value("DUPLICATE"))
+        postEvent(eventJson(eventId, workspaceId, seasonId, sourceReference, 2)).andExpect(status().isConflict)
+        postEvent(eventJson(UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 1))
+            .andExpect(jsonPath("$.status").value("STALE"))
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 2,
+                eventVersion = 3, sourceSeverity = null,
+            ),
+        ).andExpect(status().isUnprocessableContent)
+        mockMvc.perform(post("/api/v1/projections/rebuild")).andExpect(status().isOk)
+
+        mockMvc.perform(
+            itemRequest(currentPath, "ROLE_PREPARATION_INCOMPLETE", sourceReference)
+                .header(HttpHeaders.IF_NONE_MATCH, itemEtag),
+        ).andExpect(status().isNotModified)
+        mockMvc.perform(get("$editionsPath/latest").header(HttpHeaders.IF_NONE_MATCH, editionEtag))
+            .andExpect(status().isNotModified)
+    }
+
+    @Test
+    fun `미지원 기록과 같은 이벤트 식별자의 다른 본문은 양방향으로 충돌한다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000028"
+        val seasonId = "20000000-0000-0000-0000-000000000028"
+        val unsupportedEventId = "30000000-0000-0000-0000-000000000028"
+        val supportedEventId = "30000000-0000-0000-0000-000000000029"
+        postEvent(
+            eventJson(
+                unsupportedEventId, workspaceId, seasonId, "handoff:unsupported", 1,
+                eventVersion = 3, sourceSeverity = null,
+            ),
+        ).andExpect(status().isUnprocessableContent)
+        postEvent(
+            eventJson(
+                unsupportedEventId, workspaceId, seasonId, "handoff:unsupported", 2,
+                eventVersion = 3, sourceSeverity = null,
+            ),
+        ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.status").value("CONFLICT"))
+
+        postEvent(eventJson(supportedEventId, workspaceId, seasonId, "handoff:supported", 1))
+            .andExpect(status().isAccepted)
+        postEvent(
+            eventJson(
+                supportedEventId, workspaceId, seasonId, "handoff:supported", 1,
+                eventVersion = 3, sourceSeverity = null,
+            ),
+        ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.status").value("CONFLICT"))
+
+        listOf(unsupportedEventId to "UNSUPPORTED", supportedEventId to "APPLIED").forEach { (eventId, outcome) ->
+            mockMvc.perform(get("/api/v1/events/$eventId/receipt"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.aggregateRevision").value(1))
+                .andExpect(jsonPath("$.processingOutcome").value(outcome))
+                .andExpect(jsonPath("$.conflictDetectedAt").isNotEmpty)
+        }
+        assertThat(countRowsInTable(jdbc, "source_event_conflict")).isEqualTo(2)
+    }
+
+    @Test
+    fun `현재 항목 커서는 업무 종류가 바뀌어도 항목을 건너뛰지 않는다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000030"
+        val seasonId = "20000000-0000-0000-0000-000000000030"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        postEvent(
+            eventJson(
+                UUID.randomUUID().toString(), workspaceId, seasonId, "z:last-of-type", 1,
+                type = "HANDOFF_INCOMPLETE", sourceSeverity = "WARNING",
+            ),
+        ).andExpect(status().isAccepted)
+        postEvent(
+            eventJson(UUID.randomUUID().toString(), workspaceId, seasonId, "a:first-of-type", 1, type = "ROLE_UNASSIGNED"),
+        ).andExpect(status().isAccepted)
+
+        mockMvc.perform(get(path).param("limit", "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference", contains("z:last-of-type")))
+            .andExpect(jsonPath("$.nextCursor.eventType").value("HANDOFF_INCOMPLETE"))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("z:last-of-type"))
+        mockMvc.perform(
+            get(path)
+                .param("limit", "1")
+                .param("afterEventType", "HANDOFF_INCOMPLETE")
+                .param("afterSourceReference", "z:last-of-type"),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[*].sourceReference", contains("a:first-of-type")))
+            .andExpect(jsonPath("$.nextCursor").doesNotExist())
+    }
+
+    @Test
+    fun `목록 limit은 기본 20건이고 상한 100건까지 받는다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000031"
+        val seasonId = "20000000-0000-0000-0000-000000000031"
+        val path = "/api/v1/workspaces/$workspaceId/seasons/$seasonId/attention-items"
+        repeat(21) { index ->
+            postEvent(
+                eventJson(UUID.randomUUID().toString(), workspaceId, seasonId, "handoff:%02d".format(index), 1),
+            ).andExpect(status().isAccepted)
+        }
+
+        mockMvc.perform(get(path))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(20))
+            .andExpect(jsonPath("$.nextCursor.sourceReference").value("handoff:19"))
+        mockMvc.perform(get(path).param("limit", "100"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(21))
+            .andExpect(jsonPath("$.nextCursor").doesNotExist())
+    }
+
+    @Test
+    fun `조회 입력 오류는 경로마다 ProblemDetail 400으로 끝난다`() {
+        val scope = "/api/v1/workspaces/10000000-0000-0000-0000-000000000003/seasons/20000000-0000-0000-0000-000000000003"
+        val attention = "$scope/attention-items"
+        val item = "eventType=ROLE_UNASSIGNED&sourceReference=handoff:1"
+        val week = "weekStart=2026-08-10&zoneId=Asia/Seoul"
+        val tooLong = "a".repeat(129)
+        val missingEdition = "50000000-0000-0000-0000-000000000099"
+        listOf(
+            "$scope/event-receipts/anomalies?limit=0",
+            "$scope/event-receipts/anomalies?limit=101",
+            "$scope/event-receipts/anomalies?beforeIngestionSequence=0",
+            "$scope/event-receipts/anomalies?beforeIngestionSequence=abc",
+            "$attention?limit=0",
+            "$attention?limit=101",
+            "$attention?status=UNKNOWN",
+            "$attention?severity=UNKNOWN",
+            "$attention?revisionGap=maybe",
+            "$attention?afterSourceReference=handoff:1",
+            "$attention?afterEventType=ROLE_UNASSIGNED",
+            "$attention?afterEventType=UNKNOWN&afterSourceReference=handoff:1",
+            "$attention?afterEventType=ROLE_UNASSIGNED&afterSourceReference=$tooLong",
+            "$attention/summary?eventType=UNKNOWN",
+            "$attention/current?eventType=ROLE_UNASSIGNED",
+            "$attention/current?eventType=UNKNOWN&sourceReference=handoff:1",
+            "$attention/current?eventType=ROLE_UNASSIGNED&sourceReference=$tooLong",
+            "$attention/transitions?$item&limit=0",
+            "$attention/transitions?$item&limit=101",
+            "$attention/transitions?$item&beforeAggregateRevision=0",
+            "$attention/transitions?eventType=ROLE_UNASSIGNED&sourceReference=$tooLong",
+            "$attention/resolutions?zoneId=Asia/Seoul",
+            "$attention/resolutions?weekStart=2026-08-11&zoneId=Asia/Seoul",
+            "$attention/resolutions?weekStart=2026-08-10&zoneId=%2B09:00",
+            "$attention/resolutions?$week&limit=101",
+            "$attention/resolutions?$week&eventType=UNKNOWN",
+            "$scope/editions/weekly/latest?weekStart=2026-08-10",
+            "$scope/editions/weekly/latest?weekStart=2026-08-11&zoneId=Asia/Seoul",
+            "$scope/editions/weekly/latest?weekStart=2026-08-10&zoneId=Mars/Base",
+            "$scope/editions/not-a-uuid/freshness",
+            "$scope/editions/$missingEdition/changes",
+            "/api/v1/workspaces/not-a-uuid/seasons/20000000-0000-0000-0000-000000000003/editions/latest",
+            "/api/v1/editions/not-a-uuid",
+            "/api/v1/editions/$missingEdition/changes",
+            "/api/v1/editions/$missingEdition/changes?fromEditionId=not-a-uuid",
+            "/api/v1/events/not-a-uuid/receipt",
+        ).forEach { path ->
+            val response = mockMvc.perform(get(URI.create(path))).andReturn().response
+            assertThat(response.status).describedAs(path).isEqualTo(400)
+            assertThat(response.contentType).describedAs(path).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+        }
+    }
+
+    @Test
+    fun `브리프 생성 입력 오류는 저장 전에 거부한다`() {
+        val path = "/api/v1/workspaces/10000000-0000-0000-0000-000000000003/seasons/20000000-0000-0000-0000-000000000003/editions"
+        listOf(
+            """{"weekStart":"2026-08-11","zoneId":"Asia/Seoul"}""",
+            """{"weekStart":"2026-08-10","zoneId":"+09:00"}""",
+            """{"weekStart":"2026-08-10","zoneId":"Mars/Base"}""",
+            """{"weekStart":"2026-08-10"}""",
+            """{"zoneId":"Asia/Seoul"}""",
+        ).forEach { request ->
+            postEdition(path, request)
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+        assertThat(countRowsInTable(jdbc, "brief_edition")).isZero()
+    }
+
+    @Test
+    fun `원본 참조 HTTP 검증은 계약 Schema와 같은 공백 기준을 따른다`() {
+        val workspaceId = "10000000-0000-0000-0000-000000000032"
+        val seasonId = "20000000-0000-0000-0000-000000000032"
+        listOf("\u00a0", "\nreference").forEach { sourceReference ->
+            postEvent(eventJson(UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 1))
+                .andExpect(status().isAccepted)
+        }
+        listOf("", " \t\n", "\u2003").forEach { sourceReference ->
+            postEvent(eventJson(UUID.randomUUID().toString(), workspaceId, seasonId, sourceReference, 1))
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        }
+    }
+
+    @Test
+    fun `현재 항목 저장 제약은 활성 상태와 활성 시작 시각을 함께 강제한다`() {
+        val insert = """
+            INSERT INTO attention_item (
+                workspace_id, season_id, event_type, source_reference, severity,
+                item_status, observed_at, active_since, rule_version, last_revision, revision_gap
+            ) VALUES (
+                '10000000-0000-0000-0000-000000000033', '20000000-0000-0000-0000-000000000033', 'ROLE_UNASSIGNED',
+                'handoff:constraint', 'HIGH', :status, '2026-08-12T09:00:00Z', :activeSince::timestamptz, 1, 1, FALSE
+            )
+        """.trimIndent()
+        listOf("ACTIVE" to null, "RESOLVED" to "2026-08-12T09:00:00Z").forEach { (itemStatus, activeSince) ->
+            assertThatThrownBy {
+                jdbc.sql(insert).param("status", itemStatus).param("activeSince", activeSince).update()
+            }.isInstanceOf(DataIntegrityViolationException::class.java)
+                .hasMessageContaining("attention_item_active_since_matches_status")
+        }
     }
 
     private fun seedCurrentAttentionScenario(
@@ -2222,6 +2705,84 @@ class BriefMvpIntegrationTest(
         post(path)
             .contentType(MediaType.APPLICATION_JSON)
             .content(json),
+    )
+
+    /** [holder]가 잠금을 잡고 멈춘 동안 [waiter]가 [lockMode] advisory 잠금을 기다리는지 확인한 뒤 둘을 끝낸다. */
+    private fun <H, W> assertWaitsForLock(
+        lockMode: String,
+        holder: (pause: () -> Unit) -> H,
+        waiter: () -> W,
+    ): Pair<H, W> {
+        val held = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        return try {
+            val holding = executor.submit<H> {
+                holder {
+                    held.countDown()
+                    check(release.await(30, TimeUnit.SECONDS))
+                }
+            }
+            assertThat(held.await(10, TimeUnit.SECONDS)).isTrue()
+            val waiting = executor.submit<W> { waiter() }
+
+            await()
+                .pollDelay(0, TimeUnit.MILLISECONDS)
+                .pollInterval(10, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until {
+                    jdbc.sql(
+                        """
+                        SELECT EXISTS (
+                            SELECT 1
+                              FROM pg_locks
+                             WHERE database = (
+                                       SELECT oid
+                                         FROM pg_database
+                                        WHERE datname = current_database()
+                                   )
+                               AND locktype = 'advisory'
+                               AND mode = :lockMode
+                               AND NOT granted
+                        )
+                        """.trimIndent(),
+                    ).param("lockMode", lockMode).query(Boolean::class.java).single()
+                }
+            release.countDown()
+
+            holding.get(10, TimeUnit.SECONDS) to waiting.get(10, TimeUnit.SECONDS)
+        } finally {
+            release.countDown()
+            executor.shutdownNow()
+            executor.awaitTermination(10, TimeUnit.SECONDS)
+        }
+    }
+
+    private fun ingestDirectly(
+        event: SourceEvent,
+        beforeProject: () -> Unit = {},
+    ): IngestResult = persistence.processEvent(event, event.occurredAt, { event.occurredAt }) { current ->
+        beforeProject()
+        AttentionProjector.project(event, current)
+    }
+
+    private fun supportedEvent(
+        eventId: String,
+        workspaceId: String,
+        seasonId: String,
+        sourceReference: String,
+        revision: Long = 1,
+    ) = SourceEvent(
+        eventId = UUID.fromString(eventId),
+        eventType = SourceEventType.ROLE_PREPARATION_INCOMPLETE,
+        eventVersion = 2,
+        workspaceId = UUID.fromString(workspaceId),
+        seasonId = UUID.fromString(seasonId),
+        sourceReference = sourceReference,
+        aggregateRevision = revision,
+        occurredAt = Instant.parse("2026-08-12T09:00:01Z"),
+        state = SourceEventState.ACTIVE,
+        sourceSeverity = SourceEventSeverity.CRITICAL,
     )
 
     private fun concurrentStatuses(request: () -> Int): List<Int> {

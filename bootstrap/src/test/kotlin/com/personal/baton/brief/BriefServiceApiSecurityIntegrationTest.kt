@@ -1,6 +1,8 @@
 package com.personal.baton.brief
 
 import com.jayway.jsonpath.JsonPath
+import java.net.URI
+import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
@@ -119,6 +121,45 @@ class BriefServiceApiSecurityIntegrationTest(
             get("/api/v1/events/30000000-0000-0000-0000-000000000051/receipt")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"),
         ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `서비스 허용 목록의 경로만 서비스 토큰을 받고 목록 밖 운영 조회는 거부한다`() {
+        val scope = "/api/v1/workspaces/10000000-0000-0000-0000-000000000052/seasons/20000000-0000-0000-0000-000000000052"
+        val editionId = "50000000-0000-0000-0000-000000000052"
+        val item = "eventType=ROLE_UNASSIGNED&sourceReference=handoff:1"
+        val week = "weekStart=2026-08-24&zoneId=Asia/Seoul"
+        listOf(
+            "$scope/attention-items",
+            "$scope/attention-items/current?$item",
+            "$scope/attention-items/summary",
+            "$scope/attention-items/resolutions?$week",
+            "$scope/attention-items/transitions?$item",
+            "$scope/editions",
+            "$scope/editions?$week",
+            "$scope/editions/latest",
+            "$scope/editions/weekly/latest?$week",
+            "$scope/editions/$editionId/changes?fromEditionId=$editionId",
+            "$scope/editions/$editionId/freshness",
+            "/api/v1/editions/$editionId",
+            "/api/v1/editions/$editionId/changes?fromEditionId=$editionId",
+        ).forEach { path ->
+            mockMvc.perform(get(URI.create(path))).andExpect(status().isUnauthorized)
+            val authorized = mockMvc.perform(
+                get(URI.create(path)).header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"),
+            ).andReturn().response
+            // 허용한 경로는 인증을 통과해 컨트롤러까지 도달하고, 없는 데이터는 404로 끝난다.
+            assertThat(authorized.status).describedAs(path).isIn(200, 404)
+        }
+
+        listOf(
+            "$scope/event-receipts/anomalies",
+            "/api/v1/events/30000000-0000-0000-0000-000000000052/receipt",
+        ).forEach { path ->
+            mockMvc.perform(get(path)).andExpect(status().isUnauthorized)
+            mockMvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, "Bearer $SERVICE_API_TOKEN"))
+                .andExpect(status().isForbidden)
+        }
     }
 }
 

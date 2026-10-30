@@ -31,6 +31,16 @@ class WeeklyWindowTest {
     }
 
     @Test
+    fun `자정이 없는 시간대 전환일은 그날의 첫 유효 시각을 주간 시작으로 쓴다`() {
+        val window = WeeklyWindow.startingOn(
+            LocalDate.parse("2021-03-22"),
+            ZoneId.of("Asia/Tehran"),
+        )
+
+        assertThat(window.start).isEqualTo(Instant.parse("2021-03-21T20:30:00Z"))
+    }
+
+    @Test
     fun `월요일이 아닌 시작일로는 주간을 만들지 않는다`() {
         assertThatIllegalArgumentException().isThrownBy {
             WeeklyWindow.startingOn(LocalDate.parse("2026-10-20"), ZoneId.of("Asia/Seoul"))
