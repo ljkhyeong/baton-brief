@@ -18,7 +18,13 @@ groups:
         annotations:
           summary: BRIEF 지표를 2분 이상 수집하지 못했습니다.
       - alert: BriefServerErrors
-        expr: sum(increase(http_server_requests_seconds_count{job="brief",status=~"5.."}[5m])) >= 5
+        # 오류가 처음 난 경로는 시리즈가 새로 생겨 increase가 첫 묶음을 세지 못하므로 현재 값도 함께 본다.
+        expr: >-
+          sum(increase(http_server_requests_seconds_count{job="brief",status=~"5.."}[5m])) >= 5
+          or sum(
+            http_server_requests_seconds_count{job="brief",status=~"5.."}
+            unless http_server_requests_seconds_count{job="brief",status=~"5.."} offset 5m
+          ) >= 5
         for: 1m
         labels:
           severity: warning
