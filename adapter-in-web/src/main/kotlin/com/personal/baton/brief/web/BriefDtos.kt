@@ -20,7 +20,6 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.util.UUID
 import org.hibernate.validator.constraints.CodePointLength
 
@@ -29,6 +28,9 @@ internal const val SOURCE_REFERENCE_PATTERN =
 
 /** PostgreSQL 시각 범위 안에서 계약이 쓰는 네 자리 연도 */
 private val SUPPORTED_YEARS = 0..9999
+
+/** `Instant`는 `OffsetDateTime`보다 범위가 넓어 연도로 바꾸지 않고 시각끼리 비교한다. */
+private val SUPPORTED_INSTANTS = Instant.parse("0000-01-01T00:00:00Z")..<Instant.parse("+10000-01-01T00:00:00Z")
 
 data class SourceEventRequest(
     val eventId: UUID,
@@ -47,7 +49,7 @@ data class SourceEventRequest(
 ) {
     @get:AssertTrue(message = "occurredAt은 0000~9999년이어야 합니다")
     val supportedOccurredAt: Boolean
-        get() = occurredAt.atOffset(ZoneOffset.UTC).year in SUPPORTED_YEARS
+        get() = occurredAt in SUPPORTED_INSTANTS
 
     @get:AssertTrue(message = "eventVersion은 2 이상이어야 하며 2에는 sourceSeverity가 필요합니다")
     val validVersionContract: Boolean
