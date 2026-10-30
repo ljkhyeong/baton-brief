@@ -14,7 +14,9 @@ PRD-0020은 BATON 전용 Bearer를, PRD-0021은 내부 HTTP 애플리케이션�
 
 - Caddy가 외부에서 허용하는 요청은 정확히 `POST /api/v1/events` 하나다.
 - 허용한 요청은 외부 송신 경로가 없는 내부 `proxy` 네트워크의 `brief:8080`으로 전달한다.
-- 그 밖의 메서드와 경로는 Caddy에서 빈 본문의 `404`로 끝내며 BRIEF에 전달하지 않는다.
+- 그 밖의 메서드와 경로는 대소문자만 달라도 Caddy에서 빈 본문의 `404`로 끝내며 BRIEF에 전달하지
+  않는다.
+- 요청 본문은 64KB로 제한한다. 넘으면 Caddy가 `413`으로 끝낸다.
 - `/actuator/health`는 BRIEF 컨테이너 healthcheck에만 사용하고 외부 HTTPS에서 노출하지
   않는다.
 - BRIEF와 PostgreSQL은 호스트 포트를 게시하지 않는다. 호스트의 공개 이벤트 요청은 Caddy

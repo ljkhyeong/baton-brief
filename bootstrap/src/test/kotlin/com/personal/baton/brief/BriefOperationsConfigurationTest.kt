@@ -1,19 +1,28 @@
 package com.personal.baton.brief
 
 import com.personal.baton.brief.application.BriefUseCases
+import com.personal.baton.brief.application.EventReceiptAnomalyResult
+import com.personal.baton.brief.application.RebuildResult
 import com.personal.baton.brief.config.BriefOperationsConfiguration
 import com.personal.baton.brief.config.BriefOperationsContextInitializer
 import com.personal.baton.brief.config.BriefOperationsProperties
+import java.util.UUID
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatIllegalArgumentException
+import org.assertj.core.api.Assertions.assertThatIllegalStateException
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.`when`
 import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.DefaultApplicationArguments
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.boot.test.system.CapturedOutput
+import org.springframework.boot.test.system.OutputCaptureExtension
 import tools.jackson.databind.json.JsonMapper
 
 class BriefOperationsConfigurationTest {
@@ -119,5 +128,70 @@ class BriefOperationsConfigurationTest {
             }
         }
         verifyNoInteractions(brief)
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension::class)
+    fun `운영 명령은 지정한 유스케이스를 호출하고 결과 JSON을 출력한다`(output: CapturedOutput) {
+        val workspaceId = UUID.fromString("10000000-0000-0000-0000-000000000001")
+        val seasonId = UUID.fromString("20000000-0000-0000-0000-000000000001")
+        val brief = mock(BriefUseCases::class.java)
+        `when`(brief.rebuild()).thenReturn(RebuildResult(3, 2))
+        `when`(brief.findEventReceiptAnomalies(workspaceId, seasonId, 7, 5))
+            .thenReturn(EventReceiptAnomalyResult(emptyList(), null))
+        val runner = ApplicationContextRunner()
+            .withUserConfiguration(BriefOperationsConfiguration::class.java)
+            .withBean(BriefUseCases::class.java, { brief })
+            .withBean(JsonMapper::class.java, { JsonMapper.builder().build() })
+
+        runner.withPropertyValues("brief.operations.command=REBUILD").run { context ->
+            context.getBean(ApplicationRunner::class.java).run(DefaultApplicationArguments())
+        }
+        assertThat(output.out).contains("""{"itemCount":2,"receiptCount":3}""")
+
+        runner.withPropertyValues(
+            "brief.operations.command=ANOMALIES",
+            "brief.operations.workspace-id=$workspaceId",
+            "brief.operations.season-id=$seasonId",
+            "brief.operations.before-ingestion-sequence=7",
+            "brief.operations.limit=5",
+        ).run { context ->
+            context.getBean(ApplicationRunner::class.java).run(DefaultApplicationArguments())
+        }
+        verify(brief).rebuild()
+        verify(brief).findEventReceiptAnomalies(workspaceId, seasonId, 7, 5)
+        assertThat(output.out).contains("""{"nextBeforeIngestionSequence":null,"receipts":[]}""")
+    }
+
+    @Test
+    fun `운영 명령은 필수 식별자 누락과 없는 수신 기록을 실패로 끝낸다`() {
+        val brief = mock(BriefUseCases::class.java)
+        val runner = ApplicationContextRunner()
+            .withUserConfiguration(BriefOperationsConfiguration::class.java)
+            .withBean(BriefUseCases::class.java, { brief })
+            .withBean(JsonMapper::class.java, { JsonMapper.builder().build() })
+
+        listOf(
+            listOf("brief.operations.command=RECEIPT") to "event-id",
+            listOf("brief.operations.command=ANOMALIES") to "workspace-id",
+            listOf(
+                "brief.operations.command=ANOMALIES",
+                "brief.operations.workspace-id=10000000-0000-0000-0000-000000000001",
+            ) to "season-id",
+        ).forEach { (properties, message) ->
+            runner.withPropertyValues(*properties.toTypedArray()).run { context ->
+                assertThatIllegalArgumentException().isThrownBy {
+                    context.getBean(ApplicationRunner::class.java).run(DefaultApplicationArguments())
+                }.withMessageContaining(message)
+            }
+        }
+        runner.withPropertyValues(
+            "brief.operations.command=RECEIPT",
+            "brief.operations.event-id=30000000-0000-0000-0000-000000000001",
+        ).run { context ->
+            assertThatIllegalStateException().isThrownBy {
+                context.getBean(ApplicationRunner::class.java).run(DefaultApplicationArguments())
+            }.withMessageContaining("찾을 수 없습니다")
+        }
     }
 }

@@ -41,8 +41,8 @@ PRD-0019는 BATON이 판정한 다섯 연속성 신호와 원본 심각도를 �
 ## MVP 경계
 
 - 전송 방식은 내부 HTTP만 사용한다.
-- 로컬 MVP에서는 인증·인가를 구현하지 않는다. 외부 노출이나 운영 사용을 허용하는
-  결정이 아니며, 운영 경계에서는 별도 인증·인가 계약이 선행되어야 한다.
+- 로컬 기본값은 인증 없이 실행한다. 외부 노출이나 운영 사용을 허용하는 결정이 아니며,
+  이벤트 수신과 서비스 API의 인증 경계는 PRD-0020·PRD-0025를 따른다.
 - 메시지 브로커, 스케줄러, 원본 생산자 변경과 운영 배포는 포함하지 않는다.
 - BATON, WATCH, RELAY 또는 GO의 데이터베이스와 엔티티를 공유하지 않는다.
 - BRIEF는 원본 사실을 재판정하지 않고 전달받은 사실만 투영한다.
@@ -61,10 +61,11 @@ PRD-0019는 BATON이 판정한 다섯 연속성 신호와 원본 심각도를 �
 | `POST` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions` | 주간 브리프 생성 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest` | 작업공간·시즌 전역 최신 완료 브리프 조회 |
 | `GET` | `/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest` | PRD-0009의 정확한 주간 범위 최신 브리프 조회 |
-| `GET` | `/api/v1/editions/{id}` | 브리프 단건 조회 |
+| `GET` | `/api/v1/editions/{editionId}` | 브리프 단건 조회 |
 
 로컬 MVP의 엔드포인트는 기본적으로 인증 없는 내부 API다. PRD-0020에 따라
-`POST /api/v1/events`만 전용 Bearer를 선택적으로 필수화할 수 있다. 호출자가 전달한
+`POST /api/v1/events`에, PRD-0025에 따라 서비스 API 허용 목록에 각각 전용 Bearer를 필수화할 수
+있다. 서비스 API 인증을 켜면 목록 밖 `/api/v1` 경로는 거부한다. 호출자가 전달한
 작업공간·시즌의 사용자·운영자 권한은 BRIEF가 자체 판정하지 않는다.
 
 ## 이벤트 v2
@@ -94,7 +95,8 @@ PRD-0019는 BATON이 판정한 다섯 연속성 신호와 원본 심각도를 �
 문자열 필드는 JSON 문자열만 받는다. `sourceReference: 123`을 `"123"`으로 변환하지 않는다.
 열거형은 이름 문자열로 보내며 `state: 0` 같은 선언 순번은 `400 Bad Request`로 거부한다.
 UUID·시점 필드는 Jackson 표준 `UUID`·`Instant` 해석을 따른다. 따라서 Base64 형태 UUID,
-`occurredAt`의 `24:00:00`·윤초와 숫자 epoch 초도 받는다. 생산자는
+`occurredAt`의 `24:00:00`·윤초와 숫자 epoch 초도 받는다. 지수 표기처럼 범위를 벗어난 숫자는 표준
+해석이 다른 시각으로 바꿀 수 있으므로 계약 값으로 쓰지 않는다. 생산자는
 [계약 팩](../../../contracts/README.md)의 36자 하이픈 UUID와 오프셋이 있는 ISO-8601 문자열을 사용한다.
 
 `sourceReference`의 문자·공백 규칙은 수신·현재 단건·전이 이력·목록 커서에 동일하게 적용한다.
@@ -279,7 +281,7 @@ PRD-0008은 이 명령의 보존·동시성·실패 경계를 구체화한다. �
   브리프다.
 
 `GET /api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest`와
-`GET /api/v1/editions/{id}`는 저장된 고정 스냅샷을 반환하며 실시간 투영을 다시 조합하지
+`GET /api/v1/editions/{editionId}`는 저장된 고정 스냅샷을 반환하며 실시간 투영을 다시 조합하지
 않는다. PRD-0009의 별도 주간 최신 조회는 작업공간·시즌·`weekStart`·`zoneId`가 모두 같은
 범위에서 가장 큰 `generation`을 선택한다. `ruleVersion`으로 필터링하지 않고 선택한 저장
 스냅샷의 값을 응답에 포함한다.

@@ -12,11 +12,15 @@
 
 	header -Server
 
+	# path 일치는 대소문자를 무시하므로 허용 경로는 정규식으로 정확히 맞춘다.
 	@eventIngestion {
 		method POST
-		path /api/v1/events
+		path_regexp event_ingestion ^/api/v1/events$
 	}
 	handle @eventIngestion {
+		request_body {
+			max_size 64KB
+		}
 		header Cache-Control "no-store"
 		request_header -Forwarded
 		request_header -X-Forwarded-*

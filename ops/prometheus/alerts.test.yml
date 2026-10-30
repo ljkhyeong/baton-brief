@@ -124,6 +124,31 @@ tests:
               severity: warning
             exp_annotations:
               summary: BRIEF의 최근 5분 서버 오류가 5건 이상입니다.
+  - name: 새로 생긴 서버 오류 시리즈의 첫 묶음도 경보하고 5분 뒤 해제한다
+    interval: 30s
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="brief",status="500",uri="/api/v1/events"}'
+        values: '_x4 20x20'
+    alert_rule_test:
+      - eval_time: 3m30s
+        alertname: BriefServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: BRIEF의 최근 5분 서버 오류가 5건 이상입니다.
+      - eval_time: 8m
+        alertname: BriefServerErrors
+        exp_alerts: []
+  - name: 새로 생긴 시리즈라도 서버 오류가 기준 미만이면 경보하지 않는다
+    interval: 30s
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="brief",status="500",uri="/api/v1/events"}'
+        values: '_x4 4x20'
+    alert_rule_test:
+      - eval_time: 3m30s
+        alertname: BriefServerErrors
+        exp_alerts: []
   - name: 수집 대상이 없으면 경보하고 정상 수집되면 해제한다
     interval: 30s
     input_series:

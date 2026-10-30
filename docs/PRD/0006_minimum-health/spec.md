@@ -60,7 +60,7 @@ Actuator의 표준 health 자동 구성으로 애플리케이션과 DB 상태를
 컨테이너 내부 `127.0.0.1:9091`로 옮긴다. 해당 override가 healthcheck도 함께 변경한다.
 이 문서의 기본 health 전용 구성과 공개·서비스 Caddy의 관리 경로 차단은 유지한다.
 
-Spring Boot 4.1.1은 health만 기본 웹 endpoint로 노출하고 상세를 기본 숨김 처리한다. 같은
+Spring Boot 4.1은 health만 기본 웹 endpoint로 노출하고 상세를 기본 숨김 처리한다. 같은
 기본값을 설정에 반복하지 않는다. 반면 health probes의 기본값은 `true`이므로 배포 계약이
 없는 현재 MVP에서는 `management.endpoint.health.probes.enabled=false`를 명시한다.
 

@@ -46,7 +46,7 @@ PRD-0002는 이벤트를 수신한 요청에서 처리 결과를 반환하지만
 | `occurredAt` | 원본이 사실을 관측한 정규화된 시각 |
 | `state` | 최초 저장한 이벤트의 `ACTIVE` 또는 `RESOLVED` 상태 |
 | `processingOutcome` | 최초 기록에 저장된 처리 결과 |
-| `receivedAt` | BRIEF가 최초 수신 기록을 저장한 시각 |
+| `receivedAt` | BRIEF가 최초 요청을 받은 시각 |
 | `conflictDetectedAt` | 수신 필드가 다른 충돌을 처음 탐지한 시각, 없으면 `null` |
 
 `ingestionSequence`는 BRIEF가 수신 기록에 부여한 순번이다.

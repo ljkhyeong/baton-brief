@@ -1,13 +1,4 @@
 services:
-  brief:
-    environment:
-      BRIEF_SERVICE_API_AUTHENTICATION_REQUIRED: "true"
-    secrets:
-      - source: brief_service_api_bearer_token
-        target: brief.service-api.bearer-token
-      - source: brief_service_api_previous_bearer_token
-        target: brief.service-api.previous-bearer-token
-
   service-api:
     image: "${BRIEF_STAGING_SERVICE_CADDY_IMAGE:-baton-brief-service-caddy:staging}"
     build:
@@ -54,10 +45,6 @@ networks:
     name: "${BATON_BRIEF_PRIVATE_NETWORK:-baton-brief-private}"
 
 secrets:
-  brief_service_api_bearer_token:
-    file: "${BRIEF_STAGING_SERVICE_API_BEARER_TOKEN_FILE:?BRIEF_STAGING_SERVICE_API_BEARER_TOKEN_FILE is required}"
-  brief_service_api_previous_bearer_token:
-    file: "${BRIEF_STAGING_SERVICE_API_PREVIOUS_BEARER_TOKEN_FILE:?BRIEF_STAGING_SERVICE_API_PREVIOUS_BEARER_TOKEN_FILE is required}"
   brief_service_api_tls_cert:
     file: "${BRIEF_STAGING_SERVICE_API_TLS_CERT_FILE:?BRIEF_STAGING_SERVICE_API_TLS_CERT_FILE is required}"
   brief_service_api_tls_key:

@@ -2,6 +2,9 @@
 Description=BATON BRIEF PostgreSQL 백업
 Requires=docker.service
 After=docker.service
+# 재부팅 직후 보충 실행이 DB 준비 전에 실패해도 다시 시도하되 끝없이 반복하지 않는다.
+StartLimitIntervalSec=2h
+StartLimitBurst=3
 
 [Service]
 Type=oneshot
@@ -9,5 +12,9 @@ WorkingDirectory=/srv/baton-brief
 Environment=BRIEF_BACKUP_DIRECTORY=/var/backups/baton-brief
 Environment=BRIEF_STAGING_ENV_FILE=/srv/baton-brief/.env.staging
 ExecStart=/bin/bash /srv/baton-brief/ops/backup-postgresql.sh
+# oneshot은 기본 시간 제한이 없어 멈추면 이후 타이머 실행이 조용히 건너뛰어진다.
+TimeoutStartSec=2h
+Restart=on-failure
+RestartSec=10min
 UMask=0077
 Nice=10

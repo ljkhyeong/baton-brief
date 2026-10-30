@@ -87,6 +87,9 @@ docker compose --env-file .env.staging \
 계정·API 키·외부 저장소가 필요 없으며, BRIEF와 수집기 모두 호스트 포트와 외부 송신 경로가 없다.
 Prometheus는 비루트·읽기 전용으로 실행하고 전용 볼륨에 지표를 저장한다.
 애플리케이션 재배포 때는 위 명령으로 두 서비스를 함께 갱신해 네트워크 연결도 맞춘다.
+Compose의 재시작 연동은 Compose 명령에만 적용된다. OOM·프로세스 장애로 Docker가 `brief`를 다시
+시작하면 Prometheus는 이전 네트워크 공간에 남아 수집이 끊기고 아래 조회도 실패한다.
+`RestartCount`가 늘었으면 같은 Compose 파일로 `restart prometheus`를 실행해 복구한다.
 
 보관 기준은 7일 또는 1GB 중 먼저 도달하는 값이다. 1GB는 디스크 사용량의 강제 상한이 아니며
 WAL·작업 파일 여유 공간이 추가로 필요하다. 메모리는 256MB, CPU는 0.5개로 제한했다.

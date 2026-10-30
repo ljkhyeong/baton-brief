@@ -45,6 +45,11 @@ CREATE TABLE source_event_receipt (
 CREATE INDEX source_event_receipt_scope_sequence_idx
     ON source_event_receipt (workspace_id, season_id, ingestion_sequence DESC);
 
+-- 항목 전이 이력은 적용한 수신만 리비전 역순으로 읽는다.
+CREATE INDEX source_event_receipt_item_revision_idx
+    ON source_event_receipt (workspace_id, season_id, event_type, source_reference, aggregate_revision DESC)
+    WHERE processing_outcome IN ('APPLIED', 'APPLIED_WITH_GAP');
+
 CREATE TABLE source_event_conflict (
     event_id UUID PRIMARY KEY REFERENCES source_event_receipt (event_id),
     detected_at TIMESTAMPTZ NOT NULL

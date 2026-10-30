@@ -79,6 +79,9 @@ BRIEF 지표 → 기존 Prometheus 경보 → 공용 Alertmanager → Slack·Dis
    - targets: [alertmanager.internal.example:9093]
    ```
 
+   Prometheus는 `network_mode: service:brief`로 BRIEF의 내부 네트워크만 쓰므로 주소만 바꿔서는 닿지
+   않는다. `docker network create --internal`로 공유 네트워크를 만들고 Compose override로 `brief`와
+   Alertmanager를 함께 연결한다. BRIEF를 외부 송신 네트워크에 연결하지 않는다.
 4. 연결은 HTTPS이며 인증서의 호스트명을 검증한다. 사설 CA를 쓰면 `prometheus.yml`의 해당
    `alertmanagers` 항목에 `tls_config.ca_file`로 신뢰할 CA 파일을 지정한다. 수신처가 인증을 요구하면
    같은 항목에 표준 `basic_auth` 또는 `authorization.credentials_file`을 설정한다.

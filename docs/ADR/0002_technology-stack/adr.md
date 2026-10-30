@@ -32,16 +32,17 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   의존성 관리 플러그인을 추가하지 않는다.
 - Java 21 툴체인을 사용하고 Kotlin 바이트코드 대상을 JVM 21로 고정한다. BRIEF 실행 환경도
   JDK 21을 사용한다.
-- Spring Boot와 Spring Boot BOM은 4.1.1을 사용한다.
+- Spring Boot와 Spring Boot BOM은 4.1.2를 사용한다. Tomcat은 BOM이 관리하는 11.0.27을 따른다.
 - Spring Boot BOM보다 먼저 보안 수정 버전을 적용해야 하는 라이브러리는 루트 빌드에서 모든 Kotlin
   모듈의 `implementation`에 걸어 테스트를 포함한 모든 구성의 버전을 맞춘다. 한 모듈에만 걸면
   다른 모듈의 테스트 의존성처럼 그 제약이 닿지 않는 구성에 이전 버전이 남는다.
-  - Tomcat은 [11.0.25 보안 수정](https://tomcat.apache.org/security-11.html#Fixed_in_Apache_Tomcat_11.0.25)을
-    Gradle 표준 의존성 제약으로 `tomcat-embed-core`·`el`·`websocket`에 적용한다.
-  - Jackson은 3.1.6에서 수정된 `jackson-databind` 경고 때문에 같은 3.1 계열의 `jackson-bom` 3.1.7을
-    표준 `platform`으로 적용한다.
+  - Jackson은 BOM의 3.1.7에 없는 `jackson-databind` 수정(CVE-2026-110879) 때문에 같은 3.1 계열의
+    `jackson-bom` 3.1.8을 표준 `platform`으로 적용한다.
   - Spring Boot Gradle 플러그인 경로의 Jackson과 Commons Lang 3.20.0도 루트 `buildscript`에서 맞춘다.
-    실행 JAR에는 포함되지 않지만 의존성 그래프의 경고를 남기지 않기 위해서다.
+    플러그인의 `commons-compress`가 3.16.0을 가져오기 때문이다. 실행 JAR에는 포함되지 않지만 의존성
+    그래프의 경고를 남기지 않기 위해서다.
+  - 고정 버전은 version catalog의 `[libraries]`로 선언한다. `[versions]`만 참조하면 Dependabot이
+    갱신하지 못한다.
   - Spring Boot BOM과 플러그인에 수정 버전이 반영되면 해당 제약과 catalog 버전을 제거한다.
     별도 의존성 관리 플러그인이나 제품 코드를 추가하지 않는다.
 - 빌드 스크립트는 Kotlin DSL을 사용한다. 빌드는 Gradle 다중 프로젝트로 구성하고 Gradle
@@ -57,6 +58,10 @@ CI·컨테이너 기준은 Java 21에 맞춰져 있다. BRIEF와 CAL을 위한 �
   미지원 기록과 뒤늦게 충돌이 발견된 기록도 조회하므로 처리 결과로 인덱스 대상을 제한하지 않는다.
   100개 작업공간·10만 건의 합성 데이터에서 기존 조회 SQL의 실행 계획과 결과를 비교해 채택했다.
   실제 운영 성능 보장은 아니며 API·저장 데이터·선정 규칙을 바꾸지 않는다.
+- 항목 전이 이력은 적용한 수신만 리비전 역순으로 읽으므로 `(workspace_id, season_id, event_type,
+  source_reference, aggregate_revision DESC)` 부분 인덱스를 둔다. 인덱스가 없으면 수신 기록 표 전체를 읽는다.
+  수신 약 20만 건의 합성 데이터에서 같은 결과로 읽는 버퍼가 4,339개에서 24개로 줄었다.
+  실제 운영 성능 보장은 아니다.
 - 단순 행 매핑은 `JdbcClient.query(Class)` 또는 Spring `DataClassRowMapper`에 맡긴다. `Instant` 열이
   있는 행은 `DataClassRowMapper`를 확장한 매퍼로 PostgreSQL `TIMESTAMPTZ`를 JDBC 4.2의
   `OffsetDateTime`으로 읽고 `toInstant()`로 변환해 구형 `Timestamp` 경유 시 과거 날짜가
@@ -92,7 +97,7 @@ Gradle 7.6.3~9.7.0을 완전 지원한다. 이전에 쓰던 9.2.1은 Gradle 보�
 Kotlin 2.4.20은 2026-09-07 출시된 [정식 버전](https://kotlinlang.org/docs/releases.html)이며,
 빌드 캐시의 역직렬화 취약점 [GHSA-r937-wjx7-w2jp](https://github.com/advisories/GHSA-r937-wjx7-w2jp)의
 수정 버전 범위에 포함된다. 2.4.21은 2026-10-08 출시된 같은 계열의 버그 수정 릴리스이며
-Gradle 호환 범위가 같다. 컴파일러와 런타임을 함께 갱신하되 Java 21·Spring Boot 4.1.1과
+Gradle 호환 범위가 같다. 컴파일러와 런타임을 함께 갱신하되 Java 21·Spring Boot 4.1과
 제품 계약은 유지한다. Spring Boot BOM만 사용하면 플러그인이 추가하는 `kotlin-stdlib`과
 BOM의 `kotlin-reflect` 버전이 달라지므로 Kotlin BOM으로 정렬한다.
 
@@ -139,8 +144,8 @@ ADR-0003과 PRD-0020을 따른다. 이 ADR 시점에는 다른 API의 운영 인
 현재 RC ZIP 생성은 로컬 재현성과 BATON 생산자 검증 입력을 준비하는 범위이며, 게시나
 생산자 버전 고정을 완료했다는 뜻이 아니다.
 
-상세 health 정보, 탐색 페이지, 배포 probe, 별도 관리 포트와 커스텀 상태 코드는 채택하지
-않는다. 스테이징 Docker healthcheck는 기존 aggregate health를 사용하며 Kubernetes
+상세 health 정보, 탐색 페이지와 커스텀 상태 코드는 채택하지 않는다. 배포 probe와 별도 관리
+포트는 기본값이 아니며 ADR-0008과 런타임 환경변수의 선택 구성으로 둔다. 스테이징 Docker healthcheck는 기존 aggregate health를 사용하며 Kubernetes
 liveness·readiness와 외부 의존성 포함 정책은 오케스트레이터 계약을 정할 때 별도로
 결정한다.
 
@@ -175,7 +180,7 @@ Java 25 뼈대에서의 과거 성공 결과를 Kotlin/JDK 21 산출물의 성�
 
 - JDBC 행 매핑, 애그리게이트 조립과 SQL을 직접 관리해야 한다.
 - 작은 초기 서비스에도 다섯 모듈의 Kotlin 빌드 설정과 경계 검증이 필요하다.
-- Spring Boot 4.1.1과 PostgreSQL 18.6에 맞춘 로컬·CI 환경을 준비해야 한다.
+- Spring Boot 4.1과 PostgreSQL 18.6에 맞춘 로컬·CI 환경을 준비해야 한다.
 - Kotlin 플러그인과 Gradle의 공식 호환 범위를 함께 관리해야 한다.
 
 ## 보류한 대안

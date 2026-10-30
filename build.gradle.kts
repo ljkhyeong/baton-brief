@@ -7,7 +7,7 @@ buildscript {
     dependencies {
         classpath(platform(libs.jackson.bom))
         constraints {
-            classpath("org.apache.commons:commons-lang3:${libs.versions.commons.lang3.get()}")
+            classpath(libs.commons.lang3)
         }
     }
 }
@@ -29,11 +29,6 @@ subprojects {
             add("implementation", platform(libs.kotlin.bom))
             // Spring Boot BOM에 보안 수정 버전이 반영되기 전까지 모든 모듈·구성의 버전을 맞춘다.
             add("implementation", platform(libs.jackson.bom))
-            constraints {
-                listOf("tomcat-embed-core", "tomcat-embed-el", "tomcat-embed-websocket").forEach { module ->
-                    add("implementation", "org.apache.tomcat.embed:$module:${libs.versions.tomcat.get()}")
-                }
-            }
         }
 
         extensions.configure<KotlinJvmProjectExtension> {
